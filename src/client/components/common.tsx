@@ -3,6 +3,17 @@ import type { SourceMeta, StoryKind } from "../../shared/types";
 import { ApiRequestError } from "../lib/api";
 import { href } from "../lib/router";
 
+/** Only http(s) URLs are rendered as links; anything else is dropped. */
+export function safeHref(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function formatDate(s: string): string {
   if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return s; // human label for evergreen items
   const d = new Date(s.length === 10 ? s + "T12:00:00Z" : s);
@@ -17,9 +28,11 @@ export function SourceLine({ source, kind, minutes }: { source: SourceMeta; kind
       <span>{source.publisher}</span>
       <span>{formatDate(source.publishedAt)}</span>
       {minutes ? <span>{minutes} min</span> : null}
-      <a href={source.url} target="_blank" rel="noopener noreferrer">
-        Source<span className="sr-only"> (opens in a new tab)</span>
-      </a>
+      {safeHref(source.url) && (
+        <a href={safeHref(source.url)} target="_blank" rel="noopener noreferrer">
+          Source<span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      )}
     </p>
   );
 }

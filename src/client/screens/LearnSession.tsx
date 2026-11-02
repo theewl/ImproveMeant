@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Attempt, Briefing } from "../../shared/types";
-import { fillPrompt, getExercise, pickLearnExercise, pickLearnExerciseForSkill, SKILLS, SKILL_ORDER } from "../../shared/curriculum";
+import { fillPrompt, getExercise, pickLearnExercise, pickLearnExerciseForSkill, LEARN_EXERCISES, SKILLS, SKILL_ORDER } from "../../shared/curriculum";
 import type { SkillId } from "../../shared/types";
 import { PLAN, currentWeek } from "../../shared/plan";
 import { api } from "../lib/api";
@@ -69,8 +69,8 @@ export function LearnSession({ storyId }: { storyId: string }) {
   const [exercise] = useState(() => {
     // Within a skill, move to the harder version once the goal has been met twice with live feedback.
     const goalMet = summarize(data).skills;
-    const metBySkill = Object.fromEntries(SKILL_ORDER.map((k) => [k, goalMet[k].goalMetLive])) as Record<SkillId, number>;
-    // In a guided plan, practise this week's skill; otherwise rotate through skills.
+    const metBySkill = Object.fromEntries(SKILL_ORDER.map((k) => [k, goalMet[k].firstAttemptGoalMet])) as Record<SkillId, number>;
+    // In a guided plan, practice this week's skill; otherwise rotate through skills.
     if (data.plan) {
       const wk = PLAN[currentWeek(data.plan, new Date().toISOString()) - 1];
       if (wk) return pickLearnExerciseForSkill(wk.skill, metBySkill[wk.skill]);
@@ -147,7 +147,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
   };
 
   const submitMain = async (draft: AttemptDraft | null, isRetry: boolean) => {
-    const attempt = pending ?? (draft ? await s.makeAttempt(draft, { isRetry, assisted: peeked }) : null);
+    const attempt = draft ? await s.makeAttempt(draft, { isRetry, assisted: peeked }) : pending;
     if (!attempt) return;
     setPending(attempt);
     const prev = isRetry ? last : undefined;
@@ -165,7 +165,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
   };
 
   const submitFollowUp = async (draft: AttemptDraft | null) => {
-    const attempt = pending ?? (draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : null);
+    const attempt = draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : pending;
     if (!attempt) return;
     setPending(attempt);
     const fb = await s.getFeedback(attempt, {
@@ -227,7 +227,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
 
       {(phase === "recall" || phase === "retry") && (
         <section>
-          <StepHeader eyebrow={`${SKILLS[exercise.skill].name}${exercise.difficulty !== "starter" ? " · harder version" : ""}`} title={phase === "retry" ? "Try again" : "Explain it from memory"} />
+          <StepHeader eyebrow={`${SKILLS[exercise.skill].name}${exercise.difficulty !== "starter" ? ` · level ${LEARN_EXERCISES[exercise.skill].indexOf(exercise.id) + 1}` : ""}`} title={phase === "retry" ? "Try again" : "Explain it from memory"} />
           <p className="task">{task}</p>
           {phase === "retry" && last?.feedback?.retryFocus && <p className="focus-tip">Focus: {last.feedback.retryFocus}</p>}
           <ResponseCapture {...capture} label="Your explanation" submitLabel="Get feedback" onSubmit={(d) => void submitMain(d, phase === "retry")} />
@@ -253,7 +253,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       {phase === "improve" && last?.feedback && (
         <section>
           <StepHeader eyebrow={SKILLS[exercise.skill].name} title="Your feedback" />
-          <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r) => s.rateAttempt(last.id, r)} />
+          <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r, why) => s.rateAttempt(last.id, r, why)} />
           {first && first.id !== last.id && <CompareAttempts first={first} second={last} />}
           <div className="actions sticky">
             <button className="primary" type="button" onClick={() => setPhase("apply")}>
@@ -294,7 +294,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
           )}
           {followUpAnswer?.feedback && (
             <>
-              <FeedbackPanel feedback={followUpAnswer.feedback} attempt={followUpAnswer} onRate={(r) => s.rateAttempt(followUpAnswer.id, r)} />
+              <FeedbackPanel feedback={followUpAnswer.feedback} attempt={followUpAnswer} onRate={(r, why) => s.rateAttempt(followUpAnswer.id, r, why)} />
               <div className="actions sticky">
                 <button className="primary" type="button" onClick={() => setPhase("save")}>
                   Continue
@@ -308,7 +308,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       {phase === "save" && (
         <section>
           <StepHeader eyebrow="Last step" title="Remember one thing" />
-          <p className="hint">We'll ask you about it again in a few days.</p>
+          <p className="hint">We'll ask you about it tomorrow, then at longer gaps as you remember it.</p>
           <fieldset className="options">
             <legend className="sr-only">What to save</legend>
             {(

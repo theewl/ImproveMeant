@@ -14,13 +14,21 @@ export type Route =
   | { name: "phrases" }
   | { name: "onboarding" };
 
+function decode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   switch (parts[0]) {
     case "learn":
-      return parts[1] ? { name: "learn", storyId: decodeURIComponent(parts[1]) } : { name: "today" };
+      return parts[1] ? { name: "learn", storyId: decode(parts[1]) } : { name: "today" };
     case "talk": {
-      const p = parts[1] ? decodeURIComponent(parts[1]) : undefined;
+      const p = parts[1] ? decode(parts[1]) : undefined;
       if (p?.startsWith("s:") && SCENARIO_IDS.includes(p.slice(2) as ScenarioId)) return { name: "talk", scenario: p.slice(2) as ScenarioId };
       return { name: "talk", fromStoryId: p };
     }

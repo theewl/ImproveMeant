@@ -211,22 +211,27 @@ export function createApp(deps: AppDeps): Hono {
   app.post("/api/transcribe", bodyLimit({ maxSize: 12 * 1024 * 1024, onError: tooLarge }), async (c) => {
     if (!transcription) throw notConfigured("Transcription");
     const seconds = Number(c.req.query("seconds") ?? "0");
-    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 600) throw new AppError("bad_request", "Missing or invalid recording length.", 400);
+    if (!Number.isFinite(seconds) || seconds <= 0) throw new AppError("bad_request", "Missing or invalid recording length.", 400);
+    if (seconds > 600) throw new AppError("too_large", "Recordings over 10 minutes can't be transcribed. Type what you said instead.", 413);
     const contentType = (c.req.header("content-type") ?? "").split(";")[0]!.trim();
     if (!/^audio\/[a-z0-9.+-]+$/i.test(contentType)) throw new AppError("bad_request", "Unsupported audio type.", 415);
     const key = c.req.header("idempotency-key") ?? "";
     if (key.length < 8) throw new AppError("bad_request", "Missing idempotency key.", 400);
     const buf = new Uint8Array(await c.req.arrayBuffer());
     if (buf.byteLength < 1000) throw new AppError("empty_response", "The recording is empty or too short.", 422, true);
-    await usage.assertTranscriptionAllowed(seconds);
+    // The client-reported length can't be trusted for limits: also estimate from size (~3 KB/s is a low voice bitrate).
+    const estimatedSeconds = Math.max(seconds, buf.byteLength / 3000);
+    if (estimatedSeconds > 900) throw new AppError("too_large", "This recording is too long to transcribe. Type what you said instead.", 413);
+    await usage.assertTranscriptionAllowed(estimatedSeconds);
     const { value } = await dedupe.run(`tx:${key}`, async () => {
       const r = await transcription.transcribe(buf, c.req.header("content-type") ?? contentType, seconds);
+      const billed = r.durationSeconds ?? estimatedSeconds;
       await usage.record({
         kind: "transcription",
         provider: "deepgram",
         model: cfg.transcription.model,
-        audioSeconds: seconds,
-        costUsd: (seconds / 60) * cfg.transcription.pricePerMinuteUsd,
+        audioSeconds: billed,
+        costUsd: (billed / 60) * cfg.transcription.pricePerMinuteUsd,
         ok: true,
       });
       return r;

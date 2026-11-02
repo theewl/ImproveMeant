@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PLAN, PLAN_WEEKS, currentWeek, pendingLookback, weekSummary, weekTasks, type PlanTask } from "../../shared/plan";
+import { PLAN, PLAN_WEEKS, currentWeek, pendingLookback, weekSummary, weekTasks, weekWasEmpty, type PlanTask } from "../../shared/plan";
 import { useApp } from "../lib/store";
 import { href, type Route } from "../lib/router";
 
@@ -35,9 +35,10 @@ export function PlanCard({ learnStoryId }: { learnStoryId?: string }) {
           {sum("learnSessions") + sum("talkSessions")} practice sessions · {sum("braveSteps")} brave steps · {sum("fearsNotHappened")} fears that didn't happen.
         </p>
         {!data.plan.reflections.some((r) => r.week === 4) && <Lookback week={4} />}
+        <p className="hint">A second round uses the next level of each skill where you've met the goal.</p>
         <div className="row wrap">
           <button className="secondary" type="button" onClick={restart}>
-            Start a new plan
+            Start round two
           </button>
           <button className="link" type="button" onClick={end}>
             Close
@@ -92,8 +93,8 @@ export function PlanCard({ learnStoryId }: { learnStoryId?: string }) {
           );
         })}
       </ul>
-      {week === PLAN_WEEKS && !data.plan.reflections.some((r) => r.week === 4) && <Lookback week={4} />}
-      {lookback != null && <Lookback week={lookback} />}
+      {week === PLAN_WEEKS && !data.plan.reflections.some((r) => r.week === 4) && <Lookback key="lb-4" week={4} />}
+      {lookback != null && lookback !== 4 && <Lookback key={`lb-${lookback}`} week={lookback} />}
       <button className="link small" type="button" onClick={end}>
         End plan
       </button>
@@ -109,6 +110,26 @@ function Lookback({ week }: { week: number }) {
   const [next, setNext] = useState("");
   const s = weekSummary(data, week);
   if (!s) return null;
+  const empty = weekWasEmpty(data, week);
+  const skipWeek = () =>
+    update((d) => (d.plan ? { ...d, plan: { ...d.plan, reflections: [...d.plan.reflections, { week, at: new Date().toISOString(), text: "(no practice this week)" }] } } : d));
+  const restartWeek = () =>
+    update((d) => (d.plan ? { ...d, plan: { ...d.plan, startedAt: new Date(new Date(d.plan.startedAt).getTime() + 7 * 86_400_000).toISOString() } } : d));
+  if (empty && !open) {
+    return (
+      <div className="lookback">
+        <p className="hint">Nothing logged in week {week}. That's okay — life happens. Carry on, or give that week another go.</p>
+        <div className="row wrap">
+          <button className="secondary small" type="button" onClick={restartWeek}>
+            Redo week {week}
+          </button>
+          <button className="link small" type="button" onClick={skipWeek}>
+            Carry on
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="lookback">
       {!open ? (

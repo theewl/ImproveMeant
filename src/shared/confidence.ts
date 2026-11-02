@@ -1,8 +1,8 @@
 import type { Experiment, LadderStep, ThinkingTrap } from "./types";
 
 // CBT-informed self-help content for speaking/social anxiety. Original wording,
-// based on widely described techniques (cognitive restructuring, behavioural
-// experiments, graded exposure, dropping safety behaviours, outward attention).
+// based on widely described techniques (cognitive restructuring, behavioral
+// experiments, graded exposure, dropping safety behaviors, outward attention).
 // This is self-help, not therapy, and makes no treatment claims.
 
 export const THINKING_TRAPS: { id: ThinkingTrap; name: string; plain: string; question: string }[] = [
@@ -19,8 +19,8 @@ export const THINKING_TRAPS: { id: ThinkingTrap; name: string; plain: string; qu
     question: "How often has it actually gone as badly as you predicted?",
   },
   {
-    id: "catastrophising",
-    name: "Catastrophising",
+    id: "catastrophizing",
+    name: "Catastrophizing",
     plain: "Treating a stumble as a disaster you couldn't cope with.",
     question: "If it did happen, how bad would it really be a week later? How would you cope?",
   },
@@ -49,14 +49,20 @@ export const THINKING_TRAPS: { id: ThinkingTrap; name: string; plain: string; qu
     question: "Is that rule realistic? What would a kinder rule be?",
   },
   {
-    id: "labelling",
-    name: "Labelling",
+    id: "emotional-reasoning",
+    name: "Emotional reasoning",
+    plain: "Feeling anxious, so concluding it must have gone badly.",
+    question: "What actually happened, separate from how it felt?",
+  },
+  {
+    id: "labeling",
+    name: "Labeling",
     plain: "Turning one moment into a verdict on yourself: 'I'm awkward'.",
     question: "Is one moment really the whole picture of you?",
   },
 ];
 
-/** Common safety behaviours in speaking situations. Dropping one is often part of a behavioural experiment. */
+/** Common safety behaviors in speaking situations. Dropping one is often part of a behavioral experiment. */
 export const SAFETY_BEHAVIOURS = [
   "Scripting every word",
   "Avoiding eye contact",
@@ -69,6 +75,8 @@ export const SAFETY_BEHAVIOURS = [
 
 /** One-tap starter steps for the brave-steps ladder, roughly easiest first. */
 export const STARTER_STEPS: { title: string; expectedDiscomfort: number }[] = [
+  { title: "Say good morning to someone I don't usually talk to", expectedDiscomfort: 1 },
+  { title: "Ask a colleague how their week is going", expectedDiscomfort: 2 },
   { title: "Say one comment in a small meeting", expectedDiscomfort: 3 },
   { title: "Ask a question in a meeting", expectedDiscomfort: 4 },
   { title: "Explain an idea to a colleague, one-on-one", expectedDiscomfort: 3 },
@@ -85,19 +93,22 @@ export function activeLadder(steps: LadderStep[]): LadderStep[] {
 }
 
 /**
- * Suggest the next rung: the easiest step not yet completed with anxiety-after
- * at or below 4/10. Ordinary software, deterministic.
+ * Suggest the next rung: the easiest step not yet tested. A step counts as tested once
+ * any experiment on it is completed; anxiety does not have to have dropped (what matters
+ * is testing the prediction, not waiting for the feeling to fade).
  */
 export function suggestNextStep(steps: LadderStep[], experiments: Experiment[]): LadderStep | null {
   for (const s of activeLadder(steps)) {
-    const done = experiments.some((e) => e.ladderStepId === s.id && e.completedAt && (e.anxietyAfter ?? 10) <= 4);
-    if (!done) return s;
+    const tested = experiments.some((e) => e.ladderStepId === s.id && e.completedAt);
+    if (!tested) return s;
   }
   return null;
 }
 
 export interface ExperimentSummary {
   completed: number;
+  /** Completed experiments that had a prediction and recorded an outcome. */
+  tested: number;
   pending: number;
   fearNotHappened: number;
   fearPartly: number;
@@ -112,6 +123,7 @@ export function summarizeExperiments(exps: Experiment[]): ExperimentSummary {
   const mean = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
   return {
     completed: done.length,
+    tested: done.filter((e) => e.outcome).length,
     pending: exps.length - done.length,
     fearNotHappened: done.filter((e) => e.outcome === "didnt-happen").length,
     fearPartly: done.filter((e) => e.outcome === "partly").length,
@@ -126,7 +138,7 @@ export interface SafetyComparison {
   kept: { count: number; avgAnxiety: number | null; fearHappened: number };
 }
 
-/** Compare completed experiments where a safety behaviour was dropped vs not. Self-reported; small numbers. */
+/** Compare completed experiments where a safety behavior was dropped vs not. Self-reported; small numbers. */
 export function compareSafetyBehaviours(exps: Experiment[]): SafetyComparison | null {
   const done = exps.filter((e) => e.completedAt && e.anxietyAfter != null);
   const group = (xs: Experiment[]) => ({

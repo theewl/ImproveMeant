@@ -21,7 +21,7 @@ const base = (over: Partial<PlanData> = {}): PlanData => ({ plan: { startedAt: s
 
 describe("guided plan", () => {
   it("has four weeks covering all four skills", () => {
-    expect(PLAN.map((w) => w.skill)).toEqual(["main-point", "organize", "example", "conclusion"]);
+    expect(PLAN.map((w) => w.skill)).toEqual(["main-point", "organize", "conclusion", "example"]);
   });
 
   it("computes the current week and caps after week 4", () => {

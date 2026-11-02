@@ -37,8 +37,7 @@ export const EXERCISES: Exercise[] = [
     difficulty: "starter",
     title: "Explain the main idea",
     prompt: "Without looking, explain the main idea of \"{topic}\" to a colleague who hasn't read it. Lead with the point.",
-    successDefinition:
-      "The first one or two sentences state the central idea in the speaker's own words; details come after, and nothing important is factually wrong.",
+    successDefinition: "The first one or two sentences state the central idea in the speaker's own words; details come after.",
     exampleFeedback:
       "Your main point (\"cheap batteries are changing who can store solar power\") arrives in your fourth sentence, after the history. Try opening with that sentence, then give the history as one supporting detail.",
     laterVariation:
@@ -61,7 +60,7 @@ export const EXERCISES: Exercise[] = [
     difficulty: "starter",
     title: "Introduce yourself with a point",
     prompt:
-      "Introduce yourself to {audience}. Instead of a list of facts, lead with one thing you want them to remember about you.",
+      "Introduce yourself to {audience} ({topic}). Instead of a list of facts, lead with one thing you want them to remember about you.",
     successDefinition:
       "The opening states what the listener should remember (a focus, strength or reason to talk to you) before background details.",
     exampleFeedback:
@@ -147,7 +146,7 @@ export const EXERCISES: Exercise[] = [
     skill: "example",
     difficulty: "core",
     title: "Explain it to a curious 12-year-old",
-    prompt: "Explain \"{topic}\" to a curious 12-year-old. No jargon; use one example from everyday life they'd recognise.",
+    prompt: "Explain \"{topic}\" to a curious 12-year-old. No jargon; use one example from everyday life they'd recognize.",
     successDefinition:
       "No unexplained technical terms, at least one everyday example, and the main idea survives the simplification without becoming wrong.",
     exampleFeedback:
@@ -284,7 +283,7 @@ export const SCENARIOS: Scenario[] = [
       supportive: ["What first convinced you of this?", "Where would you start if we wanted to act on this?"],
       challenging: [
         "What's the strongest argument against your position?",
-        "Your example is one case. Why should we think it generalises?",
+        "Your example is one case. Why should we think it generalizes?",
       ],
     },
   },

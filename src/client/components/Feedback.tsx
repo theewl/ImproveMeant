@@ -1,6 +1,7 @@
 import type { Attempt, Feedback } from "../../shared/types";
 import { measureAttempt } from "../../shared/observations";
 import { useApp } from "../lib/store";
+import { href } from "../lib/router";
 
 /** Only the flags that change how to read an attempt. Spoken/typed is implied elsewhere. */
 export function AttemptTags({ a }: { a: Attempt }) {
@@ -20,7 +21,15 @@ export function AttemptTags({ a }: { a: Attempt }) {
   );
 }
 
-export function FeedbackPanel({ feedback: f, attempt, onRate }: { feedback: Feedback; attempt: Attempt; onRate?: (r: "useful" | "not-useful") => void }) {
+export function FeedbackPanel({
+  feedback: f,
+  attempt,
+  onRate,
+}: {
+  feedback: Feedback;
+  attempt: Attempt;
+  onRate?: (r: "useful" | "not-useful", reason?: Attempt["feedbackRatingReason"]) => void;
+}) {
   const { data } = useApp();
   const quiet = !!data.prefs.quietMode;
   const measured = measureAttempt(attempt);
@@ -53,6 +62,11 @@ export function FeedbackPanel({ feedback: f, attempt, onRate }: { feedback: Feed
           <p>{f.priority.observation}</p>
           {f.priority.quote && <blockquote>“{f.priority.quote}”</blockquote>}
           <p className="suggestion">{f.priority.suggestion}</p>
+          {live && (
+            <a className="link inline" href={href({ name: "confidence" })}>
+              Try this in a real conversation → plan a brave step
+            </a>
+          )}
         </div>
       )}
 
@@ -97,6 +111,23 @@ export function FeedbackPanel({ feedback: f, attempt, onRate }: { feedback: Feed
           <button type="button" className={attempt.feedbackRating === "not-useful" ? "chip on" : "chip"} aria-pressed={attempt.feedbackRating === "not-useful"} onClick={() => onRate("not-useful")}>
             Not really
           </button>
+        </div>
+      )}
+      {live && onRate && attempt.feedbackRating === "not-useful" && (
+        <div className="rate" role="group" aria-label="What was wrong with it?">
+          <span className="hint">Why?</span>
+          {(
+            [
+              ["not-specific", "Too generic"],
+              ["missed-point", "Missed my point"],
+              ["too-harsh", "Too harsh"],
+              ["wrong", "Wrong"],
+            ] as const
+          ).map(([v, l]) => (
+            <button key={v} type="button" className={attempt.feedbackRatingReason === v ? "chip on" : "chip"} aria-pressed={attempt.feedbackRatingReason === v} onClick={() => onRate("not-useful", v)}>
+              {l}
+            </button>
+          ))}
         </div>
       )}
 
@@ -180,7 +211,7 @@ export function WrapUp({ attempts }: { attempts: Attempt[] }) {
       <p>
         <strong>That's done — no need to replay it.</strong> If your mind goes back to the awkward bits, come back to this instead:
       </p>
-      <p className="wrapup-good">{strength ?? "You showed up and practised out loud. That's the part that counts."}</p>
+      <p className="wrapup-good">{strength ?? "You showed up and practiced out loud. That's the part that counts."}</p>
     </div>
   );
 }

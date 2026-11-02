@@ -19,11 +19,11 @@ describe("brave steps ladder", () => {
   it("orders by expected discomfort and skips archived steps", () => {
     expect(activeLadder([step("hard", 80), step("easy", 20), step("gone", 10, true)]).map((s) => s.id)).toEqual(["easy", "hard"]);
   });
-  it("suggests the easiest step not yet done at a manageable level", () => {
-    const steps = [step("a", 20), step("b", 50)];
+  it("suggests the easiest step not yet tested — anxiety does not have to have dropped", () => {
+    const steps = [step("a", 2), step("b", 5)];
     expect(suggestNextStep(steps, [])?.id).toBe("a");
-    expect(suggestNextStep(steps, [exp({ ladderStepId: "a", completedAt: "x", anxietyAfter: 7 })])?.id).toBe("a");
-    expect(suggestNextStep(steps, [exp({ ladderStepId: "a", completedAt: "x", anxietyAfter: 3 })])?.id).toBe("b");
+    expect(suggestNextStep(steps, [exp({ ladderStepId: "a" })])?.id).toBe("a"); // planned but not completed
+    expect(suggestNextStep(steps, [exp({ ladderStepId: "a", completedAt: "x", anxietyAfter: 7 })])?.id).toBe("b");
     expect(suggestNextStep([], [])).toBeNull();
   });
 });

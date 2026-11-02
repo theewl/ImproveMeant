@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { DeliveryMetrics, Modality } from "../../shared/types";
 import { formatSeconds } from "../../shared/observations";
 import { wordCount } from "../../shared/text";
@@ -101,8 +101,9 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   const [keepAudio, setKeepAudio] = useState(false);
   // Observer review (talk mode): rate how you came across, listen back as an audience member, rate again.
   const [obs, setObs] = useState<"predict" | "listen" | "rate" | "done" | "off">(p.focused ? "predict" : "off");
-  const [predicted, setPredicted] = useState(4);
+  const [predicted, setPredicted] = useState(5);
   const [observed, setObserved] = useState(5);
+  const [obsTouched, setObsTouched] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const txKey = useRef(uid("tx-"));
   const tid = useId();
@@ -116,6 +117,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
     setTxState("none");
     setTxError(null);
     txKey.current = uid("tx-");
+    setObs(p.focused ? "predict" : "off");
   };
 
   const transcribe = async () => {
@@ -131,7 +133,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
       setTxState("done");
     } catch (e) {
       const err = e as ApiRequestError;
-      if (err.message === "Cancelled.") {
+      if (err.code === "cancelled") {
         setTxState("none");
         return;
       }
@@ -221,7 +223,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
         <p className="eyebrow">Listen back as an observer · optional</p>
         {obs === "predict" && (
           <>
-            <ObserverSlider id="obs-pred" label="Before listening: how do you think you came across?" value={predicted} onChange={setPredicted} />
+            <ObserverSlider id="obs-pred" label="Before listening: how do you think you came across?" value={predicted} onChange={(v) => { setPredicted(v); setObsTouched(true); }} />
             <div className="stack">
               <button className="primary" type="button" onClick={() => setObs("listen")}>
                 Listen back
@@ -243,7 +245,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
         )}
         {obs === "rate" && (
           <>
-            <ObserverSlider id="obs-seen" label="As an audience member: how did they come across?" value={observed} onChange={setObserved} />
+            <ObserverSlider id="obs-seen" label="As an audience member: how did they come across?" value={observed} onChange={(v) => { setObserved(v); setObsTouched(true); }} />
             <button className="primary" type="button" onClick={() => setObs("done")}>
               Save
             </button>
@@ -252,7 +254,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
       </div>
     );
   }
-  const selfView = obs === "done" ? { predicted, observed } : undefined;
+  const selfView = obs === "done" && obsTouched ? { predicted, observed } : undefined;
   const edited = original != null && transcript.trim() !== original.trim();
   const words = wordCount(transcript);
   const tooLong = transcript.length > p.maxChars;
@@ -271,6 +273,9 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
 
       {txState === "none" && (
         <div className="stack">
+          {p.transcriptionAvailable && (rec.seconds > 600 || rec.blob.size > 4_000_000) && (
+            <p className="hint">This recording is too long to transcribe automatically. Listen back and type what you said.</p>
+          )}
           {p.transcriptionAvailable ? (
             <>
               {!p.transcriptionConsent && <p className="hint">Transcribing sends this audio to Deepgram, which is asked not to keep it.</p>}
@@ -379,9 +384,11 @@ function ObserverSlider({ id, label, value, onChange }: { id: string; label: str
 /** Send the recording to one person and ask for one word back. Uses the device share sheet when available. */
 function ShareClip({ blob }: { blob: Blob }) {
   const [status, setStatus] = useState<"idle" | "shared" | "failed">("idle");
+  const file = useMemo(() => {
+    const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+    return new File([blob], `practice.${ext}`, { type: blob.type });
+  }, [blob]);
   if (typeof navigator === "undefined" || typeof navigator.share !== "function" || typeof navigator.canShare !== "function") return null;
-  const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
-  const file = new File([blob], `practice.${ext}`, { type: blob.type });
   if (!navigator.canShare({ files: [file] })) return null;
   return (
     <div className="share-clip">

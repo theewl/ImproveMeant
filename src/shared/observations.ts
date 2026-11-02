@@ -43,7 +43,7 @@ export function measureAttempt(a: Pick<Attempt, "text" | "modality" | "durationS
       out.push({
         label: "Gaps over 2 seconds",
         value: String(a.delivery.longPauses),
-        basis: "Silences between recognised words. Doesn't distinguish deliberate pauses from hesitation.",
+        basis: "Silences between recognized words. Doesn't distinguish deliberate pauses from hesitation.",
       });
     }
   }
@@ -56,7 +56,7 @@ export function deliveryFromWordTimings(words: { start: number; end: number }[],
     return {
       basis: "recording-length-only",
       recordingSeconds,
-      limitations: "No words were recognised, so pace and pauses can't be measured.",
+      limitations: "No words were recognized, so pace and pauses can't be measured.",
     };
   }
   const first = words[0]!.start;

@@ -20,9 +20,9 @@ export interface PlanWeek {
 
 export const PLAN: PlanWeek[] = [
   { week: 1, skill: "main-point", theme: "Lead with your point", learnExerciseId: "mp-explain-story", talkScenario: "introduce", extra: "ladder" },
-  { week: 2, skill: "organize", theme: "Organise your thoughts", learnExerciseId: "org-two-reasons", talkScenario: "explain-group", extra: "reframe" },
-  { week: 3, skill: "example", theme: "Make it concrete", learnExerciseId: "ex-concrete-case", talkScenario: "persuade", extra: "review" },
-  { week: 4, skill: "conclusion", theme: "Land the ending", learnExerciseId: "con-takeaway", talkScenario: "propose-change", extra: "lookback" },
+  { week: 2, skill: "organize", theme: "Organize your thoughts", learnExerciseId: "org-two-reasons", talkScenario: "explain-group", extra: "reframe" },
+  { week: 3, skill: "conclusion", theme: "Land the ending", learnExerciseId: "con-takeaway", talkScenario: "propose-change", extra: "review" },
+  { week: 4, skill: "example", theme: "Make it concrete and persuasive", learnExerciseId: "ex-concrete-case", talkScenario: "persuade", extra: "lookback" },
 ];
 
 export type PlanTaskId = "learn" | "talk" | "brave" | "extra";
@@ -117,6 +117,12 @@ export function weekSummary(d: PlanData, week: number): WeekSummary | null {
     fearsNotHappened: exps.filter((e) => e.outcome === "didnt-happen").length,
     reviewsDone: d.reviews.reduce((n, r) => n + r.history.filter((h) => h.result !== "skipped" && within(h.at, w)).length, 0),
   };
+}
+
+/** True when nothing at all was logged in a week (used to offer a gentler look-back / restart). */
+export function weekWasEmpty(d: PlanData, week: number): boolean {
+  const s = weekSummary(d, week);
+  return !!s && s.learnSessions + s.talkSessions + s.braveSteps + s.reviewsDone === 0;
 }
 
 /** The earliest finished week (before the current one) that has no look-back yet. */

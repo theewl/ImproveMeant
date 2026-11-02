@@ -20,8 +20,9 @@ export function addDays(iso: string, days: number): string {
   return new Date(new Date(iso).getTime() + days * DAY_MS).toISOString();
 }
 
+/** Due once its due *day* has arrived (local time), so an evening review is back the next morning. */
 export function isDue(item: ReviewItem, nowIso: string): boolean {
-  return item.status === "active" && new Date(item.dueAt).getTime() <= new Date(nowIso).getTime();
+  return item.status === "active" && localDayKey(item.dueAt) <= localDayKey(nowIso);
 }
 
 /** New items are first asked about the next day, so recall is spaced from learning. */

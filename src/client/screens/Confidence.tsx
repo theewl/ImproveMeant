@@ -13,14 +13,12 @@ import {
   IMPACT_SCALE,
   impactGuidance,
 } from "../../shared/confidence";
-import { CRISIS_RESOURCES, mentionsCrisis } from "../../shared/safety";
+import { CrisisList, CrisisNotice } from "../components/Crisis";
 import { useApp } from "../lib/store";
 import { uid } from "../lib/storage";
 import { formatDate } from "../components/common";
 
 type View = { name: "home" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "ladder" } | { name: "reframe" } | { name: "selfcheck" };
-
-export { CrisisList };
 
 export function Confidence() {
   const { data, update } = useApp();
@@ -72,7 +70,8 @@ export function Confidence() {
 
   const next = suggestNextStep(data.ladder, data.experiments);
   const pending = data.experiments.filter((e) => !e.completedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const sum = summarizeExperiments(data.experiments);
+  const real = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
+  const reh = summarizeExperiments(data.experiments.filter((e) => e.kind === "rehearsal"));
   const cmp = compareSafetyBehaviours(data.experiments);
 
   return (
@@ -83,7 +82,7 @@ export function Confidence() {
       {!data.confidenceIntroSeen && (
         <div className="notice">
           <p>
-            These are self-help tools based on techniques from cognitive behavioural therapy (CBT). They're not therapy or a diagnosis. If anxiety is getting in the
+            These are self-help tools based on techniques from cognitive behavioral therapy (CBT). They're not therapy or a diagnosis. If anxiety is getting in the
             way of work, relationships or daily life, a doctor or licensed therapist can help.
           </p>
           <button className="secondary" type="button" onClick={() => update((d) => ({ ...d, confidenceIntroSeen: true }))}>
@@ -113,11 +112,7 @@ export function Confidence() {
             <h3>{next.title}</h3>
             <p className="hint">
               {(() => {
-                const tries = data.experiments.filter((e) => e.ladderStepId === next.id && e.completedAt);
-                const last = tries[tries.length - 1];
-                return last
-                  ? `Tried ${tries.length}× · last time ${last.anxietyAfter}/10. Repeating a step until it feels about 4/10 is how it gets easier.`
-                  : `Expected discomfort: ${next.expectedDiscomfort}/10`;
+                return `Expected discomfort: ${next.expectedDiscomfort}/10. A step counts once you've tested it — your anxiety doesn't have to drop.`;
               })()}
             </p>
             <button className="primary" type="button" onClick={() => go({ name: "plan", step: next })}>
@@ -135,13 +130,19 @@ export function Confidence() {
         )}
       </article>
 
-      {sum.completed > 0 && (
+      {(real.tested > 0 || reh.tested > 0) && (
         <p className="result-line">
-          <strong>
-            {sum.fearNotHappened} of {sum.completed}
-          </strong>{" "}
-          feared outcome{sum.completed === 1 ? "" : "s"} didn't happen
-          {sum.fearPartly ? ` · ${sum.fearPartly} partly` : ""}.
+          {real.tested > 0 && (
+            <span>
+              Real life: <strong>{real.fearNotHappened} of {real.tested}</strong> feared outcome{real.tested === 1 ? "" : "s"} didn't happen
+              {real.fearPartly ? ` (${real.fearPartly} partly)` : ""}.
+            </span>
+          )}
+          {reh.tested > 0 && (
+            <span className="block">
+              Rehearsals: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
+            </span>
+          )}
         </p>
       )}
 
@@ -189,10 +190,12 @@ export function Confidence() {
         </li>
       </ul>
 
-      <details className="more">
-        <summary>Need support now?</summary>
+      <section className="support-row" aria-labelledby="support-h">
+        <h3 id="support-h" className="section-title">
+          Need support now?
+        </h3>
         <CrisisList />
-      </details>
+      </section>
     </main>
   );
 }
@@ -201,7 +204,7 @@ function resultMessage(e: Experiment): string {
   const close = " That's logged — no need to replay it.";
   if (e.outcome === "didnt-happen") return `What you feared didn't happen. You rated it ${e.predictionLikelihood}% likely beforehand.${close}`;
   if (e.outcome === "partly") return `Part of it happened — and you got through it. That's useful evidence too.${close}`;
-  return `It happened, and you got through it. Note what helped for next time.${close}`;
+  return `It happened, and you got through it. That's still a step taken. Next time, you could try a smaller version of this step.${close}`;
 }
 
 // ---------- Shared bits ----------
@@ -241,28 +244,6 @@ function TextField({ label, value, onChange, rows = 2, hint }: { label: string; 
   );
 }
 
-function CrisisList() {
-  return (
-    <ul className="plain">
-      {CRISIS_RESOURCES.map((r) => (
-        <li key={r.label}>{r.href ? <a href={r.href} target={r.href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer">{r.label}</a> : r.label}</li>
-      ))}
-    </ul>
-  );
-}
-
-function CrisisNotice({ texts }: { texts: string[] }) {
-  if (!mentionsCrisis(...texts)) return null;
-  return (
-    <div className="notice warn" role="alert">
-      <p>
-        <strong>It sounds like things might be really hard right now.</strong> You deserve support from a person. This app can't help in a crisis, but these can:
-      </p>
-      <CrisisList />
-    </div>
-  );
-}
-
 function SubScreen({ title, eyebrow, onBack, children }: { title: string; eyebrow: string; onBack: () => void; children: ReactNode }) {
   return (
     <main className="screen" id="main">
@@ -276,7 +257,7 @@ function SubScreen({ title, eyebrow, onBack, children }: { title: string; eyebro
   );
 }
 
-// ---------- Plan a brave step (behavioural experiment) ----------
+// ---------- Plan a brave step (behavioral experiment) ----------
 
 function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () => void; onSave: (e: Experiment) => void }) {
   const [situation, setSituation] = useState(step?.title ?? "");
@@ -359,10 +340,7 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
         {anxiety >= 7 && (
           <div className="worry-box">
             <p className="label">Feeling very anxious about it? Write out your worries (optional)</p>
-            <p className="hint">
-              Spend a couple of minutes writing freely about what you're worried about. In one study, people who did this before a high-pressure task performed better than
-              those who sat quietly. This box isn't saved anywhere.
-            </p>
+            <p className="hint">Some people find that writing freely about their worries for a couple of minutes before a stressful moment takes the edge off. Optional. This box isn't saved anywhere.</p>
             <textarea aria-label="Write out your worries" rows={5} value={worry} onChange={(e) => setWorry(e.target.value)} />
           </div>
         )}
@@ -423,6 +401,11 @@ function CheckIn({ exp, onCancel, onSave }: { exp: Experiment; onCancel: () => v
         </fieldset>
         <Slider label="How anxious were you while doing it?" value={anxietyAfter} onChange={setAnxietyAfter} min={0} max={10} suffix="/10" />
         <TextField label="What actually happened? (optional)" value={whatHappened} onChange={setWhatHappened} />
+        {outcome === "happened" && (
+          <p className="notice">
+            Getting through it when the thing you feared happened is hard, and you did. What helped you cope? If this step felt too big, the next one can be smaller.
+          </p>
+        )}
         <TextField label="One thing that went okay" value={wentOkay} onChange={setWentOkay} hint="Replaying only the awkward bits keeps anxiety going. Name something that went fine." />
         <TextField label="What did you learn? (optional)" value={learned} onChange={setLearned} />
         <CrisisNotice texts={[whatHappened, wentOkay, learned]} />
@@ -449,7 +432,10 @@ function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep
 
   return (
     <SubScreen eyebrow="Confidence" title="Brave steps ladder" onBack={onBack}>
-      <p className="hint">Start with steps that feel uncomfortable but doable. Move up when a step feels manageable (around 4/10 or less).</p>
+      <p className="hint">
+        Start with steps that feel uncomfortable but doable. A step counts once you've tested what you feared — anxiety doesn't have to drop for it to count. Repeat any step
+        whenever you like.
+      </p>
       {suggestions.length > 0 && (
         <>
           <p className="label">{steps.length === 0 ? "Quick start — tap to add" : "Suggestions"}</p>
@@ -532,7 +518,8 @@ function ReframeFlow({ onCancel, onSave }: { onCancel: () => void; onSave: (r: R
   const [evidenceAgainst, setEvidenceAgainst] = useState("");
   const [friendAdvice, setFriendAdvice] = useState("");
   const [balanced, setBalanced] = useState("");
-  const [beliefAfter, setBeliefAfter] = useState(40);
+  const [beliefAfterRaw, setBeliefAfter] = useState<number | null>(null);
+  const beliefAfter = beliefAfterRaw ?? beliefBefore;
   const all = [situation, thought, evidenceAgainst, friendAdvice, balanced];
   const chosen = THINKING_TRAPS.filter((t) => traps.includes(t.id));
 
@@ -669,10 +656,10 @@ function SelfCheck({ onBack }: { onBack: () => void }) {
         {result === "seek-support" ? (
           <div className="notice warn">
             <p>
-              <strong>It sounds like anxiety is getting in the way a lot right now.</strong> That's worth talking to a doctor or a licensed therapist about. CBT with a
-              therapist is the recommended treatment for social anxiety, and it helps many people.
+              <strong>It sounds like anxiety is getting in the way a lot right now.</strong> That's worth raising with a doctor or a licensed therapist. They can help you work
+              out what's going on and what would help. Talking therapies such as CBT help many people who feel anxious about speaking or social situations.
             </p>
-            <p>You can keep using these tools alongside that — they're practice, not a replacement for support.</p>
+            <p>You can keep using these tools alongside that. They're practice, not a replacement for support.</p>
           </div>
         ) : (
           <div className="notice ok">

@@ -70,7 +70,7 @@ export function Phrases() {
                 <p className="hint">✓ In your reviews</p>
               ) : (
                 <button className="secondary small" type="button" onClick={() => add(e)}>
-                  Practise in reviews
+                  Practice in reviews
                 </button>
               )}
             </li>

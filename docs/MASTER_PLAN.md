@@ -541,6 +541,25 @@ It's optional and skippable. The ratings are self-reported and shown on the Prog
 | **Data export** | Settings → "Download my data" saves a JSON file of everything stored locally. The access token is left out, and so are recordings. |
 | **Self-check** | Four questions on avoidance, impact on work, impact on social life, and distress, answered on a five-point scale. It is our own wording, not a validated instrument. It produces no score, no "test" and no diagnosis. If any answer is "A lot" or higher, it suggests talking to a doctor or therapist and notes that CBT with a therapist is the recommended treatment. Each answer is shown next to your previous one. **[Q]** Have a clinician review the wording before public release. |
 
+### Round 3 (2026-11-02): design research, feature research, two independent code reviews
+
+Sources: `docs/research/2026-11-ui-ux-patterns.md`, `docs/research/2026-11-feature-ideas.md`, `docs/research/2026-11-code-review-A.md` (correctness and security), `docs/research/2026-11-code-review-B.md` (learning design and copy). The research is search-indexed, not fetched, and should be re-checked before public use.
+
+**Is it beneficial, or gimmicky? Honest assessment.**
+- **Likely helpful for ramblers:** the Learn loop (read → explain from memory → one grounded coaching point → retry → later application) is the part with the best evidence behind it, and the reviewer judged it sound. It rewards nothing but the exercise's definition of success, verifies every quote, and avoids scores and streaks.
+- **Plausible for anxious speakers, unproven:** the Confidence tools use the right model (behavioural experiments, graded steps, dropping safety behaviours, attention outward, reframing). Whether this app's self-help version helps is a hypothesis to test, not a claim to make.
+- **What we fixed because it would have faked progress [D]:** observer-review sliders and the thought tool's "after" rating now start where "before" started, and nothing is saved unless the learner moves a slider; a blank rehearsal prediction is no longer turned into a fabricated "it would go badly"; rehearsals and real-world steps are reported separately; the ladder no longer waits for anxiety to drop (a step counts once its prediction is tested, which matches the expectancy-violation evidence); exercise progression counts only first attempts, not retries or follow-ups.
+- **What makes it less gimmicky:** one connected transfer path (coaching → "plan a brave step" → predict → do it → compare), a "was this useful?" rating with reasons on every piece of live feedback, no outcome numbers in the UI, hedged wording for research-backed tips, and American English throughout.
+- **Still to validate:** everything in §7. A personal 4-week test is the next real signal.
+
+**Built this round.**
+- From the design research: live waveform with Stop in the record spot and a visible Pause; plan-as-hero on Today; 28-day activity dots with no streak count; one question per screen in check-ins; 56px tab targets; one subtle session-end animation.
+- From the feature research: What/So what/Now what and explain-to-a-12-year-old exercises; if-then plans and an unsaved worry write-out in brave steps; the "I'm excited" reappraisal line; name-based self-talk; a three-question weekly look-back; repeated-word and notes-coverage observations (missed lines only, hidden in quiet mode); share a clip to one person.
+- From review A (all high/medium items fixed): stale-resubmission bug; transcription limits now use a size-based estimate and the provider-reported duration; reviews are due by local day; every untrusted string in prompts is neutralised; talk recordings persist before feedback; error boundary and safe hash decoding; crisis detection on more fields; observer state reset on re-record; CSP and basic security headers; IndexedDB commits on transaction completion. Documented, not fixed: the usage ledger's read-modify-write can undercount under concurrent calls (a concern only when shared storage is skipped).
+- From review B (all high items fixed): the honesty defaults above; missions merged into brave steps; prompt rules (always a strength when on-topic, retries judged against the definition, minor_gaps means inaccuracy not omission, never suggest fancier vocabulary, short quotes); self-check wording no longer implies a diagnosis; missed-week handling and "redo this week"; week 3/4 order swapped so stretch work comes last; onboarding goal now picks the default scenario; per-skill real-world tips.
+
+**Deferred from this round [Q]:** agenda → predicted questions (AI cost); replay-timeline markers (needs word timestamps); PREP sentence stems as a separate exercise; a human-listener reply form (phase 3).
+
 ### Backlog additions
 | When | Item |
 |---|---|

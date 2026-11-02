@@ -95,7 +95,7 @@ export interface ProgressSummary {
   spokenSessions: number;
   writtenSessions: number;
   unfinished: number;
-  skills: Record<SkillId, { sessions: number; goalMetLive: number; liveFeedbackCount: number }>;
+  skills: Record<SkillId, { sessions: number; goalMetLive: number; liveFeedbackCount: number; firstAttemptGoalMet: number }>;
   retries: number;
   feedbackRated: number;
   feedbackUseful: number;
@@ -106,10 +106,10 @@ export interface ProgressSummary {
 /** A session counts as spoken if its main (first) attempt was spoken. Typed and spoken are tracked separately. */
 export function summarize(d: AppData): ProgressSummary {
   const skills = {
-    "main-point": { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0 },
-    organize: { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0 },
-    example: { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0 },
-    conclusion: { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0 },
+    "main-point": { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0, firstAttemptGoalMet: 0 },
+    organize: { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0, firstAttemptGoalMet: 0 },
+    example: { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0, firstAttemptGoalMet: 0 },
+    conclusion: { sessions: 0, goalMetLive: 0, liveFeedbackCount: 0, firstAttemptGoalMet: 0 },
   } satisfies ProgressSummary["skills"];
   let spoken = 0,
     written = 0,
@@ -126,7 +126,11 @@ export function summarize(d: AppData): ProgressSummary {
     if (!first) continue;
     if (first.modality === "spoken") spoken++;
     else written++;
+    if (!(s.skill in skills)) continue;
     skills[s.skill].sessions++;
+    const followUpIds = new Set(s.followUps.map((f) => f.answer?.id));
+    const firstMain = s.attempts.find((a) => !a.isRetry && !followUpIds.has(a.id));
+    if (firstMain?.feedback?.kind === "live" && firstMain.feedback.goalMet) skills[s.skill].firstAttemptGoalMet++;
     for (const a of s.attempts) {
       if (a.isRetry) retries++;
       if (a.feedbackRating) {

@@ -3,7 +3,7 @@ import { useApp } from "../lib/store";
 import { exportJson } from "../lib/storage";
 import { localDayKey } from "../../shared/dates";
 import { PreferencesForm } from "./Onboarding";
-import { CrisisList } from "./Confidence";
+import { CrisisList } from "../components/Crisis";
 
 export function Settings() {
   const { data, update, deleteAll, status, refreshStatus } = useApp();
@@ -29,7 +29,7 @@ export function Settings() {
         <h3 id="quiet-h">Quiet mode</h3>
         <label className="option">
           <input type="checkbox" checked={!!data.prefs.quietMode} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, quietMode: e.target.checked } }))} />
-          Hide the timer and measurement numbers while I practise
+          Hide the timer and measurement numbers while I practice
         </label>
         <p className="hint">Helpful if watching numbers makes you more self-conscious. Feedback on what you said still appears.</p>
       </section>

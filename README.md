@@ -12,7 +12,7 @@ Clearline is a mobile-first practice app for people who know what they mean but 
 
 You can also rehearse a short talk in front of a simulated audience that asks you questions.
 
-The **Confidence** tab adds self-help tools based on CBT techniques for speaking anxiety. They are not therapy. There are three:
+A 4-week guided plan, spaced reviews (FSRS), a phrase bank and an optional observer listen-back support the practice. The **Confidence** tab adds self-help tools based on CBT techniques for speaking anxiety. They are not therapy. The main ones:
 - **Brave-step experiments:** predict what you fear, do it, then compare.
 - **A graded "brave steps" ladder:** speaking situations ranked from easier to harder.
 - **"Untangle a thought":** catch an anxious thought, spot the thinking trap, and write a more balanced one.

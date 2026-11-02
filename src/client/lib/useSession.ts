@@ -76,11 +76,18 @@ export function useSession(init: () => PracticeSession) {
     }
   }, []);
 
-  const addAttempt = useCallback((a: Attempt) => setSession((s) => ({ ...s, attempts: [...s.attempts.filter((x) => x.id !== a.id), a] })), []);
+  /** Add an attempt, or replace it in place if it already exists (keeps ordering stable). */
+  const addAttempt = useCallback(
+    (a: Attempt) => setSession((s) => (s.attempts.some((x) => x.id === a.id) ? { ...s, attempts: s.attempts.map((x) => (x.id === a.id ? a : x)) } : { ...s, attempts: [...s.attempts, a] })),
+    [],
+  );
 
   const rateAttempt = useCallback(
-    (id: string, feedbackRating: Attempt["feedbackRating"]) =>
-      setSession((s) => ({ ...s, attempts: s.attempts.map((a) => (a.id === id ? { ...a, feedbackRating } : a)), followUps: s.followUps.map((f) => (f.answer?.id === id ? { ...f, answer: { ...f.answer, feedbackRating } } : f)) })),
+    (id: string, feedbackRating: Attempt["feedbackRating"], feedbackRatingReason?: Attempt["feedbackRatingReason"]) =>
+      setSession((s) => {
+        const patch = (a: Attempt): Attempt => (a.id === id ? { ...a, feedbackRating, feedbackRatingReason: feedbackRating === "not-useful" ? feedbackRatingReason : undefined } : a);
+        return { ...s, attempts: s.attempts.map(patch), followUps: s.followUps.map((f) => (f.answer ? { ...f, answer: patch(f.answer) } : f)) };
+      }),
     [],
   );
 

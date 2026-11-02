@@ -11,6 +11,8 @@ import { AppError } from "../errors";
 
 export interface TranscriptionResult {
   transcript: string;
+  /** Audio length as reported by the provider, when available. */
+  durationSeconds?: number;
   delivery: DeliveryMetrics;
   provider: string;
 }
@@ -21,6 +23,7 @@ export interface TranscriptionProvider {
 }
 
 interface DeepgramResponse {
+  metadata?: { duration?: number };
   results?: { channels?: { alternatives?: { transcript?: string; words?: { word: string; start: number; end: number }[] }[] }[] };
 }
 
@@ -60,6 +63,7 @@ export class DeepgramProvider implements TranscriptionProvider {
     if (!transcript) {
       throw new AppError("empty_response", "No speech was recognised in this recording. Try again closer to the microphone, or type your answer.", 422, true);
     }
-    return { transcript, delivery: deliveryFromWordTimings(alt?.words ?? [], recordingSeconds), provider: this.name };
+    const durationSeconds = typeof data.metadata?.duration === "number" && data.metadata.duration > 0 ? data.metadata.duration : undefined;
+    return { transcript, durationSeconds, delivery: deliveryFromWordTimings(alt?.words ?? [], durationSeconds ?? recordingSeconds), provider: this.name };
   }
 }

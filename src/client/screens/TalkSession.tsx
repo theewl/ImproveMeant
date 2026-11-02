@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { Attempt, AudienceQuestion, Briefing, Experiment, ScenarioId, TalkSetup } from "../../shared/types";
+import type { Attempt, AudienceQuestion, Briefing, Experiment, ScenarioId, SkillId, TalkSetup } from "../../shared/types";
 import { OUTWARD_FOCUS_TIP, SAFETY_BEHAVIOURS } from "../../shared/confidence";
+import { CrisisNotice } from "../components/Crisis";
 import { SCENARIOS, SKILLS, fillPrompt, getExercise, getScenario } from "../../shared/curriculum";
 import { formatSeconds, notesCoverage } from "../../shared/observations";
 import { api } from "../lib/api";
@@ -16,6 +17,13 @@ import { ErrorNotice, Loading, SessionTop, StepHeader, formatDate, useFocusMode 
 type Phase = "scenario" | "setup" | "prepare" | "present" | "question" | "feedback" | "finish" | "done";
 const TALK_STEP: Record<Phase, number> = { scenario: 1, setup: 1, prepare: 2, present: 2, question: 3, feedback: 4, finish: 4, done: 4 };
 const MAX_RETRIES = 2;
+const REAL_WORLD_TIP: Record<SkillId, string> = {
+  "main-point": "Next real conversation: say your main point in the first sentence, then stop and let them react.",
+  organize: "Next real conversation: say how many points you have before you start (\"two things\"), then keep to them.",
+  example: "Next real conversation: back one claim with a specific example — a person, a number or a moment.",
+  conclusion: "Next real conversation: end with the one thing you want them to do or remember.",
+};
+const GOAL_SCENARIO: Record<string, ScenarioId> = { meetings: "propose-change", presentations: "explain-group", explaining: "explain-group", persuading: "persuade" };
 
 function defaultSetup(id: ScenarioId, fromStoryId?: string): TalkSetup {
   const sc = getScenario(id);
@@ -34,7 +42,7 @@ function defaultSetup(id: ScenarioId, fromStoryId?: string): TalkSetup {
 
 export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromStoryId?: string; scenario?: ScenarioId }) {
   const { data, update, status } = useApp();
-  const [setup, setSetup] = useState<TalkSetup>(() => defaultSetup(initialScenario ?? (fromStoryId ? "explain-group" : "propose-change"), fromStoryId));
+  const [setup, setSetup] = useState<TalkSetup>(() => defaultSetup(initialScenario ?? (fromStoryId ? "explain-group" : (GOAL_SCENARIO[data.prefs.goal] ?? "propose-change")), fromStoryId));
   const [phase, setPhase] = useState<Phase>(fromStoryId || initialScenario ? "setup" : "scenario");
   useFocusMode(phase !== "scenario");
   const [story, setStory] = useState<Briefing | null>(null);
@@ -99,11 +107,11 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
   // --- Talk attempt ---
   const submitTalk = async (draft: AttemptDraft) => {
     const attempt = await s.makeAttempt(draft, { isRetry, assisted: false });
+    s.addAttempt(attempt); // persisted now; feedback is merged in when it arrives
+    setPending(attempt);
     if (isRetry) {
-      setPending(attempt);
       await requestTalkFeedback(attempt, null);
     } else {
-      setPending(attempt);
       setPhase("question");
       void askQuestion(attempt.text, []);
     }
@@ -144,7 +152,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
   const submitAnswer = async (draft: AttemptDraft | null) => {
     const q = questions[0];
     if (!q || !pending) return;
-    const ans = pendingAnswer ?? (draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : null);
+    const ans = draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : pendingAnswer;
     if (!ans) return;
     setPendingAnswer(ans);
     const ok = await requestTalkFeedback(pending, { question: q.question, answer: ans.text });
@@ -157,6 +165,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
 
   const skipQuestion = async () => {
     if (!pending) return;
+    setPendingAnswer(null);
     await requestTalkFeedback(pending, null);
   };
 
@@ -164,7 +173,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
   const submitSecondAnswer = async (draft: AttemptDraft | null) => {
     const q = questions[1];
     if (!q) return;
-    const ans = pendingAnswer ?? (draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : null);
+    const ans = draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : pendingAnswer;
     if (!ans) return;
     setPendingAnswer(ans);
     const fb = await s.getFeedback(ans, {
@@ -200,7 +209,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
 
       {phase === "scenario" && (
         <section>
-          <StepHeader eyebrow="Rehearse a talk" title="What are you practising?" />
+          <StepHeader eyebrow="Rehearse a talk" title="What are you practicing?" />
           <ul className="scenario-list">
             {SCENARIOS.map((sc) => (
               <li key={sc.id}>
@@ -234,7 +243,13 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
             }}
           >
             <label className="label" htmlFor="topic">
-              {setup.scenarioId === "propose-change" ? "The change you'll propose" : setup.scenarioId === "introduce" ? "Where you're introducing yourself" : "Topic"}
+              {setup.scenarioId === "propose-change"
+                ? "The change you'll propose"
+                : setup.scenarioId === "introduce"
+                  ? "Where you're introducing yourself"
+                  : setup.scenarioId === "persuade"
+                    ? "Your position (what you want them to agree with)"
+                    : "Topic"}
             </label>
             <input id="topic" value={setup.topic} maxLength={300} required onChange={(e) => setSetup({ ...setup, topic: e.target.value })} />
             <label className="label" htmlFor="audience">
@@ -334,7 +349,14 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
       {phase === "question" && (
         <section>
           <StepHeader eyebrow="Q&A" title="A question from the audience" />
-          {qLoading && <Loading label="The audience is thinking…" />}
+          {qLoading && (
+            <>
+              <Loading label="The audience is thinking…" />
+              <button className="link" type="button" onClick={() => void skipQuestion()}>
+                Skip the question
+              </button>
+            </>
+          )}
           {qError != null && (
             <ErrorNotice error={qError} onRetry={() => pending && void askQuestion(pending.text, [])}>
               <button className="link" type="button" onClick={() => void skipQuestion()}>
@@ -358,7 +380,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
       {phase === "feedback" && last?.feedback && (
         <section>
           <StepHeader eyebrow={SKILLS[exercise.skill].name} title="Your feedback" />
-          <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r) => s.rateAttempt(last.id, r)} />
+          <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r, why) => s.rateAttempt(last.id, r, why)} />
           <NotesCoverage notes={setup.notes} text={last.text} />
           {first && first.id !== last.id && <CompareAttempts first={first} second={last} />}
           {questions[1] && <SecondQuestion q={questions[1]} audience={setup.audience} answer={secondAnswer} captureProps={captureProps} error={s.error} onSubmit={submitSecondAnswer} />}
@@ -391,7 +413,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
 
       {phase === "finish" && (
         <section>
-          <StepHeader eyebrow="Last step" title="Practise this again later?" />
+          <StepHeader eyebrow="Last step" title="Practice this again later?" />
           <label className={saveSkill ? "option on" : "option"}>
             <input type="checkbox" checked={saveSkill} onChange={(e) => setSaveSkill(e.target.checked)} />
             Remind me to use “{SKILLS[exercise.skill].name}” in a new situation
@@ -420,19 +442,20 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
             <AfterCheckin
               checkin={checkin}
               onSave={(anxietyAfter, outcome) => {
+                const hadPrediction = !!checkin.prediction;
                 const e: Experiment = {
                   id: uid("x-"),
                   createdAt: s.session.startedAt,
                   kind: "rehearsal",
                   sessionId: s.session.id,
                   situation: `Rehearsal: ${scenario.title}${setup.topic ? ` — ${setup.topic}` : ""}`,
-                  prediction: checkin.prediction || "It would go badly",
-                  predictionLikelihood: 50,
+                  prediction: checkin.prediction,
+                  predictionLikelihood: checkin.prediction ? 50 : 0,
                   anxietyBefore: checkin.anxietyBefore,
                   safetyBehaviourToDrop: checkin.drop,
                   completedAt: new Date().toISOString(),
                   anxietyAfter,
-                  outcome,
+                  outcome: hadPrediction ? outcome : undefined,
                 };
                 update((d) => ({ ...d, experiments: [...d.experiments, e] }));
                 setCheckinSaved(true);
@@ -441,7 +464,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
           )}
           {checkinSaved && <p className="notice ok">Saved to Confidence.</p>}
           <WrapUp attempts={s.session.attempts} />
-          <p className="hint">In your next real meeting, try opening with your main point.</p>
+          <p className="hint">{REAL_WORLD_TIP[exercise.skill]}</p>
           <div className="actions">
             <a className="button primary" href={href({ name: "today" })}>
               Done
@@ -460,12 +483,10 @@ function NotesCoverage({ notes, text }: { notes: string; text: string }) {
   if (c.total === 0) return null;
   return (
     <details className="more">
-      <summary>
-        Notes covered: {c.covered} of {c.total}
-      </summary>
+      <summary>{c.missed.length === 0 ? "Everything in your notes came up" : `${c.missed.length} note line${c.missed.length === 1 ? "" : "s"} didn't come up`}</summary>
       {c.missed.length > 0 && (
         <>
-          <p className="hint">Lines that didn't come up (rough word match, not a grade):</p>
+          <p className="hint">Rough word match, not a grade. Leaving things out is often the right call.</p>
           <ul className="plain">
             {c.missed.map((m) => (
               <li key={m}>{m}</li>
@@ -528,12 +549,13 @@ interface Checkin {
 function AfterCheckin({ checkin, onSave }: { checkin: Checkin; onSave: (anxietyAfter: number, outcome: NonNullable<Experiment["outcome"]>) => void }) {
   const [after, setAfter] = useState(checkin.anxietyBefore);
   const [outcome, setOutcome] = useState<Experiment["outcome"]>();
+  const needsOutcome = !!checkin.prediction;
   return (
     <form
       className="checkin-after"
       onSubmit={(e) => {
         e.preventDefault();
-        if (outcome) onSave(after, outcome);
+        if (needsOutcome ? outcome : true) onSave(after, outcome ?? "didnt-happen");
       }}
     >
       <p className="eyebrow">Before, you felt {checkin.anxietyBefore}/10{checkin.prediction ? ` and worried: “${checkin.prediction}”` : ""}</p>
@@ -544,7 +566,7 @@ function AfterCheckin({ checkin, onSave }: { checkin: Checkin; onSave: (anxietyA
         <output htmlFor="after-anx">{after}/10</output>
       </div>
       <input id="after-anx" type="range" min={0} max={10} value={after} onChange={(e) => setAfter(Number(e.target.value))} />
-      <fieldset className="pills">
+      <fieldset className="pills" hidden={!needsOutcome}>
         <legend className="label">Did what you worried about happen?</legend>
         {(
           [
@@ -559,7 +581,7 @@ function AfterCheckin({ checkin, onSave }: { checkin: Checkin; onSave: (anxietyA
           </label>
         ))}
       </fieldset>
-      <button className="secondary" type="submit" disabled={!outcome}>
+      <button className="secondary" type="submit" disabled={needsOutcome && !outcome}>
         Save check-in
       </button>
     </form>
@@ -617,6 +639,7 @@ function Prepare({
             What are you worried will happen? (optional)
           </label>
           <input id="pre-pred" value={prediction} maxLength={300} placeholder="e.g. I'll lose my thread halfway" onChange={(e) => setPrediction(e.target.value)} />
+          <CrisisNotice texts={[prediction]} />
           <fieldset className="pills">
             <legend className="label">Optional: drop one habit this time</legend>
             {SAFETY_BEHAVIOURS.map((b) => (
@@ -628,8 +651,8 @@ function Prepare({
           </fieldset>
           <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
           <p className="focus-tip">
-            Try saying out loud: <strong>“I'm excited.”</strong> Nerves and excitement feel similar in the body. In one study, speakers who said this before a talk were
-            rated more persuasive than those who tried to calm down.
+            Nerves and excitement feel similar in the body. Some people find it helps to say <strong>“I'm excited”</strong> out loud instead of trying to calm down. Try it
+            if it fits you.
           </p>
         </details>
       )}

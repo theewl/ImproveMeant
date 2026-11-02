@@ -174,7 +174,7 @@ const ENTRIES: EvergreenEntry[] = [
     briefing: {
       points: [
         "Survivorship bias happens when we study only the cases that made it through some filter and ignore the ones that didn't.",
-        "The classic story: statistician Abraham Wald, analysing damage on returning WWII aircraft, argued armor belonged where returning planes had no holes — planes hit there didn't return.",
+        "The classic story: statistician Abraham Wald, analyzing damage on returning WWII aircraft, argued armor belonged where returning planes had no holes — planes hit there didn't return.",
         "Everyday version: studying only successful startups or famous dropouts hides the many who tried the same thing and failed.",
       ],
       mainIdea: "If you only look at survivors, you miss the failures that would show what really matters.",

@@ -132,7 +132,7 @@ export interface DeliveryMetrics {
   recordingSeconds: number;
   speakingSeconds?: number;
   wordsPerMinute?: number;
-  longPauses?: number; // gaps > 2s between recognised words
+  longPauses?: number; // gaps > 2s between recognized words
   limitations: string;
 }
 
@@ -157,6 +157,7 @@ export interface Attempt {
   feedback?: Feedback;
   /** Learner's rating of the feedback's usefulness (live feedback only). */
   feedbackRating?: "useful" | "not-useful";
+  feedbackRatingReason?: "not-specific" | "missed-point" | "too-harsh" | "wrong";
 }
 
 export type FidelityStatus = "accurate" | "minor_gaps" | "factual_error" | "not_applicable";
@@ -310,12 +311,13 @@ export interface ApiError {
 export type ThinkingTrap =
   | "mind-reading"
   | "fortune-telling"
-  | "catastrophising"
+  | "catastrophizing"
   | "spotlight"
   | "all-or-nothing"
   | "discounting-positives"
   | "shoulds"
-  | "labelling";
+  | "emotional-reasoning"
+  | "labeling";
 
 /** "Untangle a thought": a cognitive-restructuring worksheet entry. */
 export interface Reframe {
@@ -342,7 +344,7 @@ export interface LadderStep {
   archived?: boolean;
 }
 
-/** A behavioural experiment: predict, do it, compare. */
+/** A behavioral experiment: predict, do it, compare. */
 export interface Experiment {
   id: string;
   createdAt: string;
@@ -350,7 +352,7 @@ export interface Experiment {
   situation: string;
   ladderStepId?: string;
   sessionId?: string;
-  /** What the learner fears will happen. */
+  /** What the learner fears will happen. Empty for a rehearsal check-in without a prediction. */
   prediction: string;
   /** How likely they think it is, 0–100. */
   predictionLikelihood: number;

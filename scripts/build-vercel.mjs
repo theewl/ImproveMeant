@@ -6,6 +6,13 @@ import { build } from "esbuild";
 import { cpSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 
 const out = ".vercel/output";
+export const SECURITY_HEADERS = {
+  "content-security-policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "microphone=(self), camera=(), geolocation=()",
+};
 if (!existsSync("dist/client/index.html")) throw new Error("Run `vite build` first (dist/client missing).");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(`${out}/static`, { recursive: true });
@@ -38,6 +45,7 @@ writeFileSync(
       routes: [
         { src: "^/api/(.*)$", dest: "/api?__path=$1" },
         { src: "^/assets/(.*)$", headers: { "cache-control": "public, max-age=31536000, immutable" }, continue: true },
+        { src: "^/(.*)$", headers: SECURITY_HEADERS, continue: true },
         { handle: "filesystem" },
         { src: "^/(.*)$", dest: "/index.html" },
       ],

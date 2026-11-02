@@ -125,6 +125,25 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
     expect(screen.getByRole("link", { name: /Your reviews/ })).toBeInTheDocument();
   });
 
+  it("sends the edited answer, not a stale one, when resubmitting after an error", async () => {
+    const t = fakeTransport([textMessage("not json"), textMessage(goodFeedback)]);
+    routeFetchTo(buildTestApp({ transport: t }).app);
+    const user = userEvent.setup();
+    start("#/learn/eg-goodhart", onboarded());
+    await user.click(await screen.findByRole("button", { name: /hide the briefing/ }));
+    const box = screen.getByRole("textbox", { name: "Your explanation" });
+    await user.type(box, "First version of my answer here.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByRole("alert");
+    await user.clear(box);
+    await user.type(box, "Second, edited version of my answer here.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByText("What worked");
+    const sent = (t.calls[1]!.messages as { content: string }[])[0]!.content;
+    expect(sent).toContain("Second, edited version");
+    expect(sent).not.toContain("First version");
+  });
+
   it("shows the live-provider error instead of silently substituting demo feedback", async () => {
     routeFetchTo(buildTestApp({ transport: fakeTransport([textMessage("not json")]) }).app);
     const user = userEvent.setup();
@@ -174,7 +193,7 @@ describe("Rehearse a Talk from the Talk tab", () => {
   it("starts with a simple scenario picker, then a short setup form", async () => {
     const user = userEvent.setup();
     start("#/talk", onboarded());
-    await screen.findByRole("heading", { name: "What are you practising?" });
+    await screen.findByRole("heading", { name: "What are you practicing?" });
     expect(screen.getByText(/simulated audience/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Propose a change in a meeting/ }));
     await screen.findByRole("heading", { name: "Set up your talk" });
@@ -272,8 +291,8 @@ describe("Confidence tools", () => {
 
     await user.click(screen.getByRole("button", { name: /Brave steps ladder/ }));
     await user.click(await screen.findByRole("button", { name: "+ Ask a question in a meeting" }));
-    await user.click(screen.getByRole("button", { name: "+ Give a 1-minute update to my team" }));
-    await user.click(screen.getAllByRole("button", { name: "Plan" }).at(-1)!); // easiest rung is last (ladder shown hardest first)
+    await user.click(screen.getByRole("button", { name: "+ Say good morning to someone I don't usually talk to" }));
+    await user.click(screen.getAllByRole("button", { name: "Plan" })[0]!); // ladder is shown hardest first
     await screen.findByRole("heading", { name: "What will you do?" });
     expect(screen.getByRole("textbox", { name: "What will you do?" })).toHaveValue("Ask a question in a meeting");
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -384,7 +403,7 @@ describe("Guided plan and phrase bank", () => {
     cleanup();
     start("#/phrases", stored());
     expect(await screen.findByText("proxy")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Practise in reviews" }));
+    await user.click(screen.getByRole("button", { name: "Practice in reviews" }));
     expect(await screen.findByText("✓ In your reviews")).toBeInTheDocument();
     expect(stored().reviews.some((r) => r.kind === "phrase" && r.prompt.includes('"proxy"'))).toBe(true);
   });
@@ -401,7 +420,7 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
       await user.click(within(visible).getByLabelText(i === 1 ? "A lot" : "A little"));
       await user.click(screen.getByRole("button", { name: i < 3 ? "Next" : "See guidance" }));
     }
-    expect(await screen.findByText(/worth talking to a doctor or a licensed therapist/)).toBeInTheDocument();
+    expect(await screen.findByText(/worth raising with a doctor or a licensed therapist/)).toBeInTheDocument();
     expect(stored().impactChecks[0]!.answers).toEqual([1, 3, 1, 1]);
   });
 

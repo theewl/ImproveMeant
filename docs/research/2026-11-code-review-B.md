@@ -204,11 +204,11 @@ The structure (predict → listen as an audience member → re-rate) is the Clar
 | `TalkSession.tsx:237` | "Where you're introducing yourself" (required, unused) | Either make optional or insert `{topic}` into `mp-introduce.prompt` ("Introduce yourself at {topic} to {audience}…") |
 | `Feedback.tsx:39` | "Almost — one thing to try" | Only when `priority` is non-null; otherwise "Not there yet — see the note below". ("Almost" is false for a response far from the goal.) |
 | `Confidence.tsx:42` | "Saved. Come back afterwards and tell us how it went." | "Saved. After you've done it, come back here and tell us what actually happened." |
-| `PlanCard.tsx:129` | "What feels a little easier than before?" | Keep for active weeks; for a zero-activity week use the variant in §5 |
+| `PlanCard.tsx` (`Lookback`) | "One thing that went well / got in the way / to try next week" | Keep for active weeks; for a zero-activity week drop the summary line and "went well", keep "got in the way" and "try next week" |
 | `Settings.tsx:84` | "I've read how transcription works (unticking shows the explanation again)" | "Show the transcription notice again" as a button, or drop the checkbox and keep the per-recording consent |
 | `Progress.tsx:51` | "Goal met (AI-coached attempts)" | "Goal met · AI judgement" with the existing hint |
 | `Progress.tsx:235` | "Try it for real (optional)" | Remove after merging into brave steps; until then, "Also counts as a brave step" and make it tick the plan |
-| `LearnSession.tsx:230` | "· harder version" | "· next level: {exercise.title}" |
+| `LearnSession.tsx:230` | "· harder version" | "· next level: {exercise.title}". With `e1132bc` the ladders are now three deep (`org-two-reasons → org-what-so-what → org-stretch-objection`; `ex-concrete-case → ex-twelve → ex-analogy`), and "Explain it to a curious 12-year-old" is a *different* task, not a harder one, so the word "harder" is now wrong as well as vague |
 | `Onboarding.tsx:30` | "Short sessions: read something interesting, explain it in your own words, get one specific tip, and try again." | Add one line: "There's also a Talk rehearsal with a simulated audience, and Confidence tools for when speaking makes you nervous." (Otherwise two of four tabs are a surprise.) |
 | `Onboarding.tsx:7-12` | "Your main goal" radio | Either use it (e.g. default scenario, first ladder suggestions, plan week order) or remove it. Asking and ignoring is worse than not asking. |
 | `observations.ts:23` | "Opening sentence: N words" | Remove, or show only when > 30 words with basis "Long openings bury the point." |
@@ -251,12 +251,12 @@ Ordered by expected effect on the person, not by feature size.
 1. **One real-world system, connected to coaching.** Merge Missions into brave steps; after any session, offer "Plan to use this for real" which creates a brave step pre-filled with the skill's `laterVariation` and a date. This is the transfer link that currently exists only inside spaced reviews. (`Progress.tsx:230-305`, `Confidence.tsx:281-330`, `LearnSession.tsx:336-357`.)
 2. **Fix the self-report defaults** (findings 1–3). Without this, every Confidence number is partly fiction, and the pilot's "fears that didn't happen" signal is untrustworthy.
 3. **Expectancy-based ladder progression** (finding 4), with 1–2/10 rungs and an "it went badly" recovery path.
-4. **Implementation intention at session end.** One line on both done screens: *"When's your next session? [Tomorrow morning / Tomorrow evening / Pick a day]"* stored locally and shown on Today. The research notes already cite the effect size (feature-ideas D4). No notifications needed yet.
+4. **Implementation intention at session end.** Brave steps now have an if-then line (`e1132bc`), which covers the *event*. What is still missing is the *habit*: one line on both done screens: *"When's your next session? [Tomorrow morning / Tomorrow evening / Pick a day]"* stored locally and shown on Today. No notifications needed yet.
 5. **Progression for Talk and after week 4** (§2.2, §5).
 6. **Feedback usefulness rating:** now exists (`Feedback.tsx:91-101`). Two refinements: on "Not really", ask one tap more ("Too vague / Wrong about what I said / Not about the skill / Other"), because that is the data the pilot needs; and include the rating in the eval runner's output format so human rubric scores can be compared with learner ratings.
 7. **Prompt guardrails** (§3 items 1–5). Cheap; each closes a known LLM failure mode.
 8. **A weekly one-item self-report** ("How did speaking up go this week?", 1–5, self-reported) shown on the plan look-back, kept separate from coaching, with the look-back text. Not a validated measure and must not be presented as one; it gives the person a trend to look at and the pilot something to correlate with usage.
-9. **Pre-event quick prep.** The Talk check-in is good but only reachable inside a rehearsal. A standalone "I have something tomorrow" entry on Confidence home (predict → one balanced thought → one habit to drop → outward-focus cue) is 90% built already from `PlanStep` + `ReframeFlow`.
+9. **Pre-event quick prep.** With `e1132bc`, `PlanStep` (page 3) now holds most of this: habit to drop, if-then, worry box, outward-focus cue. What's missing is the entry point and the thought: a "Something coming up?" row on Confidence home that opens `PlanStep` with a date and, if anxiety ≥ 7, offers "Untangle the thought" inline rather than as a separate tool.
 10. **Clinical review** of the Confidence copy and the four self-check questions before any external user, as MASTER_PLAN §9 already says. The rewrites in §4.4 and §6.2 should go in that review.
 
 ---
@@ -274,6 +274,7 @@ Ordered by expected effect on the person, not by feature size.
 - Self-check that is explicitly unscored and shows last answers.
 - FSRS with a daily cap, "recall before reveal", and source-changed flags on news items.
 - The eval rubric mirroring the prompt rules.
+- From `e1132bc` and the working tree: the optional if-then plan; the unsaved worry box gated on high anxiety; the one-tap "send to one person" share; the distanced self-talk hint on "what would you tell a friend"; the 28-day activity dots that show practised days without counting misses or streaks; pause/resume on the recorder (freezers need this).
 
 ---
 
