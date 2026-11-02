@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import type { StoryCard } from "../../shared/types";
 import { dueQueue } from "../../shared/schedule";
+import { ALL_INTERESTS } from "../../shared/evergreen";
 import { api, type LiveFeedState } from "../lib/api";
 import { useApp } from "../lib/store";
 import { href } from "../lib/router";
 import { ErrorNotice, Loading, SourceLine } from "../components/common";
 
 export function Today() {
-  const { data, status } = useApp();
+  const { data } = useApp();
   const [cards, setCards] = useState<StoryCard[] | null>(null);
   const [live, setLive] = useState<LiveFeedState | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -26,68 +27,76 @@ export function Today() {
   };
   useEffect(load, [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const today = new Date().toISOString().slice(0, 10);
   const { queue } = dueQueue(data.reviews, new Date().toISOString());
-  const completedToday = data.sessions.filter((s) => s.completedAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
-  const maxCards = data.prefs.sessionMinutes === 3 ? 3 : 5;
+  const doneToday = data.sessions.filter((s) => s.completedAt?.slice(0, 10) === today).length;
+  const max = data.prefs.sessionMinutes === 3 ? 3 : 4;
+  const [featured, ...rest] = cards?.slice(0, max) ?? [];
+  const interestNames = data.prefs.interests.map((i) => ALL_INTERESTS.find((x) => x.id === i)?.label ?? i);
 
   return (
     <main className="screen" id="main">
-      <h2 className="sr-only">Today</h2>
-      <p className="lede">Stay informed. Remember what matters. Have something to say.</p>
-
-      {completedToday > 0 && (
-        <p className="notice ok" role="status">
-          You've finished {completedToday} session{completedToday === 1 ? "" : "s"} today. Another is optional.
-        </p>
-      )}
+      <h2 className="page-title">{doneToday > 0 ? "Nice work today" : "Today"}</h2>
+      <p className="hint">
+        {doneToday > 0
+          ? `${doneToday} session${doneToday === 1 ? "" : "s"} done. Another is optional.`
+          : interestNames.length
+            ? `Picked for you: ${interestNames.join(", ")}`
+            : "A mix of ideas worth knowing"}
+      </p>
 
       {queue.length > 0 && (
-        <a className="card due" href={href({ name: "review" })}>
-          <strong>
-            {queue.length} review{queue.length === 1 ? "" : "s"} ready
-          </strong>
-          <span className="hint block">About a minute each. Recall first, then check.</span>
+        <a className="pill-link" href={href({ name: "review" })}>
+          <span>
+            <strong>
+              {queue.length} review{queue.length === 1 ? "" : "s"}
+            </strong>{" "}
+            ready · about {queue.length} min
+          </span>
+          <span aria-hidden="true">→</span>
         </a>
       )}
 
-      <section aria-labelledby="pick-h">
-        <h3 id="pick-h">Pick one to explain</h3>
-        <p className="hint">
-          {data.prefs.interests.length
-            ? "Chosen from your interests. You can change them in Settings."
-            : "A mix of curated ideas. Add interests in Settings for a more personal selection."}
-        </p>
-        {live?.status === "stale" && <p className="notice warn">{live.message}</p>}
-        {live?.status === "unavailable" && <p className="notice warn">{live.message} Showing curated ideas only.</p>}
-        {live?.status === "disabled" && status?.mode === "demo" && (
-          <p className="hint">Current news appears when AI briefings are configured. Curated evergreen ideas are always available.</p>
-        )}
-        {error != null && <ErrorNotice error={error} onRetry={load} />}
-        {!cards && error == null && <Loading label="Finding today's stories…" />}
-        {cards && cards.length === 0 && <p>No stories available right now.</p>}
-        {cards && (
-          <ul className="cards">
-            {cards.slice(0, maxCards).map((c) => (
-              <li key={c.id} className="card story">
-                <h4>
-                  <a href={href({ name: "learn", storyId: c.id })}>{c.title}</a>
-                </h4>
-                <p>{c.description}</p>
-                <SourceLine source={c.source} kind={c.kind} />
-                <p className="meta">
-                  <span>About {c.estimatedMinutes} min</span>
-                  <span>{c.whySelected}</span>
-                  {c.kind === "current" && !c.briefingReady && <span>Briefing will be generated when you open it</span>}
-                </p>
+      {live?.status === "stale" && <p className="notice warn">{live.message}</p>}
+      {live?.status === "unavailable" && <p className="notice warn">Today's news couldn't load. Showing curated ideas.</p>}
+      {error != null && <ErrorNotice error={error} onRetry={load} />}
+      {!cards && error == null && <Loading label="Finding today's stories…" />}
+
+      {featured && (
+        <article className="featured">
+          <SourceLine source={featured.source} kind={featured.kind} minutes={featured.estimatedMinutes} />
+          <h3>{featured.title}</h3>
+          <p>{featured.description}</p>
+          <a className="button primary" href={href({ name: "learn", storyId: featured.id })}>
+            Start<span className="sr-only">: {featured.title}</span>
+          </a>
+        </article>
+      )}
+
+      {rest.length > 0 && (
+        <section aria-labelledby="more-h">
+          <h3 id="more-h" className="section-title">
+            Or pick another
+          </h3>
+          <ul className="rows">
+            {rest.map((c) => (
+              <li key={c.id} className="row-item">
+                <a className="row-title" href={href({ name: "learn", storyId: c.id })}>
+                  {c.title}
+                </a>
+                <p className="row-desc">{c.description}</p>
+                <SourceLine source={c.source} kind={c.kind} minutes={c.estimatedMinutes} />
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
-      <a className="card talk-cta" href={href({ name: "talk" })}>
-        <strong>Rehearse a talk</strong>
-        <span className="hint block">Introduce yourself, explain an idea, propose a change, or persuade — to a simulated audience.</span>
+      <a className="pill-link subtle" href={href({ name: "talk" })}>
+        <span>
+          <strong>Rehearse a talk</strong> for a meeting or presentation
+        </span>
+        <span aria-hidden="true">→</span>
       </a>
     </main>
   );

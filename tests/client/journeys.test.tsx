@@ -47,9 +47,10 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
   it("runs understand → recall (assisted) → feedback → retry → compare → finish, and persists", async () => {
     const user = userEvent.setup();
     start("#/learn/eg-goodhart", onboarded());
-    await screen.findByRole("heading", { name: "Understand" });
-    expect(screen.getByText(/Curated summary written for this app/)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /Original source/ })[0]).toHaveAttribute("href", expect.stringContaining("wikipedia.org"));
+    await screen.findByRole("heading", { name: "Goodhart's law: when measures become targets" });
+    expect(screen.getByText(/Written for this app/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Source/ })).toHaveAttribute("href", expect.stringContaining("wikipedia.org"));
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
 
     await user.click(screen.getByRole("button", { name: /hide the briefing/ }));
     await screen.findByRole("heading", { name: "Explain it from memory" });
@@ -64,19 +65,18 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
     // jsdom has no MediaRecorder, so the typed alternative is the default.
     await user.type(screen.getByRole("textbox", { name: "Your explanation" }), "When people are rewarded for a number they game the number.");
     await user.click(screen.getByRole("button", { name: "Get feedback" }));
-    await screen.findByRole("heading", { name: "Improve" });
-    expect(screen.getByText(/did/)).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Your feedback" });
     expect(screen.getByText("Example feedback")).toBeInTheDocument();
     expect(screen.getByText(/Assisted — briefing reopened/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Retry/ }));
+    await user.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByRole("heading", { name: "Try again" });
     await user.type(screen.getByRole("textbox", { name: "Your explanation" }), "Chasing a metric breaks the metric: people move the number, not the goal.");
     await user.click(screen.getByRole("button", { name: "Get feedback" }));
     await screen.findByRole("heading", { name: "Compare attempts" });
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    await user.click(screen.getByRole("button", { name: "Finish here" }));
+    await user.click(screen.getByRole("button", { name: "Skip" }));
     await user.click(screen.getByLabelText(/The word “proxy”/));
     await user.click(screen.getByRole("button", { name: "Finish session" }));
     await screen.findByText("Session complete");
@@ -121,21 +121,22 @@ describe("Rehearse a Talk journey (demo mode, typed)", () => {
     const user = userEvent.setup();
     start("#/talk/eg-goodhart", onboarded());
     await screen.findByRole("heading", { name: "Set up your talk" });
-    expect(screen.getByText(/audience in this rehearsal is simulated/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("textbox", { name: "Topic" })).toHaveValue("Goodhart's law: when measures become targets"));
     await user.click(screen.getByLabelText("1 min"));
+    await user.click(screen.getByText("More options"));
     await user.click(screen.getByLabelText("Challenging"));
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByRole("heading", { name: "Prepare (optional)" });
     await user.click(screen.getByRole("button", { name: "I'm ready to present" }));
-    await screen.findByText(/target 1:00/);
+    await screen.findByText(/aim for 1:00/);
+    expect(screen.getByText("simulated")).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Your talk" }), "Here's the idea: when a measure becomes a target, people game it.");
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByText(/Simulated audience member/);
     expect(screen.getByText(/sample question from the practice bank/)).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Your answer" }), "The strongest argument against is that some targets work well.");
     await user.click(screen.getByRole("button", { name: "Get feedback" }));
-    await screen.findByRole("heading", { name: "Feedback" });
+    await screen.findByRole("heading", { name: "Your feedback" });
     await user.click(screen.getByRole("button", { name: "Finish" }));
     await user.click(screen.getByRole("button", { name: "Finish session" }));
     await screen.findByText("Rehearsal complete");
@@ -144,6 +145,22 @@ describe("Rehearse a Talk journey (demo mode, typed)", () => {
     expect(s.talk).toMatchObject({ scenarioId: "explain-group", targetSeconds: 60, questionStyle: "challenging" });
     expect(s.followUps).toHaveLength(1);
     expect(stored().reviews[0]).toMatchObject({ kind: "skill", skill: "organize" });
+  });
+});
+
+describe("Rehearse a Talk from the Talk tab", () => {
+  it("starts with a simple scenario picker, then a short setup form", async () => {
+    const user = userEvent.setup();
+    start("#/talk", onboarded());
+    await screen.findByRole("heading", { name: "What are you practising?" });
+    expect(screen.getByText(/simulated audience/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Propose a change in a meeting/ }));
+    await screen.findByRole("heading", { name: "Set up your talk" });
+    expect(screen.getByRole("textbox", { name: "The change you'll propose" })).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await user.type(screen.getByRole("textbox", { name: "The change you'll propose" }), "Async status updates");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Prepare (optional)" });
   });
 });
 

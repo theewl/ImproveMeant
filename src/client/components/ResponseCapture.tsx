@@ -73,12 +73,12 @@ function TypedAnswer(p: Props & { value: string; onChange: (v: string) => void }
         p.onSubmit({ modality: "typed", text: p.value.trim(), transcriptEdited: false, keepAudio: false });
       }}
     >
-      <label htmlFor={id} className="label">
+      <label htmlFor={id} className="sr-only">
         {p.label}
       </label>
-      <textarea id={id} rows={7} value={p.value} onChange={(e) => p.onChange(e.target.value)} placeholder={p.placeholder ?? "Write it the way you'd say it."} aria-describedby={`${id}-count`} />
+      <textarea id={id} rows={6} value={p.value} onChange={(e) => p.onChange(e.target.value)} placeholder={p.placeholder ?? "Write it the way you'd say it."} aria-describedby={`${id}-count`} />
       <p id={`${id}-count`} className={tooLong ? "hint error-text" : "hint"} aria-live="polite">
-        {words} words{tooLong ? ` — too long (limit ${p.maxChars} characters)` : ""}
+        {tooLong ? `Too long — limit ${p.maxChars} characters` : words > 0 ? `${words} words` : "\u00a0"}
       </p>
       <button className="primary" type="submit" disabled={words < 3 || tooLong || p.busy} aria-busy={p.busy}>
         {p.busy ? "Working…" : p.submitLabel}
@@ -149,26 +149,27 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
 
   if (r.state === "idle" || r.state === "requesting" || (r.state === "error" && !r.recording)) {
     return (
-      <div className={p.focused ? "rec-box focused" : "rec-box"}>
+      <div className="rec-box">
         {r.error && (
           <p className="error-text" role="alert">
             {r.error}
           </p>
         )}
-        <p className="hint">Your recording stays in this browser unless you choose to send it for transcription.</p>
-        <button className="primary record" type="button" onClick={r.start} disabled={r.state === "requesting"}>
-          <span className="dot" aria-hidden="true" /> {r.state === "requesting" ? "Waiting for microphone…" : "Start recording"}
+        <button className="mic" type="button" onClick={r.start} disabled={r.state === "requesting"} aria-label={r.state === "requesting" ? "Waiting for microphone" : "Start recording"}>
+          <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+            <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+            <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+          </svg>
         </button>
-        <button className="link" type="button" onClick={p.onSwitchToTyped}>
-          Prefer to type?
-        </button>
+        <p className="mic-caption">{r.state === "requesting" ? "Waiting for microphone…" : "Tap to record"}</p>
+        <p className="hint center">Stays on your device unless you transcribe it.</p>
       </div>
     );
   }
 
   if (r.state === "recording") {
     return (
-      <div className={p.focused ? "rec-box focused live" : "rec-box live"}>
+      <div className="rec-box live">
         <p className="rec-indicator" aria-live="off">
           <span className="dot pulse" aria-hidden="true" /> Recording
         </p>
@@ -180,12 +181,12 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
         ) : (
           <p className="timer muted">Timer hidden</p>
         )}
-        {overTarget && <p className="hint" role="status">Target time reached — finish your thought, then stop when ready.</p>}
+        {overTarget && <p className="hint" role="status">Target reached — finish your thought.</p>}
         <div className="row">
           <button className="primary" type="button" onClick={r.stop}>
             Finish
           </button>
-          <button className="secondary" type="button" onClick={r.cancel}>
+          <button className="link" type="button" onClick={r.cancel}>
             Cancel
           </button>
           <button className="link" type="button" onClick={() => setShowTimer((s) => !s)} aria-pressed={!showTimer}>
@@ -202,24 +203,14 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   const words = wordCount(transcript);
   const tooLong = transcript.length > p.maxChars;
   return (
-    <div className="rec-box">
-      <p className="label">Your recording ({formatSeconds(rec.seconds)})</p>
-      <audio controls src={rec.url} aria-label="Play back your recording" />
-      <label className="check">
-        <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} />
-        Keep this recording on this device (you can delete it later)
-      </label>
+    <div className="rec-box done-rec">
+      <audio controls src={rec.url} aria-label={`Play back your recording (${formatSeconds(rec.seconds)})`} />
 
       {txState === "none" && (
         <div className="stack">
           {p.transcriptionAvailable ? (
             <>
-              {!p.transcriptionConsent && (
-                <p className="hint">
-                  To get feedback, the audio is sent to Deepgram for transcription. The server asks Deepgram not to retain it, and this app's server doesn't
-                  store audio.
-                </p>
-              )}
+              {!p.transcriptionConsent && <p className="hint">Transcribing sends this audio to Deepgram, which is asked not to keep it.</p>}
               <button
                 className="primary"
                 type="button"
@@ -232,14 +223,18 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
               </button>
             </>
           ) : (
-            <p className="hint">Automatic transcription isn't set up on this server. Listen back and type what you said, as closely as you can.</p>
+            <p className="hint">Listen back, then type what you said.</p>
           )}
-          <button className="secondary" type="button" onClick={() => setTxState("manual")}>
+          <button className={p.transcriptionAvailable ? "secondary" : "primary"} type="button" onClick={() => setTxState("manual")}>
             Type what I said
           </button>
           <button className="link" type="button" onClick={() => { resetTranscript(); r.reset(); }}>
             Record again
           </button>
+          <label className="check small">
+            <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} />
+            Keep this recording on this device
+          </label>
         </div>
       )}
       {txState === "working" && (
@@ -283,14 +278,11 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           }}
         >
           <label className="label" htmlFor={tid}>
-            {txState === "manual" ? "Type what you said" : "Check the transcript — fix any recognition mistakes"}
+            {txState === "manual" ? "Type what you said" : "Check the transcript and fix any mistakes"}
           </label>
           <textarea id={tid} rows={7} value={transcript} onChange={(e) => setTranscript(e.target.value)} />
           <p className="hint" aria-live="polite">
-            {words} words
-            {edited ? " · Edited — feedback will note this, and pace numbers come from the original recording." : ""}
-            {txState === "manual" ? " · Typed by you from the recording." : ""}
-            {tooLong ? ` · Too long (limit ${p.maxChars} characters)` : ""}
+            {tooLong ? `Too long — limit ${p.maxChars} characters` : `${words} words${edited ? " · edited" : ""}`}
           </p>
           <button className="primary" type="submit" disabled={words < 3 || tooLong || p.busy} aria-busy={p.busy}>
             {p.busy ? "Working…" : p.submitLabel}
