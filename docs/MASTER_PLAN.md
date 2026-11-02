@@ -644,6 +644,28 @@ What we avoided: scores out of 100, "confidence" or "charisma" ratings, syntheti
 
 Sources: YouTube Creator Playbook on the first 15 seconds (blog.youtube), Backlinko and Uscreen on audience retention, Teleprompter.com and Vidpros on talking-head framing, FrameOS on lighting, Crafted Films and No Fuss Video on sounding natural, Natasha Lane and Bernard Hiller on camera shyness, Hollyland and The World of Chinese on food vlogging language, Vloggingpro on Casey Neistat's structure, Everything-PR and Decker on Yoodli/Poised/Orai, and the vendors' own pages for Captions, BIGVU and Yoodli. Links in the PR description.
 
+## 11. One method, not four tabs (added 2026-11-02)
+
+**The ask.** The owner pointed out that public speaking, camera comfort, CBT-style anxiety work, memory and vocabulary were presented as separate features in separate tabs, when they share one method. They do. In every case the evidence-backed loop is the same: pick something slightly uncomfortable, predict what you fear, do it out loud, get one specific note, do it again, then check what really happened and keep what's worth remembering.
+
+**What changed.**
+- **Three tabs instead of five:** Today, Steps, Progress. Talk, Camera and Confidence are no longer destinations; they are kinds of step.
+- **Today is one path** with three things: read something and explain it from memory; the next step on the ladder (a camera drill, a talk or a real-life step, chosen by the learner's goal and prefilled with the day's story where it fits); the reviews that are due. Done items tick off during the day; the Start button opens the first thing not done.
+- **Steps is one ladder.** Explaining, the eleven camera drills, the four talk scenarios and the learner's own real-life steps are sorted together by expected discomfort (camera drill levels map onto 1–7 so they interleave with talks at 3–6). Each shows how often it's been done and how anxious the learner felt last time. The next step is the easiest one not yet done in the goal's main formats; after that, the least practised. The confidence tools (why speaking feels hard, untangle a thought, the self-check, crisis resources) sit under the ladder as side doors, not a separate tab.
+- **The check-in runs through every session.** Before any explain, talk or camera session: anxiety 0–10, an optional "what are you worried will happen", one habit to drop. After: anxiety during, and whether the fear came true. Each check-in is saved as a behavioral experiment (kinds: rehearsal, camera, real-world), so the record on Steps ("x of y feared outcomes didn't happen", anxiety with and without a safety habit) now grows from all practice, not only the Confidence tab. The camera-specific comfort slider was replaced by the same scale.
+- **Progress** reports camera anxiety from the same experiments.
+
+**Why this is better than tabs.** The learner sees one sentence that explains the whole app, and every session reinforces the same habit: predict, do, check. Graded exposure (the ladder) and behavioral experiments (the check-in) stop being "the CBT feature" and become how practice is structured; camera drills stop being a separate programme and become rungs. It also removes a design smell from rounds 3–6: three screens that each re-implemented pre/post check-ins.
+
+**[Q]** The 4-week plan still has week tasks of its own (explain, talk, brave step, extra). It should become a four-week walk up the ladder; backlog.
+
+### Backlog additions
+| When | Item |
+|---|---|
+| **Next** | Fold the 4-week plan into the ladder: each week sets a discomfort band and a theme instead of fixed tasks. |
+| **Next** | Real-iPhone test of the camera path (still outstanding from §10). |
+| **Later** | Let the learner reorder or rate the discomfort of camera and talk steps, as they can for real-life ones. |
+
 ## Appendix A: Implementation plan used for the MVP
 1. **Shared domain:** types, curriculum, the evergreen library, scheduling, and text and measurement utilities.
 2. **Server:**

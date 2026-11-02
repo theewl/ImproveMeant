@@ -11,7 +11,7 @@ export type Route =
   | { name: "review" }
   | { name: "progress" }
   | { name: "settings" }
-  | { name: "confidence" }
+  | { name: "steps" }
   | { name: "phrases" }
   | { name: "onboarding" };
 
@@ -35,10 +35,12 @@ export function parseHash(hash: string): Route {
     }
     case "camera":
       return parts[1] ? { name: "camera", drillId: decode(parts[1]), fromStoryId: parts[2] ? decode(parts[2]) : undefined } : { name: "camera" };
+    case "confidence":
+    case "steps":
+      return { name: "steps" };
     case "review":
     case "progress":
     case "settings":
-    case "confidence":
     case "phrases":
     case "onboarding":
       return { name: parts[0] };

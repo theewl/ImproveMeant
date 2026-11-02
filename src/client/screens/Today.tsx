@@ -8,8 +8,7 @@ import { useApp } from "../lib/store";
 import { href, navigate } from "../lib/router";
 import { ErrorNotice, Loading, SourceLine } from "../components/common";
 import { PlanCard } from "../components/PlanCard";
-import { nextCameraDrill } from "../../shared/camera";
-import { formatSeconds } from "../../shared/observations";
+import { todayPath, type PathItem } from "../../shared/steps";
 
 /** Type a topic (Wikipedia search) or paste your own material to explain. Live mode only. */
 function AnyTopic({ live }: { live: boolean }) {
@@ -142,19 +141,57 @@ function AnyTopic({ live }: { live: boolean }) {
   );
 }
 
-/** For learners whose goal is the camera: today's drill, first. */
-function CameraPill() {
+/** The one method, as today's three things. */
+function DailyPath({ storyId }: { storyId?: string }) {
   const { data } = useApp();
-  const next = nextCameraDrill(data.sessions);
-  const today = localDayKey();
-  const doneToday = data.sessions.some((s) => s.mode === "camera" && s.completedAt && localDayKey(s.completedAt) === today);
+  const items = todayPath(data, data.prefs.goal, new Date().toISOString());
+  const target = (it: PathItem): string | null => {
+    if (it.id === "explain") return storyId ? href({ name: "learn", storyId }) : null;
+    if (it.id === "review") return href({ name: "review" });
+    const st = it.step!;
+    switch (st.target.kind) {
+      case "camera":
+        return href({ name: "camera", drillId: st.target.drillId, fromStoryId: storyId });
+      case "talk":
+        return href({ name: "talk", scenario: st.target.scenario });
+      default:
+        return href({ name: "steps" });
+    }
+  };
+  const first = items.find((it) => !it.done);
+  const minutes = items.filter((it) => !it.done).reduce((n, it) => n + it.minutes, 0);
   return (
-    <a className="pill-link" href={href({ name: "camera", drillId: next.id })}>
-      <span>
-        <strong>{doneToday ? "Another take?" : "Today's camera drill"}</strong> · {next.title} · {formatSeconds(next.seconds)}
-      </span>
-      <span aria-hidden="true">→</span>
-    </a>
+    <article className="path" aria-labelledby="path-h">
+      <p className="eyebrow">Today · {first ? `about ${minutes} min` : "done"}</p>
+      <h3 id="path-h">{first ? "Read it, say it, take a step" : "All three done. Anything else is optional."}</h3>
+      <ol className="path-list">
+        {items.map((it) => {
+          const h = target(it);
+          return (
+            <li key={it.id} className={it.done ? "path-item done" : "path-item"}>
+              <span className="path-mark" aria-hidden="true">
+                {it.done ? "✓" : ""}
+              </span>
+              <span className="path-body">
+                {h && !it.done ? (
+                  <a href={h} className="row-title">
+                    {it.title}
+                  </a>
+                ) : (
+                  <span className="row-title">{it.title}</span>
+                )}
+                <span className="row-desc">{it.detail}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {first && target(first) && (
+        <a className="button primary" href={target(first)!}>
+          Start<span className="sr-only">: {first.title}</span>
+        </a>
+      )}
+    </article>
   );
 }
 
@@ -213,7 +250,7 @@ export function Today() {
             : "A mix of ideas worth knowing"}
       </p>
 
-      {data.prefs.goal === "camera" && <CameraPill />}
+      <DailyPath storyId={(featured ?? rest[0])?.id} />
       <PlanCard learnStoryId={(featured ?? rest[0])?.id} />
 
       {queue.length > 0 && (
@@ -280,20 +317,6 @@ export function Today() {
 
       <AnyTopic live={status?.mode === "live"} />
 
-      <a className="pill-link subtle" href={href({ name: "talk" })}>
-        <span>
-          <strong>Rehearse a talk</strong> for a meeting or presentation
-        </span>
-        <span aria-hidden="true">→</span>
-      </a>
-      {data.prefs.goal !== "camera" && (
-        <a className="pill-link subtle tight" href={href({ name: "camera" })}>
-          <span>
-            <strong>Talk to a camera</strong> · short drills for vlogs and videos
-          </span>
-          <span aria-hidden="true">→</span>
-        </a>
-      )}
     </main>
   );
 }

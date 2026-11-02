@@ -12,6 +12,7 @@ import { href } from "../lib/router";
 import { stillToBase64, useVideoRecorder, videoRecordingSupported } from "../lib/useVideoRecorder";
 import { isAppleWebKit, speechCaptureSupported, useSpeechCapture } from "../lib/useSpeechCapture";
 import { FeedbackPanel, WrapUp } from "../components/Feedback";
+import { AfterCheckin, BeforeCheckin, checkinExperiment, checkinSavedMessage, type Checkin } from "../components/Checkin";
 import { ErrorNotice, SessionTop, StepHeader } from "../components/common";
 
 type Phase = "setup" | "record" | "review" | "feedback" | "done";
@@ -28,8 +29,8 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
   const [phase, setPhase] = useState<Phase>("setup");
   const [topic, setTopic] = useState("");
   const [notes, setNotes] = useState("");
-  const [comfortBefore, setComfortBefore] = useState(5);
-  const [comfortAfter, setComfortAfter] = useState(5);
+  const [checkin, setCheckin] = useState<Checkin | null>(null);
+  const [checkinSaved, setCheckinSaved] = useState<string | null>(null);
   const [sendFrames, setSendFrames] = useState(data.cameraFramesConsent);
   const [isRetry, setIsRetry] = useState(false);
   // Remount the take only when the learner asks for another take, never while feedback is in flight.
@@ -37,7 +38,6 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [pending, setPending] = useState<Attempt | null>(null);
-  const [saved, setSaved] = useState(false);
 
   const s = useSession(() => ({
     id: uid("s-"),
@@ -122,9 +122,7 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
   const lastFrames = useRef<{ at: number; jpegBase64: string }[]>([]);
 
   const finish = () => {
-    s.setSession((x) => ({ ...x, camera: x.camera ? { ...x.camera, comfortAfter } : x.camera }));
     s.finish();
-    setSaved(true);
   };
 
   const deleted = !!drill.noReview && !first?.text;
@@ -148,7 +146,6 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
             onSubmit={(e) => {
               e.preventDefault();
               if (drill.needsTopic && !topic.trim()) return;
-              s.setSession((x) => ({ ...x, camera: { ...(x.camera ?? { drillId: drill.id, topic, notes }), comfortBefore } }));
               setPhase("record");
             }}
           >
@@ -168,19 +165,7 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
                 <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Not a script. Three words or short lines." />
               </>
             )}
-            <div className="slider">
-              <div className="slider-head">
-                <label className="label" htmlFor="cam-comfort">
-                  How comfortable do you feel about talking to a camera right now?
-                </label>
-                <output htmlFor="cam-comfort">{comfortBefore}/10</output>
-              </div>
-              <input id="cam-comfort" type="range" min={0} max={10} value={comfortBefore} onChange={(e) => setComfortBefore(Number(e.target.value))} />
-              <div className="slider-ends" aria-hidden="true">
-                <span>Dreading it</span>
-                <span>Easy</span>
-              </div>
-            </div>
+            <BeforeCheckin defaultDrop={data.myHabits?.[0]} onChange={setCheckin} />
             <details className="more">
               <summary>30-second warm-up</summary>
               <ul className="plain checks">
@@ -296,30 +281,21 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
             {retries ? ` · ${retries} more take${retries === 1 ? "" : "s"}` : ""}
           </p>
           {!deleted && <WrapUp attempts={attempts} />}
-          <div className="slider">
-            <div className="slider-head">
-              <label className="label" htmlFor="cam-after">
-                And now: how comfortable do you feel about talking to a camera?
-              </label>
-              <output htmlFor="cam-after">{comfortAfter}/10</output>
-            </div>
-            <input
-              id="cam-after"
-              type="range"
-              min={0}
-              max={10}
-              value={comfortAfter}
-              onChange={(e) => {
-                setComfortAfter(Number(e.target.value));
-                s.setSession((x) => ({ ...x, camera: x.camera ? { ...x.camera, comfortAfter: Number(e.target.value) } : x.camera }));
+          {checkin && !checkinSaved && (
+            <AfterCheckin
+              checkin={checkin}
+              onSave={(anxietyAfter, outcome) => {
+                const e = checkinExperiment({ kind: "camera", sessionId: s.session.id, createdAt: s.session.startedAt, situation: `Camera: ${drill.title}${topic ? ` — ${topic}` : ""}`, checkin, anxietyAfter, outcome });
+                update((d) => ({ ...d, experiments: [...d.experiments, e] }));
+                setCheckinSaved(checkinSavedMessage(checkin.anxietyBefore, anxietyAfter, e.outcome));
               }}
             />
-            <div className="slider-ends" aria-hidden="true">
-              <span>Dreading it</span>
-              <span>Easy</span>
-            </div>
-            {saved && comfortAfter > comfortBefore && <p className="hint">Up from {comfortBefore}/10 before. That's the repetition working.</p>}
-          </div>
+          )}
+          {checkinSaved && (
+            <p className="notice ok" role="status">
+              {checkinSaved}
+            </p>
+          )}
           <p className="hint">Next up: drill {next.level}, {next.title}.</p>
           <div className="actions">
             <a className="button primary" href={href({ name: "camera", drillId: next.id })}>

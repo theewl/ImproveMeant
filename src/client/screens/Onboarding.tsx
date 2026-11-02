@@ -78,7 +78,7 @@ export function Onboarding() {
   return (
     <main className="screen" id="main">
       <h2>Welcome</h2>
-      <p className="lede">Short sessions: read something interesting, explain it in your own words, get one specific tip, and try again.</p>
+      <p className="lede">One method for speaking up, talking to a camera and feeling less anxious doing it: read something, say it out loud, get one specific note, say it again, then check what really happened.</p>
       <PreferencesForm
         submitLabel="Start"
         onDone={() => navigate({ name: "today" })}

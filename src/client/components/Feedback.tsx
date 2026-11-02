@@ -86,8 +86,8 @@ export function FeedbackPanel({
           {f.priority.quote && <blockquote>“{f.priority.quote}”</blockquote>}
           <p className="suggestion">{f.priority.suggestion}</p>
           {live && (
-            <a className="link inline" href={href({ name: "confidence" })}>
-              Try this in a real conversation → plan a brave step
+            <a className="link inline" href={href({ name: "steps" })}>
+              Try this in a real conversation → plan a real-life step
             </a>
           )}
         </div>

@@ -291,7 +291,7 @@ describe("Confidence tools", () => {
     await user.click(screen.getByRole("button", { name: "Got it" }));
     expect(stored().myHabits).toEqual(["Avoiding eye contact"]);
 
-    await screen.findByRole("heading", { name: "Pick a brave step" });
+    await screen.findByRole("heading", { name: "Add a real-life step" });
     await user.click(await screen.findByRole("button", { name: "+ Ask a question in a meeting" }));
     await user.click(screen.getByRole("button", { name: "+ Say good morning to someone I don't usually talk to" }));
     await user.click(screen.getAllByRole("button", { name: "Plan" })[0]!); // ladder is shown hardest first
@@ -305,7 +305,7 @@ describe("Confidence tools", () => {
     await user.type(screen.getByLabelText("then I will"), "pause and restate my point");
     await user.click(screen.getByRole("button", { name: "Save my plan" }));
 
-    expect(await screen.findByText("Your current step")).toBeInTheDocument();
+    expect(await screen.findByText("Your real-life step, planned")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "What happened?" }));
     await user.click(screen.getByLabelText("No, it didn't"));
     await user.type(screen.getByRole("textbox", { name: "One thing that went okay" }), "I asked it clearly");
@@ -360,8 +360,8 @@ describe("Confidence tools", () => {
     await screen.findByRole("heading", { name: "Set up your talk" });
     await waitFor(() => expect(screen.getByRole("textbox", { name: "Topic" })).not.toHaveValue(""));
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    await user.click(await screen.findByText("Feeling nervous? Quick check-in"));
-    const details = screen.getByText("Feeling nervous? Quick check-in").closest("details")!;
+    await user.click(await screen.findByText("Quick check-in (20 seconds)"));
+    const details = screen.getByText("Quick check-in (20 seconds)").closest("details")!;
     details.open = true;
     fireEvent(details, new Event("toggle"));
     fireEvent.change(screen.getByLabelText(/How anxious do you feel/), { target: { value: "8" } });
@@ -375,7 +375,7 @@ describe("Confidence tools", () => {
     await screen.findByText(/Before, you felt 8\/10/);
     await user.click(screen.getByLabelText("No"));
     await user.click(screen.getByRole("button", { name: "Save check-in" }));
-    await screen.findByText("Saved to Confidence.");
+    await screen.findByText(/Logged under Steps/);
     expect(stored().experiments[0]).toMatchObject({ kind: "rehearsal", anxietyBefore: 8, prediction: "I'll lose my thread", outcome: "didnt-happen" });
   });
 });
@@ -472,9 +472,9 @@ describe("onboarding", () => {
 describe("Camera drills (demo mode, no camera in jsdom)", () => {
   it("lists the ladder, falls back to typing when there is no camera, and records comfort", async () => {
     const user = userEvent.setup();
-    start("#/camera", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "camera" } }));
-    await screen.findByRole("heading", { name: "Camera" });
-    expect(screen.getByRole("heading", { name: "Just press record" })).toBeInTheDocument();
+    start("#/steps", onboarded({ confidenceIntroSeen: true, prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "camera" } }));
+    await screen.findByRole("heading", { name: "Steps" });
+    expect(screen.getByRole("heading", { name: "Just press record" })).toBeInTheDocument(); // the easiest camera step comes first for a camera goal
     expect(screen.getByRole("link", { name: /Hook in ten seconds/ })).toHaveAttribute("href", "#/camera/cam-hook");
 
     await user.click(screen.getByRole("link", { name: /^Start/ }));
@@ -490,21 +490,43 @@ describe("Camera drills (demo mode, no camera in jsdom)", () => {
 
     await user.click(screen.getByRole("button", { name: "Finish" }));
     await screen.findByRole("heading", { name: "Take done" });
-    fireEvent.change(screen.getByLabelText(/And now: how comfortable/), { target: { value: "7" } });
     expect(screen.getByRole("link", { name: "Next drill" })).toHaveAttribute("href", "#/camera/cam-one-person");
 
     const saved = stored().sessions.find((s) => s.mode === "camera")!;
     expect(saved.completedAt).toBeTruthy();
     expect(saved.camera?.drillId).toBe("cam-press-record");
-    expect(saved.camera?.comfortAfter).toBe(7);
     expect(saved.attempts[0]?.feedback?.kind).toBe("illustrative");
   });
 
-  it("puts today's camera drill first on Today when the goal is the camera", async () => {
+  it("puts the day's path on Today: explain, the next step (a camera drill for a camera goal), reviews", async () => {
     start("#/today", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "camera" } }));
-    const pill = await screen.findByRole("link", { name: /Today's camera drill/ });
-    expect(pill).toHaveAttribute("href", "#/camera/cam-press-record");
-    expect(screen.getByRole("link", { name: "Camera" })).toBeInTheDocument();
+    const step = await screen.findByRole("link", { name: "Next step: Just press record" });
+    expect(step).toHaveAttribute("href", expect.stringMatching(/^#\/camera\/cam-press-record/));
+    expect(screen.getByRole("heading", { name: "Read it, say it, take a step" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Steps" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Camera" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Talk" })).not.toBeInTheDocument();
+  });
+
+  it("records the check-in around a camera take as an experiment", async () => {
+    const user = userEvent.setup();
+    start("#/camera/cam-one-person", onboarded());
+    await screen.findByRole("heading", { name: "Hello, one person" });
+    const details = screen.getByText("Quick check-in (20 seconds)").closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    fireEvent.change(screen.getByLabelText(/How anxious do you feel/), { target: { value: "7" } });
+    await user.type(screen.getByRole("textbox", { name: /What are you worried will happen/ }), "I'll freeze");
+    await user.click(screen.getByRole("button", { name: "Open the camera" }));
+    await screen.findByRole("heading", { name: "Camera not available" });
+    await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "Hi, it's me. If you've ever fixed a bike at midnight, you know.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await user.click(await screen.findByRole("button", { name: "Finish" }));
+    await screen.findByText(/Before, you felt 7\/10/);
+    await user.click(screen.getByLabelText("No"));
+    await user.click(screen.getByRole("button", { name: "Save check-in" }));
+    await screen.findByText(/didn't happen/);
+    expect(stored().experiments[0]).toMatchObject({ kind: "camera", anxietyBefore: 7, prediction: "I'll freeze", outcome: "didnt-happen" });
   });
 });
 

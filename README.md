@@ -12,12 +12,14 @@ Clearline is a mobile-first practice app for people who know what they mean but 
 
 You can also rehearse a short talk in front of a simulated audience that asks you questions.
 
-A 4-week guided plan, spaced reviews (FSRS), a phrase bank and an optional observer listen-back support the practice. Stories come from Wikipedia's daily feed (in the news, widely read, featured), chosen each day by the AI for your interests, or you can type any topic or paste your own material. Recording uses your browser's built-in speech recognition for a free transcript; Deepgram is optional. The **Confidence** tab is one short path based on CBT techniques for speaking anxiety (not therapy): why it feels hard → pick a small step → predict → do it → see what happened. Its tools:
+The same loop runs through everything, so the app has three tabs: **Today** (read something and explain it, take the next step, do the reviews that are due), **Steps** (one ladder of camera drills, talk rehearsals and real-life steps sorted by expected discomfort, with the confidence tools around it) and **Progress**. Before and after each session there is a 20-second check-in (anxiety, what you fear will happen, one habit to drop; then what actually happened), which is CBT's behavioral experiment built into practice rather than a separate feature.
+
+A 4-week guided plan, spaced reviews (FSRS), a phrase bank and an optional observer listen-back support the practice. Stories come from Wikipedia's daily feed (in the news, widely read, featured), chosen each day by the AI for your interests, or you can type any topic or paste your own material. Recording uses your browser's built-in speech recognition for a free transcript; Deepgram is optional. The confidence tools, based on CBT techniques for speaking anxiety (not therapy), live under **Steps**:
 - **Brave-step experiments:** predict what you fear, do it, then compare.
 - **A graded "brave steps" ladder:** speaking situations ranked from easier to harder.
 - **"Untangle a thought":** catch an anxious thought, spot the thinking trap, and write a more balanced one.
 
-The **Camera** tab is for getting natural on video (vlogs, YouTube): eleven short drills from "just press record" to a two-minute unscripted take, a front-camera preview with a framing guide and your talking points near the lens, playback as a viewer, and feedback on your opening, your words and (from three still frames, with your consent) framing, light and eye line. Measures such as pace and fillers are shown with their basis, never as a score. See [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) §10 for the research behind it.
+The camera drills on the ladder are for getting natural on video (vlogs, YouTube): eleven short drills from "just press record" to a two-minute unscripted take, a front-camera preview with a framing guide and your talking points near the lens, playback as a viewer, and feedback on your opening, your words and (from three still frames, with your consent) framing, light and eye line. Measures such as pace and fillers are shown with their basis, never as a score. See [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) §10 for the research behind it.
 
 This is a **private MVP**. For the product plan, evidence, roadmap and backlog, see [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
 

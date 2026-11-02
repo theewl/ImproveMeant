@@ -6,7 +6,6 @@ import {
   STARTER_STEPS,
   THINKING_TRAPS,
   activeLadder,
-  suggestNextStep,
   summarizeExperiments,
   compareSafetyBehaviours,
   IMPACT_QUESTIONS,
@@ -14,6 +13,9 @@ import {
   impactGuidance,
 } from "../../shared/confidence";
 import { CrisisList, CrisisNotice } from "../components/Crisis";
+import { CAMERA_PRINCIPLES, CAMERA_SETUP } from "../../shared/camera";
+import { allSteps, nextStep, realStepIdeas, stepKindLabel, stepRecord, type Step } from "../../shared/steps";
+import { href } from "../lib/router";
 import { useApp } from "../lib/store";
 import { uid } from "../lib/storage";
 import { formatDate } from "../components/common";
@@ -21,9 +23,9 @@ import { formatDate } from "../components/common";
 type View = { name: "home" } | { name: "start" } | { name: "pick" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "reframe" } | { name: "selfcheck" };
 
 /**
- * One path, in this order: why it feels hard → pick a small step → predict → do it
- * (attention out, one habit dropped) → check what happened → next step.
- * Thought untangling and the self-check are side doors, not the main road.
+ * Steps: one ladder for every way of practising (explain, camera, talk, real life),
+ * with the confidence tools (predict → do it → check what happened; untangle a thought;
+ * self-check) around it. Thought untangling and the self-check are side doors.
  */
 export function Confidence() {
   const { data, update } = useApp();
@@ -83,60 +85,116 @@ export function Confidence() {
       />
     );
 
-  const next = suggestNextStep(data.ladder, data.experiments);
   const pending = data.experiments.filter((e) => !e.completedAt && e.kind === "real-world").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const real = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
-  const reh = summarizeExperiments(data.experiments.filter((e) => e.kind === "rehearsal"));
+  const reh = summarizeExperiments(data.experiments.filter((e) => e.kind !== "real-world"));
   const cmp = compareSafetyBehaviours(data.experiments);
-  const stepNumber = real.completed + 1;
+  const next = nextStep(data, data.prefs.goal);
+  const steps = allSteps(data);
+  const ideas = realStepIdeas(data.ladder);
+  const ladderStep = (st: Step) => {
+    const t = st.target;
+    return t.kind === "real" ? data.ladder.find((l) => l.id === t.ladderStepId) : undefined;
+  };
+  const stepHref = (st: Step): string | null => {
+    switch (st.target.kind) {
+      case "learn":
+        return href({ name: "today" });
+      case "camera":
+        return href({ name: "camera", drillId: st.target.drillId });
+      case "talk":
+        return href({ name: "talk", scenario: st.target.scenario });
+      case "real":
+        return null;
+    }
+  };
 
   return (
     <main className="screen" id="main">
-      <h2 className="page-title">Confidence</h2>
-      <p className="hint">One small brave step at a time. Predict what you fear, do it, see what really happens.</p>
+      <h2 className="page-title">Steps</h2>
+      <p className="hint">One method for all of it: pick a step that's slightly uncomfortable, say what you fear, do it out loud, get one note, do it again, then check what really happened.</p>
       {flash && (
         <p className="notice ok" role="status">
           {flash}
         </p>
       )}
 
-      {pending.length > 0 ? (
-        pending.map((e) => (
-          <article key={e.id} className="featured">
-            <p className="eyebrow">Your current step</p>
-            <h3>{e.situation}</h3>
-            <p className="hint">You expect: {e.prediction || "—"} ({e.predictionLikelihood}% sure){e.safetyBehaviourToDrop ? ` · without: ${e.safetyBehaviourToDrop.toLowerCase()}` : ""}</p>
-            <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
-            <button className="primary" type="button" onClick={() => go({ name: "checkin", id: e.id })}>
-              What happened?
-            </button>
-          </article>
-        ))
-      ) : (
+      {pending.map((e) => (
+        <article key={e.id} className="featured">
+          <p className="eyebrow">Your real-life step, planned</p>
+          <h3>{e.situation}</h3>
+          <p className="hint">
+            You expect: {e.prediction || "—"} ({e.predictionLikelihood}% sure){e.safetyBehaviourToDrop ? ` · without: ${e.safetyBehaviourToDrop.toLowerCase()}` : ""}
+          </p>
+          <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
+          <button className="primary" type="button" onClick={() => go({ name: "checkin", id: e.id })}>
+            What happened?
+          </button>
+        </article>
+      ))}
+
+      {pending.length === 0 && (
         <article className="featured">
-          <p className="eyebrow">Brave step {stepNumber}</p>
-          {next ? (
-            <>
-              <h3>{next.title}</h3>
-              <p className="hint">Expected discomfort {next.expectedDiscomfort}/10. Say what you fear will happen, then find out.</p>
-              <button className="primary" type="button" onClick={() => go({ name: "plan", step: next })}>
-                Plan this step
-              </button>
-              <button className="link" type="button" onClick={() => go({ name: "pick" })}>
-                Choose a different step
-              </button>
-            </>
+          <p className="eyebrow">
+            Next step · {stepKindLabel(next.kind)} · expected discomfort {next.discomfort}/10
+          </p>
+          <h3>{next.title}</h3>
+          <p>{next.detail}</p>
+          {stepHref(next) ? (
+            <a className="button primary" href={stepHref(next)!}>
+              Start<span className="sr-only">: {next.title}</span>
+            </a>
           ) : (
-            <>
-              <h3>Pick a small step</h3>
-              <p className="hint">Start easier than you think you need to. You'll climb from there.</p>
-              <button className="primary" type="button" onClick={() => go({ name: "pick" })}>
-                Pick a brave step
-              </button>
-            </>
+            <button className="primary" type="button" onClick={() => go({ name: "plan", step: ladderStep(next) })}>
+              Plan this step
+            </button>
           )}
         </article>
       )}
+
+      <section aria-labelledby="ladder-h">
+        <h3 id="ladder-h" className="section-title">
+          The ladder, easiest first
+        </h3>
+        <ol className="ladder">
+          {steps.map((st) => {
+            const r = stepRecord(st, data);
+            const h = stepHref(st);
+            const body = (
+              <>
+                <span className="ladder-level" aria-label={`Expected discomfort ${st.discomfort} out of 10`}>
+                  {st.discomfort}
+                </span>
+                <span className="ladder-body">
+                  <span className="row-title">{st.title}</span>
+                  <span className="row-desc">
+                    {stepKindLabel(st.kind)}
+                    {r.count > 0 ? ` · done ${r.count}×${r.lastAnxiety != null ? `, last time ${r.lastAnxiety}/10 anxious` : ""}` : ""}
+                  </span>
+                </span>
+                <span aria-hidden="true">→</span>
+              </>
+            );
+            return (
+              <li key={st.id} className={r.count > 0 ? "ladder-item done" : "ladder-item"}>
+                {h ? (
+                  <a href={h}>{body}</a>
+                ) : (
+                  <button type="button" className="ladder-button" onClick={() => go({ name: "plan", step: ladderStep(st) })}>
+                    {body}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        <div className="row wrap">
+          <button className="secondary small" type="button" onClick={() => go({ name: "pick" })}>
+            Add a real-life step
+          </button>
+          {ideas.length > 0 && <span className="hint">e.g. {ideas[0]!.title.toLowerCase()}</span>}
+        </div>
+      </section>
 
       {(real.tested > 0 || reh.tested > 0 || cmp) && (
         <section className="record" aria-labelledby="record-h">
@@ -151,7 +209,7 @@ export function Confidence() {
           )}
           {reh.tested > 0 && (
             <p>
-              Rehearsals: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
+              Practice sessions: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
             </p>
           )}
           {cmp && (
@@ -184,6 +242,27 @@ export function Confidence() {
         </li>
       </ul>
 
+      <details className="more">
+        <summary>Before you record: five camera checks</summary>
+        <ul className="plain checks">
+          {CAMERA_SETUP.map((c) => (
+            <li key={c.id}>
+              <strong>{c.text}.</strong> {c.why}
+            </li>
+          ))}
+        </ul>
+      </details>
+      <details className="more">
+        <summary>What makes talking to a camera work</summary>
+        <ul className="plain checks">
+          {CAMERA_PRINCIPLES.map((pr) => (
+            <li key={pr.title}>
+              <strong>{pr.title}.</strong> {pr.text}
+            </li>
+          ))}
+        </ul>
+      </details>
+
       <section className="support-row" aria-labelledby="support-h">
         <h3 id="support-h" className="section-title">
           Need support now?
@@ -209,7 +288,7 @@ function Start({ onDone }: { onDone: (habits: string[]) => void }) {
   const [picked, setPicked] = useState<string[]>(() => HABIT_OPTIONS.filter((h) => data.myHabits?.includes(HABIT_TO_BEHAVIOR[h]!)));
   return (
     <main className="screen" id="main">
-      <p className="eyebrow">Confidence</p>
+      <p className="eyebrow">Steps</p>
       <h2>Why speaking feels so hard</h2>
       <div className="loop">
         <p>When you're worried about how you come across, your attention turns inward. You start watching yourself — your voice, your face, your hands — and you build a picture of how you think you look. It's usually worse than the truth.</p>
@@ -471,7 +550,7 @@ function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep
     update((x) => ({ ...x, ladder: [...x.ladder, { id: uid("l-"), createdAt: new Date().toISOString(), title: t, expectedDiscomfort: d }] }));
 
   return (
-    <SubScreen eyebrow="Confidence" title="Pick a brave step" onBack={onBack}>
+    <SubScreen eyebrow="Steps" title="Add a real-life step" onBack={onBack}>
       <p className="hint">Start easier than you think you need to. A step counts once you've tested what you feared — anxiety doesn't have to drop. Repeat any step whenever you like.</p>
       {suggestions.length > 0 && (
         <>

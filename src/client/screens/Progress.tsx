@@ -105,7 +105,7 @@ export function Progress() {
       <section aria-labelledby="real-h">
         <h3 id="real-h">Try it for real</h3>
         <p className="hint">The point of practice is the next real conversation. Plan one small brave step, predict what you fear, and see what happens.</p>
-        <a className="button secondary" href={href({ name: "confidence" })}>
+        <a className="button secondary" href={href({ name: "steps" })}>
           Plan a brave step
         </a>
       </section>
@@ -287,7 +287,7 @@ function OnCamera() {
   const takes = data.sessions.filter((s) => s.mode === "camera" && s.completedAt);
   if (takes.length === 0) return null;
   const minutes = takes.reduce((n, s) => n + s.attempts.reduce((m, a) => m + (a.durationSeconds ?? 0), 0), 0) / 60;
-  const rated = takes.filter((s) => s.camera?.comfortBefore != null && s.camera.comfortAfter != null);
+  const rated = data.experiments.filter((e) => e.kind === "camera" && e.completedAt && e.anxietyAfter != null);
   const avg = (xs: number[]) => (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1);
   const drills = cameraProgress(data.sessions).filter((p) => p.completed > 0).length;
   const recent = [...takes]
@@ -315,14 +315,14 @@ function OnCamera() {
         </div>
         {rated.length >= 2 && (
           <div>
-            <dt>Comfort, before → after</dt>
+            <dt>Anxiety, before → during</dt>
             <dd>
-              {avg(rated.map((s) => s.camera!.comfortBefore!))} → {avg(rated.map((s) => s.camera!.comfortAfter!))}
+              {avg(rated.map((e) => e.anxietyBefore))} → {avg(rated.map((e) => e.anxietyAfter!))}
             </dd>
           </div>
         )}
       </dl>
-      <p className="hint">Comfort is self-reported, 0–10, on each take.</p>
+      <p className="hint">Anxiety is self-reported, 0–10, when you check in around a take.</p>
       {recent.length > 0 && (
         <details className="more">
           <summary>Last takes, measured here</summary>

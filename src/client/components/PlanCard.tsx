@@ -58,9 +58,9 @@ export function PlanCard({ learnStoryId }: { learnStoryId?: string }) {
       case "talk":
         return { name: "talk", scenario: spec.talkScenario };
       case "brave":
-        return { name: "confidence" };
+        return { name: "steps" };
       case "extra":
-        return spec.extra === "review" ? { name: "review" } : spec.extra === "lookback" ? null : { name: "confidence" };
+        return spec.extra === "review" ? { name: "review" } : spec.extra === "lookback" ? null : { name: "steps" };
     }
   };
 

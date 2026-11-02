@@ -12,6 +12,7 @@ import { href } from "../lib/router";
 import { ResponseCapture, type AttemptDraft } from "../components/ResponseCapture";
 import { CompareAttempts, FeedbackPanel, WrapUp } from "../components/Feedback";
 import { ErrorNotice, Loading, SessionTop, SourceLine, StepHeader, formatDate, useFocusMode } from "../components/common";
+import { AfterCheckin, BeforeCheckin, checkinExperiment, checkinSavedMessage, type Checkin } from "../components/Checkin";
 
 type Phase = "understand" | "recall" | "improve" | "retry" | "apply" | "save" | "done";
 const MAX_RETRIES = 2;
@@ -86,6 +87,8 @@ export function LearnSession({ storyId }: { storyId: string }) {
   const [saveChoice, setSaveChoice] = useState<SaveChoice | "none">("idea");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [answeringFollowUp, setAnsweringFollowUp] = useState(false);
+  const [checkin, setCheckin] = useState<Checkin | null>(null);
+  const [checkinSaved, setCheckinSaved] = useState<string | null>(null);
 
   const s = useSession(() => ({
     id: uid("s-"),
@@ -238,6 +241,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
           <StepHeader eyebrow={`${SKILLS[exercise.skill].name}${exercise.difficulty !== "starter" ? ` · level ${LEARN_EXERCISES[exercise.skill].indexOf(exercise.id) + 1}` : ""}`} title={phase === "retry" ? "Try again" : "Explain it from memory"} />
           <p className="task">{task}</p>
           {phase === "retry" && last?.feedback?.retryFocus && <p className="focus-tip">Focus: {last.feedback.retryFocus}</p>}
+          {phase === "recall" && mainAttempts.length === 0 && <BeforeCheckin defaultDrop={data.myHabits?.[0]} onChange={setCheckin} />}
           <ResponseCapture {...capture} label="Your explanation" submitLabel="Get feedback" onSubmit={(d) => void submitMain(d, phase === "retry")} />
           {s.error != null && (
             <ErrorNotice error={s.error} onRetry={() => void submitMain(null, phase === "retry")}>
@@ -352,6 +356,21 @@ export function LearnSession({ storyId }: { storyId: string }) {
             {retries > 0 ? ` and improved it with ${retries === 1 ? "a retry" : "two retries"}` : ""}.
           </p>
           {saveMsg && <p className="hint">{saveMsg}</p>}
+          {checkin && !checkinSaved && (
+            <AfterCheckin
+              checkin={checkin}
+              onSave={(anxietyAfter, outcome) => {
+                const e = checkinExperiment({ kind: "rehearsal", sessionId: s.session.id, createdAt: s.session.startedAt, situation: `Explained: ${briefing.title}`, checkin, anxietyAfter, outcome });
+                update((d) => ({ ...d, experiments: [...d.experiments, e] }));
+                setCheckinSaved(checkinSavedMessage(checkin.anxietyBefore, anxietyAfter, e.outcome));
+              }}
+            />
+          )}
+          {checkinSaved && (
+            <p className="notice ok" role="status">
+              {checkinSaved}
+            </p>
+          )}
           <WrapUp attempts={s.session.attempts} />
           <div className="actions">
             <a className="button primary" href={href({ name: "today" })}>
