@@ -1406,3 +1406,64 @@ button.small {
 .share-clip {
   margin-top: 0.25rem;
 }
+
+/* ---------- Recording (waveform, stop, pause) ---------- */
+.wave {
+  display: block;
+  width: 100%;
+  height: 56px;
+  color: var(--warm);
+  margin: 0.5rem 0 0.25rem;
+}
+.rec-box.paused .wave {
+  opacity: 0.5;
+}
+.mic.stop {
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: none;
+}
+@media (prefers-color-scheme: dark) {
+  .mic.stop {
+    background: var(--ink);
+    color: var(--bg);
+  }
+}
+.tabbar a {
+  min-height: 56px;
+}
+
+/* Session-end mark: one subtle animation; none with reduced motion */
+.done-mark {
+  animation: pop 0.3s ease-out both;
+}
+@keyframes pop {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.dots {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 0.4rem;
+}
+.dot-day {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+.dot-day.on {
+  background: var(--accent);
+}
+.dots-section {
+  margin-bottom: 1.25rem;
+}

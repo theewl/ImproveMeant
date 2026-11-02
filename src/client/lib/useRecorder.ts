@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type RecorderState = "idle" | "requesting" | "recording" | "stopped" | "denied" | "unsupported" | "error";
+export type RecorderState = "idle" | "requesting" | "recording" | "paused" | "stopped" | "denied" | "unsupported" | "error";
 
 const PREFERRED_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
 
@@ -31,12 +31,21 @@ export function useRecorder() {
   const startedAt = useRef(0);
   const timer = useRef<number | null>(null);
   const cancelled = useRef(false);
+  const pausedAt = useRef<number | null>(null);
+  const pausedTotal = useRef(0);
+  const audioCtx = useRef<AudioContext | null>(null);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+
+  const elapsedNow = () => (performance.now() - startedAt.current - pausedTotal.current - (pausedAt.current != null ? performance.now() - pausedAt.current : 0)) / 1000;
 
   const cleanupStream = () => {
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     if (timer.current) window.clearInterval(timer.current);
     timer.current = null;
+    void audioCtx.current?.close().catch(() => undefined);
+    audioCtx.current = null;
+    setAnalyser(null);
   };
 
   useEffect(
@@ -94,7 +103,7 @@ export function useRecorder() {
       if (e.data && e.data.size > 0) chunks.current.push(e.data);
     };
     mr.onstop = () => {
-      const seconds = (performance.now() - startedAt.current) / 1000;
+      const seconds = elapsedNow();
       cleanupStream();
       if (cancelled.current) {
         setState("idle");
@@ -111,9 +120,44 @@ export function useRecorder() {
     };
     rec.current = mr;
     startedAt.current = performance.now();
+    pausedAt.current = null;
+    pausedTotal.current = 0;
     setElapsed(0);
     mr.start(1000);
-    timer.current = window.setInterval(() => setElapsed((performance.now() - startedAt.current) / 1000), 250);
+    timer.current = window.setInterval(() => setElapsed(elapsedNow()), 250);
+    // Live level meter for the waveform (optional; recording works without it).
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctx) {
+        const ctx = new Ctx();
+        const src = ctx.createMediaStreamSource(stream.current);
+        const an = ctx.createAnalyser();
+        an.fftSize = 1024;
+        an.smoothingTimeConstant = 0.6;
+        src.connect(an);
+        audioCtx.current = ctx;
+        setAnalyser(an);
+      }
+    } catch {
+      /* no meter */
+    }
+    setState("recording");
+  }, []);
+
+  const pause = useCallback(() => {
+    const mr = rec.current;
+    if (!mr || mr.state !== "recording" || typeof mr.pause !== "function") return;
+    mr.pause();
+    pausedAt.current = performance.now();
+    setState("paused");
+  }, []);
+
+  const resume = useCallback(() => {
+    const mr = rec.current;
+    if (!mr || mr.state !== "paused") return;
+    mr.resume();
+    if (pausedAt.current != null) pausedTotal.current += performance.now() - pausedAt.current;
+    pausedAt.current = null;
     setState("recording");
   }, []);
 
@@ -135,5 +179,5 @@ export function useRecorder() {
     setState(recordingSupported() ? "idle" : "unsupported");
   }, []);
 
-  return { state, elapsed, recording, error, start, stop, cancel, reset };
+  return { state, elapsed, recording, error, analyser, start, stop, pause, resume, cancel, reset };
 }

@@ -33,7 +33,10 @@ export function Today() {
   const { queue } = dueQueue(data.reviews, new Date().toISOString());
   const doneToday = data.sessions.filter((s) => s.completedAt && localDayKey(s.completedAt) === today).length;
   const max = data.prefs.sessionMinutes === 3 ? 3 : 4;
-  const [featured, ...rest] = cards?.slice(0, max) ?? [];
+  const planActive = !!data.plan;
+  const shown = cards?.slice(0, max) ?? [];
+  const featured = planActive ? undefined : shown[0];
+  const rest = planActive ? shown : shown.slice(1);
   const interestNames = data.prefs.interests.map((i) => ALL_INTERESTS.find((x) => x.id === i)?.label ?? i);
 
   return (
@@ -47,7 +50,7 @@ export function Today() {
             : "A mix of ideas worth knowing"}
       </p>
 
-      <PlanCard learnStoryId={featured?.id} />
+      <PlanCard learnStoryId={(featured ?? rest[0])?.id} />
 
       {queue.length > 0 && (
         <a className="pill-link" href={href({ name: "review" })}>
@@ -80,7 +83,7 @@ export function Today() {
       {rest.length > 0 && (
         <section aria-labelledby="more-h">
           <h3 id="more-h" className="section-title">
-            Or pick another
+            {planActive ? "Pick a story to explain" : "Or pick another"}
           </h3>
           <ul className="rows">
             {rest.map((c) => (

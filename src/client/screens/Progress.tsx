@@ -6,6 +6,7 @@ import { addRealWorld, summarize, upsertSession } from "../lib/state";
 import { summarizeExperiments } from "../../shared/confidence";
 import { phraseBank } from "./Phrases";
 import { href } from "../lib/router";
+import { localDayKey } from "../../shared/dates";
 import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
@@ -18,6 +19,8 @@ export function Progress() {
   return (
     <main className="screen" id="main">
       <h2>Progress</h2>
+      <ActivityDots />
+
       <section aria-labelledby="counts-h">
         <h3 id="counts-h">Practice</h3>
         <dl className="stats">
@@ -99,6 +102,41 @@ export function Progress() {
         {sessions.length === 0 ? <p className="hint">Your sessions will appear here.</p> : sessions.map((s) => <SessionEntry key={s.id} s={s} />)}
       </section>
     </main>
+  );
+}
+
+/** Last four weeks as dots: a day is filled if anything was practised. No streaks, no counts of misses. */
+function ActivityDots() {
+  const { data } = useApp();
+  const days = new Set<string>();
+  for (const s of data.sessions) if (s.completedAt) days.add(localDayKey(s.completedAt));
+  for (const e of data.experiments) if (e.completedAt) days.add(localDayKey(e.completedAt));
+  for (const r of data.reviews) for (const h of r.history) if (h.result !== "skipped") days.add(localDayKey(h.at));
+  for (const r of data.reframes) days.add(localDayKey(r.at));
+  const today = new Date();
+  const cells = Array.from({ length: 28 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (27 - i));
+    return { key: localDayKey(d), on: days.has(localDayKey(d)), label: d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) };
+  });
+  const active = cells.filter((c) => c.on).length;
+  return (
+    <section aria-labelledby="dots-h" className="dots-section">
+      <h3 id="dots-h" className="sr-only">
+        Last four weeks
+      </h3>
+      <ul className="dots" aria-label={`Days with practice in the last four weeks: ${active} of 28`}>
+        {cells.map((c) => (
+          <li key={c.key} className={c.on ? "dot-day on" : "dot-day"} title={c.label}>
+            <span className="sr-only">
+              {c.label}: {c.on ? "practised" : "no practice"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">
+        {active} day{active === 1 ? "" : "s"} with practice in the last four weeks. Gaps are normal; what matters is coming back.
+      </p>
+    </section>
   );
 }
 

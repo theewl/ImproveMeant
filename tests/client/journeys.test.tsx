@@ -274,9 +274,11 @@ describe("Confidence tools", () => {
     await user.click(await screen.findByRole("button", { name: "+ Ask a question in a meeting" }));
     await user.click(screen.getByRole("button", { name: "+ Give a 1-minute update to my team" }));
     await user.click(screen.getAllByRole("button", { name: "Plan" }).at(-1)!); // easiest rung is last (ladder shown hardest first)
-    await screen.findByRole("heading", { name: "Plan it" });
+    await screen.findByRole("heading", { name: "What will you do?" });
     expect(screen.getByRole("textbox", { name: "What will you do?" })).toHaveValue("Ask a question in a meeting");
+    await user.click(screen.getByRole("button", { name: "Next" }));
     await user.type(screen.getByRole("textbox", { name: "What are you worried will happen?" }), "My voice will shake and people will notice");
+    await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByLabelText("Avoiding eye contact"));
     await user.type(screen.getByLabelText("If"), "I lose my thread");
     await user.type(screen.getByLabelText("then I will"), "pause and restate my point");
@@ -394,9 +396,11 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
     start("#/confidence", onboarded({ confidenceIntroSeen: true }));
     await user.click(await screen.findByRole("button", { name: /How much is it getting in the way/ }));
     expect(screen.getByText(/not a diagnosis/)).toBeInTheDocument();
-    const groups = screen.getAllByRole("group");
-    for (const [i, g] of groups.entries()) await user.click(within(g).getByLabelText(i === 1 ? "A lot" : "A little"));
-    await user.click(screen.getByRole("button", { name: "See guidance" }));
+    for (let i = 0; i < 4; i++) {
+      const visible = document.querySelector("fieldset.impact-q:not([hidden])") as HTMLElement;
+      await user.click(within(visible).getByLabelText(i === 1 ? "A lot" : "A little"));
+      await user.click(screen.getByRole("button", { name: i < 3 ? "Next" : "See guidance" }));
+    }
     expect(await screen.findByText(/worth talking to a doctor or a licensed therapist/)).toBeInTheDocument();
     expect(stored().impactChecks[0]!.answers).toEqual([1, 3, 1, 1]);
   });

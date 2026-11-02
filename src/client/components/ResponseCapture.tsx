@@ -174,12 +174,14 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
     );
   }
 
-  if (r.state === "recording") {
+  if (r.state === "recording" || r.state === "paused") {
+    const paused = r.state === "paused";
     return (
-      <div className="rec-box live">
-        <p className="rec-indicator" aria-live="off">
-          <span className="dot pulse" aria-hidden="true" /> Recording
+      <div className={paused ? "rec-box live paused" : "rec-box live"}>
+        <p className="rec-indicator" aria-live="polite">
+          <span className={paused ? "dot" : "dot pulse"} aria-hidden="true" /> {paused ? "Paused" : "Recording"}
         </p>
+        <Waveform analyser={r.analyser} active={!paused} />
         {showTimer ? (
           <p className="timer" aria-label={`Elapsed ${Math.round(r.elapsed)} seconds`}>
             {formatSeconds(r.elapsed)}
@@ -189,9 +191,15 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           <p className="timer muted">Timer hidden</p>
         )}
         {overTarget && <p className="hint" role="status">Target reached — finish your thought.</p>}
+        <button className="mic stop" type="button" onClick={r.stop} aria-label="Finish recording">
+          <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+          </svg>
+        </button>
+        <p className="mic-caption">Tap to finish</p>
         <div className="row">
-          <button className="primary" type="button" onClick={r.stop}>
-            Finish
+          <button className="secondary small" type="button" onClick={paused ? r.resume : r.pause}>
+            {paused ? "Resume" : "Pause"}
           </button>
           <button className="link" type="button" onClick={r.cancel}>
             Cancel
@@ -395,4 +403,74 @@ function ShareClip({ blob }: { blob: Blob }) {
       {status === "failed" && <p className="hint">Sharing didn't work on this device.</p>}
     </div>
   );
+}
+
+/** Live input level bars drawn on a canvas. Static (low-rate) when reduced motion is preferred; frozen while paused. */
+function Waveform({ analyser, active }: { analyser: AnalyserNode | null; active: boolean }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const bars = useRef<number[]>(Array(40).fill(0.05));
+  useEffect(() => {
+    const c = canvas.current;
+    if (!c) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    let raf = 0;
+    let timer = 0;
+    let last = 0;
+    const buf = analyser ? new Uint8Array(analyser.fftSize) : null;
+    const draw = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.clientWidth;
+      const h = c.clientHeight;
+      if (c.width !== w * dpr || c.height !== h * dpr) {
+        c.width = w * dpr;
+        c.height = h * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const color = getComputedStyle(c).color;
+      const n = bars.current.length;
+      const gap = 3;
+      const bw = (w - gap * (n - 1)) / n;
+      bars.current.forEach((v, i) => {
+        const bh = Math.max(3, v * h);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.35 + 0.65 * (i / n);
+        ctx.fillRect(i * (bw + gap), (h - bh) / 2, bw, bh);
+      });
+      ctx.globalAlpha = 1;
+    };
+    const sample = () => {
+      if (analyser && buf && active) {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const x = (buf[i]! - 128) / 128;
+          sum += x * x;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        bars.current = [...bars.current.slice(1), Math.min(1, 0.05 + rms * 3)];
+      }
+      draw();
+    };
+    if (reduced) {
+      timer = window.setInterval(sample, 250);
+    } else {
+      const loop = (t: number) => {
+        if (t - last > 50) {
+          last = t;
+          sample();
+        }
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+    }
+    draw();
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(timer);
+    };
+  }, [analyser, active]);
+  return <canvas ref={canvas} className="wave" aria-hidden="true" />;
 }

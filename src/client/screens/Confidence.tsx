@@ -287,9 +287,11 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
   const [obstacle, setObstacle] = useState("");
   const [action, setAction] = useState("");
   const [worry, setWorry] = useState(""); // deliberately not saved
+  const [page, setPage] = useState(1);
   const ok = situation.trim().length > 2 && prediction.trim().length > 2;
+  const titles = ["", "What will you do?", "What are you worried will happen?", "Before you go"];
   return (
-    <SubScreen eyebrow="Brave step" title="Plan it" onBack={onCancel}>
+    <SubScreen eyebrow={`Brave step · ${page} of 3`} title={titles[page]!} onBack={page === 1 ? onCancel : () => setPage(page - 1)}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -308,10 +310,25 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
           });
         }}
       >
-        <TextField label="What will you do?" value={situation} onChange={setSituation} hint="e.g. Ask one question in Tuesday's team meeting" />
-        <TextField label="What are you worried will happen?" value={prediction} onChange={setPrediction} hint="Be specific: 'My voice will shake and people will think I'm unprepared.'" />
-        <Slider label="How likely does that feel?" value={likelihood} onChange={setLikelihood} min={0} max={100} suffix="%" />
-        <Slider label="How anxious do you feel about it now?" value={anxiety} onChange={setAnxiety} min={0} max={10} suffix="/10" />
+        <div hidden={page !== 1}>
+          <TextField label="What will you do?" value={situation} onChange={setSituation} hint="e.g. Ask one question in Tuesday's team meeting" />
+          <div className="actions sticky">
+            <button className="primary" type="button" disabled={situation.trim().length < 3} onClick={() => setPage(2)}>
+              Next
+            </button>
+          </div>
+        </div>
+        <div hidden={page !== 2}>
+          <TextField label="What are you worried will happen?" value={prediction} onChange={setPrediction} hint="Be specific: 'My voice will shake and people will think I'm unprepared.'" />
+          <Slider label="How likely does that feel?" value={likelihood} onChange={setLikelihood} min={0} max={100} suffix="%" />
+          <Slider label="How anxious do you feel about it now?" value={anxiety} onChange={setAnxiety} min={0} max={10} suffix="/10" />
+          <div className="actions sticky">
+            <button className="primary" type="button" disabled={prediction.trim().length < 3} onClick={() => setPage(3)}>
+              Next
+            </button>
+          </div>
+        </div>
+        <div hidden={page !== 3}>
         <fieldset className="pills">
           <legend className="label">Optional: one habit to drop this time</legend>
           {SAFETY_BEHAVIOURS.map((b) => (
@@ -350,12 +367,13 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
           </div>
         )}
         <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
-        <CrisisNotice texts={[situation, prediction, worry]} />
         <div className="actions sticky">
           <button className="primary" type="submit" disabled={!ok}>
             Save my plan
           </button>
         </div>
+        </div>
+        <CrisisNotice texts={[situation, prediction, worry]} />
       </form>
     </SubScreen>
   );
@@ -641,6 +659,7 @@ function SelfCheck({ onBack }: { onBack: () => void }) {
   const { data, update } = useApp();
   const [answers, setAnswers] = useState<(number | null)[]>(IMPACT_QUESTIONS.map(() => null));
   const [result, setResult] = useState<"seek-support" | "self-help" | null>(null);
+  const [qi, setQi] = useState(0);
   const last = data.impactChecks[data.impactChecks.length - 1];
   const complete = answers.every((a) => a != null);
 
@@ -678,9 +697,8 @@ function SelfCheck({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <SubScreen eyebrow="Self-check · not a diagnosis" title="How much is it getting in the way?" onBack={onBack}>
-      <p className="hint">Think about the last two weeks. There are no right answers.</p>
-      {last && <p className="hint">Last checked {formatDate(last.at)}.</p>}
+    <SubScreen eyebrow={`Self-check · ${qi + 1} of ${IMPACT_QUESTIONS.length} · not a diagnosis`} title={IMPACT_QUESTIONS[qi]!} onBack={qi === 0 ? onBack : () => setQi(qi - 1)}>
+      {qi === 0 && <p className="hint">Think about the last two weeks. There are no right answers.{last ? ` Last checked ${formatDate(last.at)}.` : ""}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -690,24 +708,30 @@ function SelfCheck({ onBack }: { onBack: () => void }) {
           setResult(impactGuidance(a));
         }}
       >
-        {IMPACT_QUESTIONS.map((q, qi) => (
-          <fieldset key={q} className="impact-q">
-            <legend className="label">{q}</legend>
-            <div className="pills">
+        {IMPACT_QUESTIONS.map((q, i) => (
+          <fieldset key={q} className="impact-q" hidden={i !== qi}>
+            <legend className="sr-only">{q}</legend>
+            <div className="options">
               {IMPACT_SCALE.map((label, v) => (
-                <label key={label} className={answers[qi] === v ? "pill on" : "pill"}>
-                  <input type="radio" name={`impact-${qi}`} checked={answers[qi] === v} onChange={() => setAnswers((xs) => xs.map((x, i) => (i === qi ? v : x)))} />
+                <label key={label} className={answers[i] === v ? "option on" : "option"}>
+                  <input type="radio" name={`impact-${i}`} checked={answers[i] === v} onChange={() => setAnswers((xs) => xs.map((x, j) => (j === i ? v : x)))} />
                   {label}
                 </label>
               ))}
             </div>
-            {last && <p className="hint small-hint">Last time: {IMPACT_SCALE[last.answers[qi] ?? 0]}</p>}
+            {last && <p className="hint small-hint">Last time: {IMPACT_SCALE[last.answers[i] ?? 0]}</p>}
           </fieldset>
         ))}
         <div className="actions sticky">
-          <button className="primary" type="submit" disabled={!complete}>
-            See guidance
-          </button>
+          {qi < IMPACT_QUESTIONS.length - 1 ? (
+            <button className="primary" type="button" disabled={answers[qi] == null} onClick={() => setQi(qi + 1)}>
+              Next
+            </button>
+          ) : (
+            <button className="primary" type="submit" disabled={!complete}>
+              See guidance
+            </button>
+          )}
         </div>
       </form>
     </SubScreen>
