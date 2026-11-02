@@ -23,9 +23,10 @@ export function AppProvider({ children, initial }: { children: ReactNode; initia
   const [saveFailed, setSaveFailed] = useState(false);
   const first = useRef(true);
 
-  useEffect(() => {
-    setAccessToken(data.prefs.accessToken);
-  }, [data.prefs.accessToken]);
+  // Set synchronously during render, not in an effect: children's effects (the first
+  // stories request on Today) run before this provider's effects, so an effect here
+  // would send the first request after a reload without the saved token (HTTP 401).
+  setAccessToken(data.prefs.accessToken);
 
   useEffect(() => {
     if (first.current && initial) {

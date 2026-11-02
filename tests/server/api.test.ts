@@ -167,9 +167,10 @@ describe("live content pipeline", () => {
 
   it("lists live stories with source metadata, generates a grounded briefing once, and caches it", async () => {
     const { provider } = fakeContent();
-    const t = fakeTransport([textMessage("not json (curation falls back)"), textMessage(briefingOut)]);
+    const t = fakeTransport([textMessage(briefingOut)]);
     const { call } = buildTestApp({ transport: t, content: provider, now });
     const list = await (await call("/api/stories?interests=environment")).json();
+    expect(list.curation).toBe("available");
     const live = list.cards.find((c: { kind: string }) => c.kind === "current");
     expect(live.source.publisher).toMatch(/Wikipedia/);
     expect(live.source.retrievedAt).toBeTruthy();
@@ -186,7 +187,7 @@ describe("live content pipeline", () => {
     expect(b.keyTerm.inContext).toBe("better spent on cooling centres");
 
     await call("/api/stories/wp-123/briefing");
-    expect(t.calls).toHaveLength(2); // one curation attempt + one briefing
+    expect(t.calls).toHaveLength(1); // the stories list never calls the model
     expect(provider.calls.fetch).toBe(1);
     const again = await (await call("/api/stories?interests=environment")).json();
     expect(again.cards[0].briefingReady).toBe(true);
@@ -194,7 +195,7 @@ describe("live content pipeline", () => {
 
   it("refuses to brief from too-short source text and stops offering the story", async () => {
     const { provider } = fakeContent({ doc: { text: "A short headline-length snippet." } });
-    const t = fakeTransport([textMessage("not json (curation falls back)"), textMessage(briefingOut)]);
+    const t = fakeTransport([textMessage(briefingOut)]);
     const { call } = buildTestApp({ transport: t, content: provider, now });
     await call("/api/stories");
     const before = t.calls.length;
@@ -271,12 +272,12 @@ describe("live content pipeline", () => {
 
   it("sends only the server-side briefing (not client text) as feedback context", async () => {
     const { provider } = fakeContent();
-    const t = fakeTransport([textMessage("not json (curation falls back)"), textMessage(briefingOut), textMessage(goodFeedback)]);
+    const t = fakeTransport([textMessage(briefingOut), textMessage(goodFeedback)]);
     const { call, post } = buildTestApp({ transport: t, content: provider, now });
     await call("/api/stories");
     await call("/api/stories/wp-123/briefing");
     await post("/api/feedback", feedbackBody({ storyId: "wp-123" }));
-    const user = (t.calls[2]!.messages as { content: string }[])[0]!.content;
+    const user = (t.calls[1]!.messages as { content: string }[])[0]!.content;
     expect(user).toContain(briefingOut.mainIdea);
     expect(user).not.toContain(SOURCE_TEXT.slice(0, 200)); // compact context: briefing only, not full article
   });
@@ -410,15 +411,18 @@ describe("curated picks and refresh", () => {
     const { provider } = fakeContent({ candidates: cands });
     const t = fakeTransport([textMessage(curation)]);
     const { call } = buildTestApp({ transport: t, content: provider, now });
-    const r = await (await call("/api/stories?interests=business")).json();
-    const live = r.cards.filter((c: { kind: string }) => c.kind === "current");
+    const plain = await (await call("/api/stories?interests=business")).json();
+    expect(t.calls).toHaveLength(0); // the fast list never waits on the model
+    expect(plain.curation).toBe("available");
+    const r = await (await call("/api/stories/picks?interests=business")).json();
+    const live = r.cards;
     expect(live.map((c: { id: string }) => c.id)).toEqual(["wp-2", "wp-3", "wp-777"]);
     expect(live[0].whySelected).toBe("Everyone is feeling it and few can explain it.");
     expect(live[2]).toMatchObject({ feed: "timeless", title: "Looked-up topic", whySelected: "Timeless and useful at work." });
     const user = (t.calls[0]!.messages as { content: string }[])[0]!.content;
     expect(user).toContain("Interests: Business & work");
     expect(user).toContain("- Inflation · Rise in prices · trending");
-    await call("/api/stories?interests=business");
+    await call("/api/stories/picks?interests=business");
     expect(t.calls).toHaveLength(1);
     // A timeless pick can be opened like any live story.
     expect((await call("/api/stories/wp-777/status")).status).toBe(200);
@@ -427,8 +431,8 @@ describe("curated picks and refresh", () => {
   it("falls back to the plain interest match when curation output is unusable", async () => {
     const { provider } = fakeContent({ candidates: cands });
     const { call } = buildTestApp({ transport: fakeTransport([textMessage("not json")]), content: provider, now });
-    const r = await (await call("/api/stories?interests=science")).json();
-    const live = r.cards.filter((c: { kind: string }) => c.kind === "current");
+    const r = await (await call("/api/stories/picks?interests=science")).json();
+    const live = r.cards;
     expect(live.length).toBeGreaterThan(0);
     expect(live[0].id).toBe("wp-3"); // interest match first
   });
@@ -438,12 +442,14 @@ describe("curated picks and refresh", () => {
     const t = fakeTransport([textMessage(curation), textMessage(curation)]);
     let clock = new Date("2026-11-01T12:00:00Z");
     const { call } = buildTestApp({ transport: t, content: provider, now: () => clock });
-    await call("/api/stories?interests=business");
+    await call("/api/stories/picks?interests=business");
     expect(provider.calls.list).toBe(1);
+    expect(t.calls).toHaveLength(1);
     clock = new Date("2026-11-01T12:05:00Z");
     const a = await (await call("/api/stories?interests=business&refresh=1&seed=1")).json();
     expect(provider.calls.list).toBe(2);
-    expect(t.calls).toHaveLength(2);
+    await call("/api/stories/picks?interests=business");
+    expect(t.calls).toHaveLength(2); // re-curated after the refresh
     const b = await (await call("/api/stories?interests=business&seed=2")).json();
     const ever = (x: { cards: { kind: string; id: string }[] }) => x.cards.filter((c) => c.kind === "evergreen").map((c) => c.id);
     expect(ever(a)).not.toEqual(ever(b));

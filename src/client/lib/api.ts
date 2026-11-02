@@ -16,17 +16,31 @@ export function setAccessToken(t: string | undefined) {
   accessToken = t || undefined;
 }
 
+/** Works on browsers without AbortSignal.timeout (older iOS Safari). */
+function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void; timedOut: () => boolean } {
+  const ctl = new AbortController();
+  let fired = false;
+  const t = setTimeout(() => {
+    fired = true;
+    ctl.abort();
+  }, ms);
+  return { signal: ctl.signal, clear: () => clearTimeout(t), timedOut: () => fired };
+}
+
 async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 90_000): Promise<T> {
   const headers = new Headers(init.headers);
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const own = init.signal ? null : timeoutSignal(timeoutMs);
   let res: Response;
   try {
-    res = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(timeoutMs) });
+    res = await fetch(path, { ...init, headers, signal: init.signal ?? own!.signal });
   } catch (err) {
     const name = (err as Error).name;
+    if (own?.timedOut()) throw new ApiRequestError("provider_timeout", "The request took too long. Check your connection and try again.", true, 0);
     if (name === "AbortError") throw new ApiRequestError("cancelled", "Cancelled.", true, 0);
-    if (name === "TimeoutError") throw new ApiRequestError("provider_timeout", "The request took too long.", true, 0);
-    throw new ApiRequestError("network", "Couldn't reach the app server. Is it running?", true, 0);
+    throw new ApiRequestError("network", `Couldn't reach the app server (${name || "network error"}). Check your connection.`, true, 0);
+  } finally {
+    own?.clear();
   }
   let body: unknown = null;
   try {
@@ -36,7 +50,8 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 90_0
   }
   if (!res.ok) {
     const e = body as Partial<ApiError> | null;
-    throw new ApiRequestError(e?.code ?? "provider_error", e?.error ?? `Request failed (${res.status}).`, e?.retryable ?? res.status >= 500, res.status);
+    const msg = e?.error ?? (res.status === 504 ? "The server took too long to answer." : `Request failed.`);
+    throw new ApiRequestError(e?.code ?? "provider_error", `${msg} (HTTP ${res.status})`, e?.retryable ?? res.status >= 500, res.status);
   }
   return body as T;
 }
@@ -52,7 +67,8 @@ export interface LiveFeedState {
 export const api = {
   status: () => request<AppStatus>("/api/status"),
   stories: (interests: Interest[], opts: { refresh?: boolean; seed?: number } = {}) =>
-    request<{ cards: StoryCard[]; live: LiveFeedState }>(`/api/stories?interests=${interests.join(",")}${opts.refresh ? "&refresh=1" : ""}${opts.seed ? `&seed=${opts.seed}` : ""}`),
+    request<{ cards: StoryCard[]; live: LiveFeedState; curation: "available" | "none" }>(`/api/stories?interests=${interests.join(",")}${opts.refresh ? "&refresh=1" : ""}${opts.seed ? `&seed=${opts.seed}` : ""}`),
+  storyPicks: (interests: Interest[]) => request<{ cards: StoryCard[] }>(`/api/stories/picks?interests=${interests.join(",")}`, {}, 60_000),
   briefing: (id: string, refresh = false) => request<Briefing & { sourceChanged: boolean }>(`/api/stories/${encodeURIComponent(id)}/briefing${refresh ? "?refresh=1" : ""}`),
   storyStatus: (id: string) => request<{ sourceVersion: string | null; sourceUpdatedAt?: string; known: boolean }>(`/api/stories/${encodeURIComponent(id)}/status`),
   feedback: (body: FeedbackBody) => request<{ feedback: Feedback; deduplicated: boolean }>("/api/feedback", json(body)),

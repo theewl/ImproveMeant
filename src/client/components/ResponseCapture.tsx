@@ -5,7 +5,7 @@ import { wordCount } from "../../shared/text";
 import { api, ApiRequestError } from "../lib/api";
 import { uid } from "../lib/storage";
 import { useRecorder, recordingSupported } from "../lib/useRecorder";
-import { useSpeechCapture } from "../lib/useSpeechCapture";
+import { isAppleWebKit, speechCaptureSupported, useSpeechCapture } from "../lib/useSpeechCapture";
 import { useApp } from "../lib/store";
 
 export interface AttemptDraft {
@@ -56,6 +56,8 @@ export function ResponseCapture(p: Props) {
       <div id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${modality === "spoken" ? "speak" : "type"}`}>
         {modality === "typed" ? (
           <TypedAnswer {...p} value={typed} onChange={setTyped} />
+        ) : isAppleWebKit() && !p.transcriptionAvailable && speechCaptureSupported() ? (
+          <SpeechOnlyAnswer {...p} onSwitchToTyped={() => setModality("typed")} />
         ) : (
           <SpokenAnswer {...p} onSwitchToTyped={() => setModality("typed")} />
         )}
@@ -114,11 +116,12 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   useEffect(() => () => abort.current?.abort(), []);
 
   // Run the browser's speech recognition alongside the recorder, so a transcript is ready on stop.
+  const concurrentSpeech = speech.supported && !isAppleWebKit();
   useEffect(() => {
-    if (!speech.supported) return;
+    if (!concurrentSpeech) return;
     if (r.state === "recording") speech.start();
     else speech.stop();
-  }, [r.state, speech.supported]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [r.state, concurrentSpeech]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When the recording stops with a usable browser transcript, go straight to "check and get feedback".
   useEffect(() => {
@@ -213,7 +216,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           <span className={paused ? "dot" : "dot pulse"} aria-hidden="true" /> {paused ? "Paused" : "Recording"}
         </p>
         <Waveform analyser={r.analyser} active={!paused} />
-        {speech.supported && !speech.failed && (speech.text || speech.interim) && (
+        {concurrentSpeech && !speech.failed && (speech.text || speech.interim) && (
           <p className="live-transcript" aria-live="off">
             {speech.text} <span className="interim">{speech.interim}</span>
           </p>
@@ -308,9 +311,9 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
       {txState === "none" && (
         <div className="stack">
           <p className="hint">
-            {speech.supported && !speech.failed
+            {concurrentSpeech && !speech.failed
               ? "Your browser didn't catch enough words to make a transcript. "
-              : speech.failed
+              : concurrentSpeech && speech.failed
                 ? "Your browser's speech recognition didn't work this time. "
                 : ""}
             Feedback is based on what you said, so it needs the words.
@@ -535,4 +538,138 @@ function Waveform({ analyser, active }: { analyser: AnalyserNode | null; active:
     };
   }, [analyser, active]);
   return <canvas ref={canvas} className="wave" aria-hidden="true" />;
+}
+
+/**
+ * iPhone/iPad and Safari without a transcription key: the browser can transcribe OR record,
+ * not both. This mode transcribes live (no playback) so feedback still works.
+ */
+function SpeechOnlyAnswer(p: Props & { onSwitchToTyped: () => void }) {
+  const speech = useSpeechCapture();
+  const { data } = useApp();
+  const [phase, setPhase] = useState<"idle" | "listening" | "done">("idle");
+  const [elapsed, setElapsed] = useState(0);
+  const [transcript, setTranscript] = useState("");
+  const startedAt = useRef(0);
+  const timer = useRef<number | null>(null);
+  const tid = useId();
+  const showTimer = !data.prefs.quietMode;
+
+  useEffect(() => () => { if (timer.current) window.clearInterval(timer.current); }, []);
+
+  const start = () => {
+    speech.reset();
+    speech.start();
+    startedAt.current = performance.now();
+    setElapsed(0);
+    timer.current = window.setInterval(() => setElapsed((performance.now() - startedAt.current) / 1000), 250);
+    setPhase("listening");
+  };
+  const finish = () => {
+    speech.stop();
+    if (timer.current) window.clearInterval(timer.current);
+    timer.current = null;
+    setTranscript([speech.text, speech.interim].filter(Boolean).join(" ").trim());
+    setPhase("done");
+  };
+  const words = wordCount(transcript);
+  const tooLong = transcript.length > p.maxChars;
+  const target = p.targetSeconds;
+
+  if (phase === "idle") {
+    return (
+      <div className="rec-box">
+        {speech.failed && (
+          <p className="error-text" role="alert">
+            Speech recognition isn't available right now. You can type your answer instead.
+          </p>
+        )}
+        <button className="mic" type="button" onClick={start} aria-label="Start speaking">
+          <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+            <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+            <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+          </svg>
+        </button>
+        <p className="mic-caption">Tap to speak</p>
+        <p className="hint center">On this device the browser transcribes as you talk (no audio playback). Your device may send the audio to Apple to do this.</p>
+        <button className="link" type="button" onClick={p.onSwitchToTyped}>
+          Prefer to type?
+        </button>
+      </div>
+    );
+  }
+  if (phase === "listening") {
+    return (
+      <div className="rec-box live">
+        <p className="rec-indicator" aria-live="polite">
+          <span className="dot pulse" aria-hidden="true" /> Listening
+        </p>
+        {showTimer && (
+          <p className="timer" aria-label={`Elapsed ${Math.round(elapsed)} seconds`}>
+            {formatSeconds(elapsed)}
+            {target ? <span className="timer-target"> / {formatSeconds(target)}</span> : null}
+          </p>
+        )}
+        <p className="live-transcript" aria-live="off">
+          {speech.text} <span className="interim">{speech.interim}</span>
+        </p>
+        {speech.failed && (
+          <p className="error-text" role="alert">
+            Speech recognition stopped ({speech.failed}). Finish and type what you said.
+          </p>
+        )}
+        <button className="mic stop" type="button" onClick={finish} aria-label="Finish speaking">
+          <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+          </svg>
+        </button>
+        <p className="mic-caption">Tap to finish</p>
+        <button
+          className="link"
+          type="button"
+          onClick={() => {
+            speech.reset();
+            if (timer.current) window.clearInterval(timer.current);
+            setPhase("idle");
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="rec-box done-rec">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (words < 3 || tooLong || p.busy) return;
+          const manual = !speech.text.trim();
+          p.onSubmit({
+            modality: "spoken",
+            text: transcript.trim(),
+            transcriptEdited: transcript.trim() !== [speech.text, speech.interim].filter(Boolean).join(" ").trim(),
+            transcriptSource: manual ? "typed-by-user" : "browser-speech",
+            durationSeconds: elapsed,
+            delivery: { basis: "recording-length-only", recordingSeconds: elapsed, limitations: "Transcribed live by your browser; no audio was kept, so nothing about pace or pauses was measured." },
+            keepAudio: false,
+          });
+        }}
+      >
+        <label className="label" htmlFor={tid}>
+          {speech.text.trim() ? "Check the transcript, fix any mistakes, then get feedback" : "Nothing was recognised — type what you said to get feedback"}
+        </label>
+        <textarea id={tid} rows={7} value={transcript} onChange={(e) => setTranscript(e.target.value)} />
+        <p className="hint" aria-live="polite">
+          {tooLong ? `Too long — limit ${p.maxChars} characters` : `${words} words · ${formatSeconds(elapsed)}`}
+        </p>
+        <button className="primary" type="submit" disabled={words < 3 || tooLong || p.busy} aria-busy={p.busy}>
+          {p.busy ? "Working…" : p.submitLabel}
+        </button>
+        <button className="link" type="button" onClick={start}>
+          Speak again
+        </button>
+      </form>
+    </div>
+  );
 }

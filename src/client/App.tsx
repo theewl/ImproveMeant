@@ -52,9 +52,13 @@ export function App() {
           </>
         )}
       </header>
-      {status?.mode === "demo" && (route.name === "today" || route.name === "settings") && <p className="banner demo">Demo mode — feedback is an example, not about your answer.</p>}
-      {statusError && <p className="banner error">Can't reach the app server: {statusError}</p>}
-      {saveFailed && <p className="banner error">Your browser couldn't save progress (storage full or disabled).</p>}
+      {((status?.mode === "demo" && (route.name === "today" || route.name === "settings")) || statusError || saveFailed) && (
+        <aside aria-label="App status">
+          {status?.mode === "demo" && (route.name === "today" || route.name === "settings") && <p className="banner demo">Demo mode — feedback is an example, not about your answer.</p>}
+          {statusError && <p className="banner error">Can't reach the app server: {statusError}</p>}
+          {saveFailed && <p className="banner error">Your browser couldn't save progress (storage full or disabled).</p>}
+        </aside>
+      )}
 
       {route.name === "onboarding" && <Onboarding />}
       {route.name === "today" && <Today />}

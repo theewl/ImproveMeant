@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../lib/store";
+import { api, ApiRequestError } from "../lib/api";
 import { exportJson } from "../lib/storage";
 import { localDayKey } from "../../shared/dates";
 import { PreferencesForm } from "./Onboarding";
@@ -10,6 +11,7 @@ export function Settings() {
   const [saved, setSaved] = useState(false);
   const [token, setToken] = useState(data.prefs.accessToken ?? "");
   const [deleted, setDeleted] = useState(false);
+  const [check, setCheck] = useState<string | null>(null);
 
   return (
     <main className="screen" id="main">
@@ -50,6 +52,29 @@ export function Settings() {
         ) : (
           <p className="hint">Server status unavailable.</p>
         )}
+        <div className="row wrap">
+          <button
+            className="secondary small"
+            type="button"
+            onClick={async () => {
+              setCheck("Checking…");
+              try {
+                const r = await api.stories(data.prefs.interests);
+                setCheck(`Connected. ${r.cards.length} stories available${status?.accessTokenRequired ? " · access token accepted" : ""}.`);
+              } catch (e) {
+                const err = e as ApiRequestError;
+                setCheck(`Not working: ${err.message}${err.code ? ` [${err.code}]` : ""}`);
+              }
+            }}
+          >
+            Check connection
+          </button>
+          {check && (
+            <p className="hint" role="status">
+              {check}
+            </p>
+          )}
+        </div>
         {status?.accessTokenRequired && (
           <form
             onSubmit={(e) => {
@@ -59,7 +84,7 @@ export function Settings() {
             }}
           >
             <label className="label" htmlFor="token">
-              Access token for this server
+              Access token for this server {data.prefs.accessToken ? `(saved: ${data.prefs.accessToken.length} characters)` : "(none saved)"}
             </label>
             <input id="token" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
             <button className="secondary" type="submit">
