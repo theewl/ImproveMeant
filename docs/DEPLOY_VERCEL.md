@@ -11,7 +11,7 @@ The repo builds its own Vercel output, defined in `vercel.json` and `scripts/bui
    - Framework Preset: **Other**.
    - Leave the build and output settings empty or default; `vercel.json` sets them.
    - Node.js version: **22.x**.
-2. **Project → Storage → add Upstash Redis** (from the Marketplace; free tier is fine) and connect it to this project. This adds `KV_REST_API_URL` / `KV_REST_API_TOKEN` or `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` automatically. Both naming schemes work.
+2. *(Optional but recommended)* **Project → Storage → add Upstash Redis** (from the Marketplace; free tier is fine) and connect it to this project. This adds `KV_REST_API_URL` / `KV_REST_API_TOKEN` or `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` automatically. Both naming schemes work.
 3. **Project → Settings → Environment Variables** (Production and Preview):
 
    | Name | Value |
@@ -20,6 +20,7 @@ The repo builds its own Vercel output, defined in `vercel.json` and `scripts/bui
    | `APP_ACCESS_TOKEN` | a long random password (required: without it the API refuses requests from the internet) |
    | `CONTENT_USER_AGENT` | e.g. `ClearlinePersonal/0.1 (you@example.com)` |
    | optional `DEEPGRAM_API_KEY` | for transcription |
+   | `SKIP_SHARED_STORAGE` | `true` **only if you skipped Upstash**. The app's daily/monthly caps then won't hold across instances: set a spend limit in the Anthropic Console and track spend there. Live-news briefings may also be regenerated more often (small extra cost). |
    | optional `USAGE_DAILY_COST_LIMIT_USD`, `USAGE_MONTHLY_COST_LIMIT_USD` | defaults: 1.50 / 20 |
 
 4. **Deploy:** go to **Deployments → Redeploy** the latest one, or push to the production branch. Environment variables only apply to deployments made after you add them.
