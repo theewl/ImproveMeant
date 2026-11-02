@@ -18,6 +18,8 @@ export interface AppData {
   reframes: Reframe[];
   /** Briefings made from material the learner pasted. Local only; never on the server. */
   ownBriefings: Record<string, Briefing>;
+  /** Safety habits the learner says they use (from the intro). */
+  myHabits?: string[];
   /** Self-check history (non-diagnostic). */
   impactChecks: ImpactCheck[];
   /** Optional 4-week guided plan. */

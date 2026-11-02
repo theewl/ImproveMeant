@@ -18,11 +18,16 @@ import { useApp } from "../lib/store";
 import { uid } from "../lib/storage";
 import { formatDate } from "../components/common";
 
-type View = { name: "home" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "ladder" } | { name: "reframe" } | { name: "selfcheck" };
+type View = { name: "home" } | { name: "start" } | { name: "pick" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "reframe" } | { name: "selfcheck" };
 
+/**
+ * One path, in this order: why it feels hard → pick a small step → predict → do it
+ * (attention out, one habit dropped) → check what happened → next step.
+ * Thought untangling and the self-check are side doors, not the main road.
+ */
 export function Confidence() {
   const { data, update } = useApp();
-  const [view, setView] = useState<View>({ name: "home" });
+  const [view, setView] = useState<View>(data.confidenceIntroSeen ? { name: "home" } : { name: "start" });
   const [flash, setFlash] = useState<string | null>(null);
   const go = (v: View, msg: string | null = null) => {
     setFlash(msg);
@@ -30,14 +35,25 @@ export function Confidence() {
     window.scrollTo?.({ top: 0 });
   };
 
+  if (view.name === "start")
+    return (
+      <Start
+        onDone={(habits) => {
+          update((d) => ({ ...d, confidenceIntroSeen: true, myHabits: habits }));
+          go({ name: "pick" });
+        }}
+      />
+    );
+  if (view.name === "pick") return <Ladder onBack={() => go({ name: "home" })} onPlan={(step) => go({ name: "plan", step })} />;
   if (view.name === "plan")
     return (
       <PlanStep
         step={view.step}
+        defaultDrop={data.myHabits?.[0]}
         onCancel={() => go({ name: "home" })}
         onSave={(e) => {
           update((d) => ({ ...d, experiments: [...d.experiments, e] }));
-          go({ name: "home" }, "Saved. Come back afterwards and tell us how it went.");
+          go({ name: "home" }, "Planned. When you've done it, come back and tap “What happened?”.");
         }}
       />
     );
@@ -56,136 +72,114 @@ export function Confidence() {
     );
   }
   if (view.name === "selfcheck") return <SelfCheck onBack={() => go({ name: "home" })} />;
-  if (view.name === "ladder") return <Ladder onBack={() => go({ name: "home" })} onPlan={(step) => go({ name: "plan", step })} />;
   if (view.name === "reframe")
     return (
       <ReframeFlow
         onCancel={() => go({ name: "home" })}
         onSave={(r) => {
           update((d) => ({ ...d, reframes: [...d.reframes, r] }));
-          go({ name: "home" }, "Saved. Nice work untangling that.");
+          go({ name: "home" }, "Saved. Now the real test: take the step and see what happens.");
         }}
       />
     );
 
   const next = suggestNextStep(data.ladder, data.experiments);
-  const pending = data.experiments.filter((e) => !e.completedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const pending = data.experiments.filter((e) => !e.completedAt && e.kind === "real-world").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const real = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
   const reh = summarizeExperiments(data.experiments.filter((e) => e.kind === "rehearsal"));
   const cmp = compareSafetyBehaviours(data.experiments);
+  const stepNumber = real.completed + 1;
 
   return (
     <main className="screen" id="main">
       <h2 className="page-title">Confidence</h2>
-      <p className="hint">Small brave steps, and a calmer way to think about them.</p>
-
-      {!data.confidenceIntroSeen && (
-        <div className="notice">
-          <p>
-            These are self-help tools based on techniques from cognitive behavioral therapy (CBT). They're not therapy or a diagnosis. If anxiety is getting in the
-            way of work, relationships or daily life, a doctor or licensed therapist can help.
-          </p>
-          <button className="secondary" type="button" onClick={() => update((d) => ({ ...d, confidenceIntroSeen: true }))}>
-            Got it
-          </button>
-        </div>
-      )}
+      <p className="hint">One small brave step at a time. Predict what you fear, do it, see what really happens.</p>
       {flash && (
         <p className="notice ok" role="status">
           {flash}
         </p>
       )}
 
-      {pending.map((e) => (
-        <button key={e.id} type="button" className="pill-link as-button" onClick={() => go({ name: "checkin", id: e.id })}>
-          <span>
-            <strong>How did it go?</strong> {e.situation}
-          </span>
-          <span aria-hidden="true">→</span>
-        </button>
-      ))}
-
-      <article className="featured">
-        <p className="eyebrow">Next brave step</p>
-        {next ? (
-          <>
-            <h3>{next.title}</h3>
-            <p className="hint">
-              {(() => {
-                return `Expected discomfort: ${next.expectedDiscomfort}/10. A step counts once you've tested it — your anxiety doesn't have to drop.`;
-              })()}
-            </p>
-            <button className="primary" type="button" onClick={() => go({ name: "plan", step: next })}>
-              Plan it
+      {pending.length > 0 ? (
+        pending.map((e) => (
+          <article key={e.id} className="featured">
+            <p className="eyebrow">Your current step</p>
+            <h3>{e.situation}</h3>
+            <p className="hint">You expect: {e.prediction || "—"} ({e.predictionLikelihood}% sure){e.safetyBehaviourToDrop ? ` · without: ${e.safetyBehaviourToDrop.toLowerCase()}` : ""}</p>
+            <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
+            <button className="primary" type="button" onClick={() => go({ name: "checkin", id: e.id })}>
+              What happened?
             </button>
-          </>
-        ) : (
-          <>
-            <h3>Plan a speaking moment</h3>
-            <p className="hint">Predict what you're worried about, do it, then compare. It's how you find out what really happens.</p>
-            <button className="primary" type="button" onClick={() => go({ name: "plan" })}>
-              Plan one
-            </button>
-          </>
-        )}
-      </article>
-
-      {(real.tested > 0 || reh.tested > 0) && (
-        <p className="result-line">
-          {real.tested > 0 && (
-            <span>
-              Real life: <strong>{real.fearNotHappened} of {real.tested}</strong> feared outcome{real.tested === 1 ? "" : "s"} didn't happen
-              {real.fearPartly ? ` (${real.fearPartly} partly)` : ""}.
-            </span>
+          </article>
+        ))
+      ) : (
+        <article className="featured">
+          <p className="eyebrow">Brave step {stepNumber}</p>
+          {next ? (
+            <>
+              <h3>{next.title}</h3>
+              <p className="hint">Expected discomfort {next.expectedDiscomfort}/10. Say what you fear will happen, then find out.</p>
+              <button className="primary" type="button" onClick={() => go({ name: "plan", step: next })}>
+                Plan this step
+              </button>
+              <button className="link" type="button" onClick={() => go({ name: "pick" })}>
+                Choose a different step
+              </button>
+            </>
+          ) : (
+            <>
+              <h3>Pick a small step</h3>
+              <p className="hint">Start easier than you think you need to. You'll climb from there.</p>
+              <button className="primary" type="button" onClick={() => go({ name: "pick" })}>
+                Pick a brave step
+              </button>
+            </>
           )}
-          {reh.tested > 0 && (
-            <span className="block">
-              Rehearsals: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
-            </span>
-          )}
-        </p>
+        </article>
       )}
 
-      {cmp && (
-        <div className="compare-card">
-          <p className="eyebrow">Dropping safety habits · self-reported</p>
-          <div className="compare">
-            <div className="compare-col">
-              <p className="eyebrow">Dropped a habit ({cmp.dropped.count})</p>
-              <p>
-                Anxiety during: <strong>{cmp.dropped.avgAnxiety}/10</strong>
-              </p>
-              <p className="hint">Feared outcome happened {cmp.dropped.fearHappened}×</p>
-            </div>
-            <div className="compare-col">
-              <p className="eyebrow">Kept habits ({cmp.kept.count})</p>
-              <p>
-                Anxiety during: <strong>{cmp.kept.avgAnxiety}/10</strong>
-              </p>
-              <p className="hint">Feared outcome happened {cmp.kept.fearHappened}×</p>
-            </div>
-          </div>
-          <p className="hint">Small numbers and different situations — treat this as a hint, not proof. Many people find the habits weren't protecting them as much as they felt.</p>
-        </div>
+      {(real.tested > 0 || reh.tested > 0 || cmp) && (
+        <section className="record" aria-labelledby="record-h">
+          <h3 id="record-h" className="section-title">
+            Your record
+          </h3>
+          {real.tested > 0 && (
+            <p>
+              Real life: <strong>{real.fearNotHappened} of {real.tested}</strong> feared outcome{real.tested === 1 ? "" : "s"} didn't happen
+              {real.fearPartly ? ` (${real.fearPartly} partly)` : ""}.
+            </p>
+          )}
+          {reh.tested > 0 && (
+            <p>
+              Rehearsals: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
+            </p>
+          )}
+          {cmp && (
+            <p className="hint">
+              Without a safety habit, your anxiety during was {cmp.dropped.avgAnxiety}/10 on average ({cmp.dropped.count}); with your usual habits, {cmp.kept.avgAnxiety}/10 (
+              {cmp.kept.count}). Small numbers — a hint, not proof.
+            </p>
+          )}
+        </section>
       )}
 
       <ul className="rows tools">
         <li className="row-item">
-          <button type="button" className="row-button" onClick={() => go({ name: "ladder" })}>
-            <span className="row-title">Brave steps ladder</span>
-            <span className="row-desc">Rank speaking situations from easier to harder, then climb one rung at a time.</span>
+          <button type="button" className="row-button" onClick={() => go({ name: "reframe" })}>
+            <span className="row-title">A thought keeps bugging you?</span>
+            <span className="row-desc">Untangle it in four short steps, then take the step anyway.</span>
           </button>
         </li>
         <li className="row-item">
-          <button type="button" className="row-button" onClick={() => go({ name: "reframe" })}>
-            <span className="row-title">Untangle a thought</span>
-            <span className="row-desc">Catch an anxious thought, spot the thinking trap, find a more balanced view.</span>
+          <button type="button" className="row-button" onClick={() => go({ name: "start" })}>
+            <span className="row-title">Why speaking feels so hard</span>
+            <span className="row-desc">The loop that keeps anxiety going, and your own habits.</span>
           </button>
         </li>
         <li className="row-item">
           <button type="button" className="row-button" onClick={() => go({ name: "selfcheck" })}>
-            <span className="row-title">How much is it getting in the way?</span>
-            <span className="row-desc">A short, private check-in — not a test or diagnosis — with guidance on when to get support.</span>
+            <span className="row-title">Is it getting in the way?</span>
+            <span className="row-desc">A short private check-in, with guidance on when to get support. Not a test.</span>
           </button>
         </li>
       </ul>
@@ -200,9 +194,55 @@ export function Confidence() {
   );
 }
 
+const HABIT_OPTIONS = ["I rehearse every word", "I avoid eye contact", "I keep it as short as I can", "I watch my own voice or hands", "I skip it if I can"];
+const HABIT_TO_BEHAVIOR: Record<string, string> = {
+  "I rehearse every word": "Scripting every word",
+  "I avoid eye contact": "Avoiding eye contact",
+  "I keep it as short as I can": "Rushing to get it over with",
+  "I watch my own voice or hands": "Staying quiet unless asked",
+  "I skip it if I can": "Staying quiet unless asked",
+};
+
+/** Step 0: why it feels hard (four plain sentences) and which habits are yours. */
+function Start({ onDone }: { onDone: (habits: string[]) => void }) {
+  const { data } = useApp();
+  const [picked, setPicked] = useState<string[]>(() => HABIT_OPTIONS.filter((h) => data.myHabits?.includes(HABIT_TO_BEHAVIOR[h]!)));
+  return (
+    <main className="screen" id="main">
+      <p className="eyebrow">Confidence</p>
+      <h2>Why speaking feels so hard</h2>
+      <div className="loop">
+        <p>When you're worried about how you come across, your attention turns inward. You start watching yourself — your voice, your face, your hands — and you build a picture of how you think you look. It's usually worse than the truth.</p>
+        <p>To cope, you do small things that feel safer: rehearse every line, avoid eye contact, keep it short, or skip it altogether. Those habits feel like help, but they stop you from ever finding out that the thing you fear mostly doesn't happen.</p>
+        <p>
+          <strong>The way out:</strong> put your attention on the people you're talking to, drop one safety habit at a time, and check what really happened.
+        </p>
+      </div>
+      <fieldset className="options">
+        <legend className="label">Which of these do you do?</legend>
+        {HABIT_OPTIONS.map((h) => {
+          const on = picked.includes(h);
+          return (
+            <label key={h} className={on ? "option on" : "option"}>
+              <input type="checkbox" checked={on} onChange={() => setPicked((xs) => (on ? xs.filter((x) => x !== h) : [...xs, h]))} />
+              {h}
+            </label>
+          );
+        })}
+      </fieldset>
+      <p className="hint">This is self-help based on CBT techniques. It's not therapy or a diagnosis. If anxiety is getting in the way of work, friendships or daily life, a doctor or licensed therapist can help.</p>
+      <div className="actions sticky">
+        <button className="primary" type="button" onClick={() => onDone([...new Set(picked.map((h) => HABIT_TO_BEHAVIOR[h]!))])}>
+          Got it
+        </button>
+      </div>
+    </main>
+  );
+}
+
 function resultMessage(e: Experiment): string {
   const close = " That's logged — no need to replay it.";
-  if (e.outcome === "didnt-happen") return `What you feared didn't happen. You rated it ${e.predictionLikelihood}% likely beforehand.${close}`;
+  if (e.outcome === "didnt-happen") return `What you feared didn't happen. You rated it ${e.predictionLikelihood}% likely beforehand.${close} Ready for the next step?`;
   if (e.outcome === "partly") return `Part of it happened — and you got through it. That's useful evidence too.${close}`;
   return `It happened, and you got through it. That's still a step taken. Next time, you could try a smaller version of this step.${close}`;
 }
@@ -259,12 +299,12 @@ function SubScreen({ title, eyebrow, onBack, children }: { title: string; eyebro
 
 // ---------- Plan a brave step (behavioral experiment) ----------
 
-function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () => void; onSave: (e: Experiment) => void }) {
+function PlanStep({ step, defaultDrop, onCancel, onSave }: { step?: LadderStep; defaultDrop?: string; onCancel: () => void; onSave: (e: Experiment) => void }) {
   const [situation, setSituation] = useState(step?.title ?? "");
   const [prediction, setPrediction] = useState("");
   const [likelihood, setLikelihood] = useState(60);
   const [anxiety, setAnxiety] = useState(5);
-  const [drop, setDrop] = useState<string | undefined>();
+  const [drop, setDrop] = useState<string | undefined>(defaultDrop);
   const [obstacle, setObstacle] = useState("");
   const [action, setAction] = useState("");
   const [worry, setWorry] = useState(""); // deliberately not saved
@@ -407,7 +447,7 @@ function CheckIn({ exp, onCancel, onSave }: { exp: Experiment; onCancel: () => v
           </p>
         )}
         <TextField label="One thing that went okay" value={wentOkay} onChange={setWentOkay} hint="Replaying only the awkward bits keeps anxiety going. Name something that went fine." />
-        <TextField label="What did you learn? (optional)" value={learned} onChange={setLearned} />
+        <TextField label="One line for next time (optional)" value={learned} onChange={setLearned} hint="What did you learn, or what's the next rung?" />
         <CrisisNotice texts={[whatHappened, wentOkay, learned]} />
         <div className="actions sticky">
           <button className="primary" type="submit" disabled={!outcome}>
@@ -431,14 +471,11 @@ function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep
     update((x) => ({ ...x, ladder: [...x.ladder, { id: uid("l-"), createdAt: new Date().toISOString(), title: t, expectedDiscomfort: d }] }));
 
   return (
-    <SubScreen eyebrow="Confidence" title="Brave steps ladder" onBack={onBack}>
-      <p className="hint">
-        Start with steps that feel uncomfortable but doable. A step counts once you've tested what you feared — anxiety doesn't have to drop for it to count. Repeat any step
-        whenever you like.
-      </p>
+    <SubScreen eyebrow="Confidence" title="Pick a brave step" onBack={onBack}>
+      <p className="hint">Start easier than you think you need to. A step counts once you've tested what you feared — anxiety doesn't have to drop. Repeat any step whenever you like.</p>
       {suggestions.length > 0 && (
         <>
-          <p className="label">{steps.length === 0 ? "Quick start — tap to add" : "Suggestions"}</p>
+          <p className="label">{steps.length === 0 ? "Tap to add a step" : "More ideas"}</p>
           <div className="pills">
             {suggestions.map((s) => (
               <button key={s.title} type="button" className="pill" onClick={() => add(s.title, s.expectedDiscomfort)}>

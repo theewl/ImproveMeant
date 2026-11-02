@@ -560,6 +560,12 @@ Sources: `docs/research/2026-11-ui-ux-patterns.md`, `docs/research/2026-11-featu
 
 **Deferred from this round [Q]:** agenda → predicted questions (AI cost); replay-timeline markers (needs word timestamps); PREP sentence stems as a separate exercise; a human-listener reply form (phase 3).
 
+### Round 4 (2026-11-02): topics people care about, and Confidence as one path
+
+**Topics.** Source: the same Wikimedia feed, now read fully. Live stories come from three places and are labelled: *In the news*, *Widely read* (yesterday's most-read articles, kept only when they match an interest category and aren't celebrity, film or sports bios), and *Today's featured article*. Up to four live stories a day with variety across the three. Two new ways in: **type any topic** (Wikipedia search → briefing from the article, about 5¢ each, not shared) and **paste your own material** (a private briefing kept only on the device; the server never caches it; a compact copy is sent with each feedback request for accuracy checks and is neutralised like all untrusted text). Not verified live: the feed's `mostread` and `tfa` shapes and the search endpoint are built from documentation and tested on fixtures. **[Q]** Confirm with one live request.
+
+**Confidence, rebuilt as one path.** Source: `docs/research/2026-11-cbt-minimal-path.md` (search-indexed). What it found: the active ingredients are a behavioural experiment done with a safety habit dropped and attention turned outward; video or recording feedback helps only after a specific prediction; a separate thought-challenging step adds little beyond doing the step; digital programmes that are linear and short keep more people. So the tab now reads: **Why speaking feels so hard** (four plain sentences and "which of these do you do?") → **Pick a brave step** (start easier than you think) → **Plan it** (what you fear, how sure, attention out, one habit to drop, pre-filled from your own habits) → **Do it** → **What happened?** (outcome, anxiety during, one thing that went okay, one line for next time) → next step offered. Thought untangling is a side door ("A thought keeps bugging you?"), the self-check is a quiet link, and the habits comparison is one sentence in "Your record". **[D]** Progression follows predictions being tested, never anxiety dropping.
+
 ### Backlog additions
 | When | Item |
 |---|---|
