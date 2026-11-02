@@ -322,7 +322,7 @@ export interface DrillProgress {
 
 export function cameraProgress(sessions: PracticeSession[]): DrillProgress[] {
   return CAMERA_DRILLS.map((drill) => {
-    const done = sessions.filter((s) => s.mode === "camera" && s.camera?.drillId === drill.id && s.completedAt);
+    const done = sessions.filter((s) => s.mode === "camera" && s.camera?.drillId === drill.id && !s.camera.promptId && s.completedAt);
     const lastAt = done.map((s) => s.completedAt!).sort().pop();
     return { drill, completed: done.length, lastAt };
   });
@@ -400,7 +400,7 @@ export function measureCameraTake(text: string, seconds: number | undefined, tra
     out.push({
       label: "Pace",
       value: `about ${wpm} words per minute`,
-      basis: wpm < 110 ? "Word count over recording length. Conversational video usually sits around 140–170; under 110 can feel slow." : wpm > 185 ? "Word count over recording length. Over about 185 is fast for most viewers; pauses help." : "Word count over recording length. This is a comfortable range for talking to camera.",
+      basis: wpm < 120 ? "Word count over recording length. Conversational video usually sits around 140–170; under 120 can feel slow." : wpm > 180 ? "Word count over recording length. Over about 180 is fast for most viewers; pauses help." : "Word count over recording length. This is a comfortable range for talking to camera.",
     });
   }
   const f = fillerWords(text);
@@ -415,5 +415,52 @@ export function measureCameraTake(text: string, seconds: number | undefined, tra
   }
   const you = viewerAddress(text);
   out.push({ label: "Talking to the viewer", value: you === 0 ? "no “you”" : `“you” ×${you}`, basis: "How often you addressed the viewer directly." });
+  return out;
+}
+
+// ---------- Visible improvement ----------
+
+export interface TakeStats {
+  wpm: number | null;
+  fillersPerMinute: number | null;
+  genericPerMinute: number | null;
+  you: number;
+  words: number;
+}
+
+export function takeStats(text: string, seconds: number | undefined): TakeStats {
+  const words = wordCount(text);
+  const minutes = seconds && seconds >= 5 ? seconds / 60 : null;
+  return {
+    wpm: wordsPerMinute(text, seconds),
+    fillersPerMinute: minutes ? Math.round((fillerWords(text).total / minutes) * 10) / 10 : null,
+    genericPerMinute: minutes ? Math.round((genericWords(text).total / minutes) * 10) / 10 : null,
+    you: viewerAddress(text),
+    words,
+  };
+}
+
+export interface Improvement {
+  label: string;
+  before: string;
+  after: string;
+  /** Whether the change is in the helpful direction. Null when neither direction is better. */
+  better: boolean | null;
+}
+
+/** Plain before/after lines between the learner's first take and this one. Directions follow the creator guidance; never a score. */
+export function improvementSince(first: TakeStats, latest: TakeStats): Improvement[] {
+  const out: Improvement[] = [];
+  if (first.fillersPerMinute != null && latest.fillersPerMinute != null && first.fillersPerMinute !== latest.fillersPerMinute) {
+    out.push({ label: "Fillers per minute", before: String(first.fillersPerMinute), after: String(latest.fillersPerMinute), better: latest.fillersPerMinute < first.fillersPerMinute });
+  }
+  if (first.wpm != null && latest.wpm != null && first.wpm !== latest.wpm) {
+    const inRange = (w: number) => w >= 120 && w <= 180;
+    out.push({ label: "Pace (words per minute)", before: String(first.wpm), after: String(latest.wpm), better: inRange(latest.wpm) && !inRange(first.wpm) ? true : !inRange(latest.wpm) && inRange(first.wpm) ? false : null });
+  }
+  if (first.genericPerMinute != null && latest.genericPerMinute != null && first.genericPerMinute !== latest.genericPerMinute) {
+    out.push({ label: "Vague words per minute", before: String(first.genericPerMinute), after: String(latest.genericPerMinute), better: latest.genericPerMinute < first.genericPerMinute });
+  }
+  if (first.you !== latest.you) out.push({ label: "Times you said “you”", before: String(first.you), after: String(latest.you), better: latest.you > first.you });
   return out;
 }

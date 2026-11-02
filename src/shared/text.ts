@@ -6,7 +6,7 @@ export function normalizeForMatch(s: string): string {
     .replace(/[‘’‛′]/g, "'")
     .replace(/[“”″]/g, '"')
     .replace(/[–—]/g, "-")
-    .replace(/[^a-z0-9'%$\- ]+/g, " ")
+    .replace(/[^\p{L}\p{N}'%$\- ]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -28,9 +28,16 @@ export function quoteAppearsIn(quote: string, text: string): boolean {
   return true;
 }
 
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/gu;
+
+/** Words for Latin-style scripts; one "word" per character for scripts written without spaces. */
 export function wordCount(s: string): number {
-  const m = s.trim().match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu);
-  return m ? m.length : 0;
+  const t = s.trim();
+  if (!t) return 0;
+  const cjk = (t.match(CJK) ?? []).length;
+  const rest = t.replace(CJK, " ");
+  const m = rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu);
+  return (m ? m.length : 0) + cjk;
 }
 
 export function sentenceCount(s: string): number {

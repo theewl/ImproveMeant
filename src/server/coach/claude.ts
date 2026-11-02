@@ -62,7 +62,7 @@ interface CallSpec<T> {
   effort: Effort;
 }
 
-const MAX_TOKENS = { briefing: 6000, feedback: 5000, camera_feedback: 6000, audience_question: 1500, variation: 1200, curation: 1500 } as const;
+const MAX_TOKENS = { briefing: 6000, feedback: 6000, camera_feedback: 8000, audience_question: 1500, variation: 1200, curation: 1500 } as const;
 /** Rough token cost of one downscaled still (about 640×480). */
 const IMAGE_TOKENS = 900;
 
@@ -109,7 +109,9 @@ export class ClaudeCoach implements CoachProvider {
     try {
       msg = await this.transport.create(params, { timeout: this.cfg.claude.timeoutMs, maxRetries: this.cfg.claude.maxRetries });
     } catch (err) {
-      await this.usage.record({ kind: spec.kind, provider: "claude", model: this.cfg.claude.model, costUsd: 0, ok: false });
+      // A timed-out request may still have completed and been billed: count the worst case.
+      const timedOut = err instanceof Anthropic.APIConnectionTimeoutError;
+      await this.usage.record({ kind: spec.kind, provider: "claude", model: this.cfg.claude.model, costUsd: timedOut ? worstCase : 0, ok: false });
       throw mapSdkError(err);
     }
 
@@ -333,6 +335,7 @@ export function buildCameraFeedback(out: CameraFeedbackOutput, response: string,
     priority,
     hook,
     camera,
+    throughline: out.throughline ? clamp(out.throughline, 300) : null,
     explanation: clamp(out.explanation, 600),
     fidelity: { status: "not_applicable", note: null },
     opinionNote: null,
@@ -345,6 +348,10 @@ export function buildCameraFeedback(out: CameraFeedbackOutput, response: string,
 
 export function mapSdkError(err: unknown): AppError {
   if (err instanceof AppError) return err;
+  if (err instanceof Anthropic.APIError) {
+    // Name and status only; never the request or response body.
+    console.warn(`claude: ${err.name}${err.status ? ` ${err.status}` : ""}`);
+  }
   if (err instanceof Anthropic.APIConnectionTimeoutError) {
     return new AppError("provider_timeout", "The AI service took too long to respond. You can try again.", 504, true);
   }

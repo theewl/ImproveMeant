@@ -126,7 +126,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   // When the recording stops with a usable browser transcript, go straight to "check and get feedback".
   useEffect(() => {
     if (r.state !== "stopped" || txState !== "none" || !r.recording) return;
-    const t = speech.text.trim();
+    const t = [speech.text, speech.interim].filter(Boolean).join(" ").trim();
     if (speech.failed || wordCount(t) < 3) return;
     setTranscript(t);
     setOriginal(t);
@@ -138,6 +138,16 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
     });
     setTxState("done");
   }, [r.state, r.recording, speech.text, speech.failed, txState]);
+
+  // Late finals from the recogniser: keep syncing until the learner edits the transcript.
+  useEffect(() => {
+    if (txState !== "done" || txSource !== "browser-speech" || original == null) return;
+    const t = [speech.text, speech.interim].filter(Boolean).join(" ").trim();
+    if (t && t !== original && transcript === original) {
+      setTranscript(t);
+      setOriginal(t);
+    }
+  }, [speech.text, speech.interim]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetTranscript = () => {
     speech.reset();

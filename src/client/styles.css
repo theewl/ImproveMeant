@@ -533,7 +533,7 @@ details > summary {
   color: var(--ink);
   text-decoration: none;
 }
-.row-title::after {
+.row-item .row-title::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1677,4 +1677,161 @@ button.small {
   margin: 0.5rem 0;
   display: grid;
   gap: 0.35rem;
+}
+
+/* ---------- Today's path ---------- */
+.path {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin: 0.75rem 0 1rem;
+  border: 1px solid var(--line);
+}
+.path h3 {
+  margin: 0.1rem 0 0.6rem;
+  font-size: 1.25rem;
+}
+.path-list {
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.path-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+.path-mark {
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 0.1rem;
+}
+.path-item.done .path-mark {
+  background: var(--ok-soft);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.path-item.done .row-title {
+  color: var(--ink-2);
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+.path-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.path-body .row-desc {
+  margin: 0;
+}
+.ladder-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  min-height: 56px;
+}
+.ladder-button:hover {
+  border-color: var(--accent);
+}
+.checkin {
+  margin: 0.5rem 0 1rem;
+}
+.path-body .row-desc,
+.ladder-body .row-desc {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* ---------- Vlog-first Today ---------- */
+.week {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink-2);
+  margin: -0.25rem 0 0.9rem;
+  font-size: 0.95rem;
+}
+.week-dots {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.week-dots .dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--line);
+}
+.week-dots .dot.on {
+  background: var(--accent);
+}
+.take-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.1rem 1rem;
+  margin: 0 0 1rem;
+}
+.take-prompt {
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  line-height: 1.35;
+  margin: 0.3rem 0 0.9rem;
+}
+.task.big {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  line-height: 1.35;
+}
+.quick {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.quick .pill-link {
+  margin: 0;
+}
+.react .rows {
+  margin-top: 0.25rem;
+}
+.since {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  margin: 0.75rem 0;
+  text-align: left;
+}
+.since .eyebrow {
+  margin: 0 0 0.3rem;
+}
+.since ul {
+  margin: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+.since-better {
+  color: var(--ok);
+  font-weight: 600;
+}
+.since-worse {
+  color: var(--ink-2);
 }

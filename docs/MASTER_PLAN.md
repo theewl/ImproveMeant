@@ -644,6 +644,67 @@ What we avoided: scores out of 100, "confidence" or "charisma" ratings, syntheti
 
 Sources: YouTube Creator Playbook on the first 15 seconds (blog.youtube), Backlinko and Uscreen on audience retention, Teleprompter.com and Vidpros on talking-head framing, FrameOS on lighting, Crafted Films and No Fuss Video on sounding natural, Natasha Lane and Bernard Hiller on camera shyness, Hollyland and The World of Chinese on food vlogging language, Vloggingpro on Casey Neistat's structure, Everything-PR and Decker on Yoodli/Poised/Orai, and the vendors' own pages for Captions, BIGVU and Yoodli. Links in the PR description.
 
+## 11. One method, not four tabs (added 2026-11-02)
+
+**The ask.** The owner pointed out that public speaking, camera comfort, CBT-style anxiety work, memory and vocabulary were presented as separate features in separate tabs, when they share one method. They do. In every case the evidence-backed loop is the same: pick something slightly uncomfortable, predict what you fear, do it out loud, get one specific note, do it again, then check what really happened and keep what's worth remembering.
+
+**What changed.**
+- **Three tabs instead of five:** Today, Steps, Progress. Talk, Camera and Confidence are no longer destinations; they are kinds of step.
+- **Today is one path** with three things: read something and explain it from memory; the next step on the ladder (a camera drill, a talk or a real-life step, chosen by the learner's goal and prefilled with the day's story where it fits); the reviews that are due. Done items tick off during the day; the Start button opens the first thing not done.
+- **Steps is one ladder.** Explaining, the eleven camera drills, the four talk scenarios and the learner's own real-life steps are sorted together by expected discomfort (camera drill levels map onto 1–7 so they interleave with talks at 3–6). Each shows how often it's been done and how anxious the learner felt last time. The next step is the easiest one not yet done in the goal's main formats; after that, the least practised. The confidence tools (why speaking feels hard, untangle a thought, the self-check, crisis resources) sit under the ladder as side doors, not a separate tab.
+- **The check-in runs through every session.** Before any explain, talk or camera session: anxiety 0–10, an optional "what are you worried will happen", one habit to drop. After: anxiety during, and whether the fear came true. Each check-in is saved as a behavioral experiment (kinds: rehearsal, camera, real-world), so the record on Steps ("x of y feared outcomes didn't happen", anxiety with and without a safety habit) now grows from all practice, not only the Confidence tab. The camera-specific comfort slider was replaced by the same scale.
+- **Progress** reports camera anxiety from the same experiments.
+
+**Why this is better than tabs.** The learner sees one sentence that explains the whole app, and every session reinforces the same habit: predict, do, check. Graded exposure (the ladder) and behavioral experiments (the check-in) stop being "the CBT feature" and become how practice is structured; camera drills stop being a separate programme and become rungs. It also removes a design smell from rounds 3–6: three screens that each re-implemented pre/post check-ins.
+
+**[Q]** The 4-week plan still has week tasks of its own (explain, talk, brave step, extra). It should become a four-week walk up the ladder; backlog.
+
+### Backlog additions
+| When | Item |
+|---|---|
+| **Next** | Fold the 4-week plan into the ladder: each week sets a discomfort band and a theme instead of fixed tasks. |
+| **Next** | Real-iPhone test of the camera path (still outstanding from §10). |
+| **Later** | Let the learner reorder or rate the discomfort of camera and talk steps, as they can for real-life ones. |
+
+## 12. Vlogging first (added 2026-11-02)
+
+**The ask.** Make the app for becoming a confident speaker and vlogger, with topics and logic built from what successful speakers and creators do, and keep it simple, easy to follow and rewarding to come back to, with visible improvement.
+
+### 12.1 What the best do, and what the app does because of it
+
+| Who | What they do | In the app |
+|---|---|---|
+| Chris Anderson (TED) | One idea worth spreading: a throughline the audience can repeat. | Every take starts with "the one thing they should walk away with"; the coach returns the idea a viewer would take away, in the speaker's words, and says whether the take delivered the stated one. |
+| YouTube's Creator Playbook; MrBeast's production guide | The first 15 seconds decide who stays; the first minute is where viewers leave; retention is watched obsessively. | A hook pattern chosen before recording, a hook window while recording, the first ten seconds shown back, and the coach's hook note with an optional rewrite. |
+| Ali Abdaal | Smile before the first line, warm up, don't read, speak to one person, accept imperfection. | "Who's your one viewer?" at onboarding; every prompt is written to them by name; warm-up and smile cues; cues near the lens instead of a script. |
+| Casey Neistat | A daily vlog still has setup, tension and payoff; shoot more than you use. | Story prompts with the setup → turn → payoff scaffold; one short take a day. |
+| Nancy Duarte | Great talks alternate what is with what could be. | Contrast prompts and the what is → what could be scaffold. |
+| Emma Chamberlain | Unpolished moments and failures read as honest. | No restarts; record-and-delete warm-up; the coach never grades polish or appearance. |
+| Marques Brownlee | Explain simply, never talk down; treat the camera as a person. | Explainer prompts ("a 12-year-old could repeat it"); eye-line coaching from stills. |
+| Food and travel creators | Texture, smell, sound and a verdict, because taste doesn't cross the screen. | Sensory prompts, the three-senses scaffold, vague-word count. |
+| Toastmasters | One commendation, one recommendation, end on what went well. | One strength, one change, and a wrap-up that names what worked. |
+
+### 12.2 What changed
+
+- **Onboarding is three questions:** who's your one viewer (a first name), what will you talk about (up to three niches), takes a week (3, 5 or 7). Goal defaults to the camera; news interests are derived from niches. Everything else is under "More" in Settings.
+- **Today is one take.** A prompt from a reviewed bank of 60 (ten niches, six kinds: quick, story, opinion, explainer, sensory, hook), deterministic per day, skipping prompts already done, with "Different prompt". Underneath: a 20-second warm-up (deleted unwatched), the next step on the ladder, reviews when due, and three stories to react to.
+- **The take screen is short:** the prompt, the one idea, a hook pattern (prefilled from the prompt, with an example), the shape as one line. Talking points, warm-up, camera checks and the stills toggle are under "More".
+- **Visible improvement without scores:** week dots (n of target takes), and after each take "Since your first take" lines for fillers per minute, pace, vague words per minute and times you said "you", each with a tick when it moved in the helpful direction. Progress keeps the per-take table.
+- **Coaching:** the rubric adds "one idea per take, explained simply without talking down"; the request carries the stated throughline and chosen hook pattern; feedback shows "What a viewer walks away with".
+- **Prompt bank design:** every prompt names the viewer, asks for one concrete thing, and is paired with a hook pattern and a shape, so the setup screen can be short. Prompts are evaluated against the matching camera drill's definition of success (story → "Tell a 60-second story", sensory → "Describe what you ate", and so on), so no new rubric was needed.
+
+**What "addictive" means here.** A loop under three minutes, a fresh prompt every day, one tap to the next take, a weekly target with dots that fill, and a before/after line you can see move. No streak loss, no scores, no badges.
+
+**[Q]** The prompt bank is hand-written; AI-personalised prompts from the learner's niches and recent takes are a cheap later addition (one call a day). Still untested on a real iPhone.
+
+### Backlog additions
+| When | Item |
+|---|---|
+| **Next** | Real-iPhone test of the take flow. |
+| **Next** | AI-personalised daily prompts from niches and the last three takes (about one cent a day). |
+| **Later** | A "best take of the week" pick from the learner's saved takes, for posting. |
+| **Later** | Two-hooks drill: record two openings for the same take, choose one. |
+
 ## Appendix A: Implementation plan used for the MVP
 1. **Shared domain:** types, curriculum, the evergreen library, scheduling, and text and measurement utilities.
 2. **Server:**

@@ -32,7 +32,7 @@ export interface AppData {
   cameraFramesConsent: boolean;
 }
 
-export const DEFAULT_PREFS: Preferences = { interests: [], goal: "meetings", sessionMinutes: 5, onboarded: false };
+export const DEFAULT_PREFS: Preferences = { interests: [], goal: "camera", sessionMinutes: 5, onboarded: false };
 
 export function emptyData(): AppData {
   return {

@@ -54,7 +54,7 @@ export function Phrases() {
       <h2 className="page-title">Phrase bank</h2>
       <p className="hint">Useful words and phrases from your sessions. The best way to own one is to use it in your own sentence.</p>
       {bank.length === 0 ? (
-        <p className="notice">Finish a Learn session and its phrase will appear here.</p>
+        <p className="notice">Open a story on Today, explain it, and its phrase will appear here.</p>
       ) : (
         <ul className="phrases">
           {bank.map((e) => (

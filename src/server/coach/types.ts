@@ -28,6 +28,10 @@ export interface CameraFeedbackInput {
   taskPrompt: string;
   topic: string;
   notes: string;
+  /** The one idea the speaker intended, if they wrote one. */
+  throughline: string;
+  /** Hook pattern the speaker chose (question, claim, promise, mid-action, contrast), if any. */
+  hookPattern: string;
   response: string;
   durationSeconds: number | null;
   transcriptSource: "provider" | "browser-speech" | "typed-by-user";

@@ -16,6 +16,7 @@ const cameraOut = {
       { aspect: "lighting", observation: "Window behind you; face in shadow.", fix: "Turn to face the window." },
     ],
   },
+  throughline: "Burn it twice and you'll still eat it.",
   explanation: "On a phone, the first line decides whether the thumb keeps scrolling.",
   retryFocus: "End on the one change.",
 };
@@ -26,6 +27,8 @@ function body(over: Record<string, unknown> = {}) {
     drillId: "cam-hook",
     topic: "cooking rice",
     notes: "burned rice, alarm, what I'd change",
+    throughline: "burned rice twice, still edible",
+    hookPattern: "question",
     response: { text: TAKE, transcriptSource: "browser-speech", transcriptEdited: false, durationSeconds: 24 },
     frames: [
       { at: 2, jpegBase64: JPEG },
@@ -58,6 +61,9 @@ describe("POST /api/camera-feedback (live)", () => {
     expect(content[3]!.text).toContain("Still frames attached: 2s, 12s, 23s");
     expect(content[3]!.text).toContain("Drill: Hook in ten seconds");
     expect(content[3]!.text).toContain("cooking rice");
+    expect(content[3]!.text).toContain("walk away with: burned rice twice, still edible");
+    expect(content[3]!.text).toContain("Hook pattern the speaker chose: question");
+    expect(feedback.throughline).toBe("Burn it twice and you'll still eat it.");
     expect(String(params.system)).toContain("Never comment on appearance");
     const usage = await deps.usage.summary();
     expect(usage.today.requests).toBe(1);

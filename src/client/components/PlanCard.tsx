@@ -3,7 +3,7 @@ import { PLAN, PLAN_WEEKS, currentWeek, pendingLookback, weekSummary, weekTasks,
 import { useApp } from "../lib/store";
 import { href, type Route } from "../lib/router";
 
-/** The guided 4-week plan, shown at the top of Today. */
+/** The guided 4-week plan (on Progress). */
 export function PlanCard({ learnStoryId }: { learnStoryId?: string }) {
   const { data, update } = useApp();
   const now = new Date().toISOString();
@@ -54,13 +54,13 @@ export function PlanCard({ learnStoryId }: { learnStoryId?: string }) {
   const target = (t: PlanTask): Route | null => {
     switch (t.id) {
       case "learn":
-        return learnStoryId ? { name: "learn", storyId: learnStoryId } : null;
+        return learnStoryId ? { name: "learn", storyId: learnStoryId } : { name: "today" };
       case "talk":
         return { name: "talk", scenario: spec.talkScenario };
       case "brave":
-        return { name: "confidence" };
+        return { name: "steps" };
       case "extra":
-        return spec.extra === "review" ? { name: "review" } : spec.extra === "lookback" ? null : { name: "confidence" };
+        return spec.extra === "review" ? { name: "review" } : spec.extra === "lookback" ? null : { name: "steps" };
     }
   };
 

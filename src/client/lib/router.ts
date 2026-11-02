@@ -8,10 +8,11 @@ export type Route =
   | { name: "learn"; storyId: string }
   | { name: "talk"; fromStoryId?: string; scenario?: ScenarioId }
   | { name: "camera"; drillId?: string; fromStoryId?: string }
+  | { name: "take"; promptId: string }
   | { name: "review" }
   | { name: "progress" }
   | { name: "settings" }
-  | { name: "confidence" }
+  | { name: "steps" }
   | { name: "phrases" }
   | { name: "onboarding" };
 
@@ -33,12 +34,16 @@ export function parseHash(hash: string): Route {
       if (p?.startsWith("s:") && SCENARIO_IDS.includes(p.slice(2) as ScenarioId)) return { name: "talk", scenario: p.slice(2) as ScenarioId };
       return { name: "talk", fromStoryId: p };
     }
+    case "take":
+      return parts[1] ? { name: "take", promptId: decode(parts[1]) } : { name: "today" };
     case "camera":
       return parts[1] ? { name: "camera", drillId: decode(parts[1]), fromStoryId: parts[2] ? decode(parts[2]) : undefined } : { name: "camera" };
+    case "confidence":
+    case "steps":
+      return { name: "steps" };
     case "review":
     case "progress":
     case "settings":
-    case "confidence":
     case "phrases":
     case "onboarding":
       return { name: parts[0] };
@@ -51,6 +56,8 @@ export function href(r: Route): string {
   switch (r.name) {
     case "learn":
       return `#/learn/${encodeURIComponent(r.storyId)}`;
+    case "take":
+      return `#/take/${encodeURIComponent(r.promptId)}`;
     case "camera":
       return r.drillId ? `#/camera/${encodeURIComponent(r.drillId)}${r.fromStoryId ? `/${encodeURIComponent(r.fromStoryId)}` : ""}` : "#/camera";
     case "talk":

@@ -50,7 +50,7 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 90_0
   }
   if (!res.ok) {
     const e = body as Partial<ApiError> | null;
-    const msg = e?.error ?? (res.status === 504 ? "The server took too long to answer." : `Request failed.`);
+    const msg = e?.error ?? (res.status === 504 ? "The server took too long to answer." : res.status === 413 ? "That upload is too large for the server. Type what you said instead." : `Request failed.`);
     throw new ApiRequestError(e?.code ?? "provider_error", `${msg} (HTTP ${res.status})`, e?.retryable ?? res.status >= 500, res.status);
   }
   return body as T;
@@ -101,6 +101,8 @@ export interface CameraFeedbackBody {
   drillId: string;
   topic: string;
   notes: string;
+  throughline?: string;
+  hookPattern?: string;
   response: { text: string; transcriptSource: "provider" | "browser-speech" | "typed-by-user"; transcriptEdited: boolean; durationSeconds: number | null };
   frames: { at: number; jpegBase64: string }[];
   previous?: { text: string; retryFocus: string | null } | null;

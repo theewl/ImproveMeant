@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { dueQueue } from "../shared/schedule";
 import { useApp } from "./lib/store";
 import { href, navigate, useRoute, type Route } from "./lib/router";
-import { Today } from "./screens/Today";
 import { LearnSession } from "./screens/LearnSession";
 import { TalkSession } from "./screens/TalkSession";
 import { Review } from "./screens/Review";
@@ -11,17 +10,18 @@ import { Settings } from "./screens/Settings";
 import { Onboarding } from "./screens/Onboarding";
 import { Confidence } from "./screens/Confidence";
 import { Phrases } from "./screens/Phrases";
-import { Camera } from "./screens/Camera";
 import { CameraSession } from "./screens/CameraSession";
 import { isCameraDrill } from "../shared/camera";
+import { getPrompt, PROMPT_DRILL } from "../shared/vlog";
+
+const PROMPT_DRILL_FOR = (id: string) => PROMPT_DRILL[getPrompt(id)!.kind];
+import { Today } from "./screens/Today";
 
 const GEAR = "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z";
 
 const NAV: { route: Route; label: string; icon: string }[] = [
   { route: { name: "today" }, label: "Today", icon: "M4 11l8-7 8 7v9h-5v-6H9v6H4z" },
-  { route: { name: "camera" }, label: "Camera", icon: "M4 8h3l2-3h6l2 3h3v11H4zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" },
-  { route: { name: "talk" }, label: "Talk", icon: "M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4" },
-  { route: { name: "confidence" }, label: "Confidence", icon: "M12 20s-7-4.4-7-9.6A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.4C19 15.6 12 20 12 20z" },
+  { route: { name: "steps" }, label: "Steps", icon: "M4 20h5v-5h5v-5h5V5" },
   { route: { name: "progress" }, label: "Progress", icon: "M5 20V10M12 20V4M19 20v-7" },
 ];
 
@@ -29,7 +29,7 @@ export function App() {
   const route = useRoute();
   const { data, status, statusError, saveFailed } = useApp();
   const due = dueQueue(data.reviews, new Date().toISOString()).queue.length;
-  const inSession = route.name === "learn" || (route.name === "camera" && !!route.drillId);
+  const inSession = route.name === "learn" || (route.name === "camera" && !!route.drillId) || (route.name === "take" && !!getPrompt(route.promptId));
 
   useEffect(() => {
     if (!data.prefs.onboarded && route.name === "today") navigate({ name: "onboarding" });
@@ -71,14 +71,20 @@ export function App() {
       {route.name === "review" && <Review />}
       {route.name === "progress" && <Progress />}
       {route.name === "settings" && <Settings />}
-      {route.name === "confidence" && <Confidence />}
+      {route.name === "take" && (getPrompt(route.promptId) ? <CameraSession key={route.promptId} drillId={PROMPT_DRILL_FOR(route.promptId)} prompt={getPrompt(route.promptId)} /> : <Today />)}
+      {route.name === "steps" && <Confidence />}
+      {route.name === "camera" && !route.drillId && <Confidence />}
       {route.name === "phrases" && <Phrases />}
-      {route.name === "camera" && !route.drillId && <Camera />}
-      {route.name === "camera" && route.drillId && (isCameraDrill(route.drillId) ? <CameraSession key={route.drillId + (route.fromStoryId ?? "")} drillId={route.drillId} fromStoryId={route.fromStoryId} /> : <Camera />)}
+      {route.name === "camera" && route.drillId && (isCameraDrill(route.drillId) ? <CameraSession key={route.drillId + (route.fromStoryId ?? "")} drillId={route.drillId} fromStoryId={route.fromStoryId} /> : <Confidence />)}
 
       <nav className="tabbar" aria-label="Main">
         {NAV.map((n) => {
-          const active = n.route.name === route.name || (n.route.name === "today" && route.name === "review") || (n.route.name === "progress" && route.name === "phrases");
+          const active =
+            n.route.name === route.name ||
+            (n.route.name === "today" && (route.name === "review" || route.name === "learn")) ||
+            (n.route.name === "today" && route.name === "take") ||
+            (n.route.name === "steps" && (route.name === "camera" || route.name === "talk")) ||
+            (n.route.name === "progress" && route.name === "phrases");
           return (
             <a key={n.label} href={href(n.route)} aria-current={active ? "page" : undefined} className={active ? "on" : ""}>
               <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
