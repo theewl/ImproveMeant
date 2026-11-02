@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { timingSafeEqual, createHash } from "node:crypto";
 import { z } from "zod";
-import type { AppStatus, Interest } from "../shared/types";
+import type { AppStatus, Briefing, Interest } from "../shared/types";
 import { fillPrompt, getExercise, getScenario, EXERCISES } from "../shared/curriculum";
 import { wordCount } from "../shared/text";
 import { ALL_INTERESTS } from "../shared/evergreen";
@@ -52,6 +52,10 @@ export function createApp(deps: AppDeps): Hono {
     mode: z.enum(["learn", "talk"]),
     target: z.enum(["main", "followup"]).default("main"),
     storyId: z.string().max(80).optional(),
+    /** For briefings the client holds locally (your own material): a compact copy for fidelity checks. */
+    ownBriefing: z
+      .object({ title: z.string().max(200), mainIdea: z.string().max(600), points: z.array(z.string().max(600)).max(6), uncertainty: z.string().max(600).nullable() })
+      .optional(),
     talk: TalkSetupSchema.optional(),
     response: z.object({
       text: z.string(),
@@ -149,6 +153,24 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(await content.getBriefing(id, { refresh: c.req.query("refresh") === "1" }));
   });
 
+  app.get("/api/topics/search", async (c) => {
+    const q = (c.req.query("q") ?? "").trim().slice(0, 100);
+    if (q.length < 2) throw new AppError("bad_request", "Type at least two characters.", 400);
+    return c.json({ hits: await content.searchTopics(q) });
+  });
+
+  const AddTopic = z.object({ pageid: z.number().int().positive() });
+  app.post("/api/topics", bodyLimit({ maxSize: 4 * 1024, onError: tooLarge }), async (c) => {
+    const req = AddTopic.parse(await readJson(c));
+    return c.json(await content.addTopic(req.pageid));
+  });
+
+  const OwnMaterial = z.object({ title: z.string().max(120).default(""), text: z.string().max(60_000) });
+  app.post("/api/briefings/own", bodyLimit({ maxSize: 80 * 1024, onError: tooLarge }), async (c) => {
+    const req = OwnMaterial.parse(await readJson(c));
+    return c.json(await content.briefOwnMaterial(req.title, req.text));
+  });
+
   app.get("/api/stories/:id/status", async (c) => {
     const id = c.req.param("id");
     if (!/^[a-z0-9-]{1,80}$/i.test(id)) throw new AppError("bad_request", "Invalid story id.", 400);
@@ -161,7 +183,12 @@ export function createApp(deps: AppDeps): Hono {
     if (text.length > maxChars) throw new AppError("too_large", `Responses are limited to ${maxChars} characters.`, 413);
     if (wordCount(text) < 3) throw new AppError("empty_response", "There's nothing to give feedback on yet. Record or type an answer first.", 422);
     const exercise = getExercise(req.exerciseId);
-    const briefing = req.storyId ? await content.getBriefing(req.storyId).catch(() => null) : null;
+    const briefing =
+      req.storyId?.startsWith("own-") && req.ownBriefing
+        ? ({ ...req.ownBriefing, storyId: req.storyId, kind: "evergreen", keyTerm: { term: "", meaning: "", inContext: null, exampleUse: "" }, followUpQuestion: "", source: { url: "", publisher: "Your material", publishedAt: "", retrievedAt: "" }, supportingExcerpts: [], coverage: "curated", generatedBy: "claude", generatedAt: "", sourceVersion: "" } satisfies Briefing)
+        : req.storyId
+          ? await content.getBriefing(req.storyId).catch(() => null)
+          : null;
     const talk = req.talk ?? null;
     const topic = talk?.topic || briefing?.title || "";
     const taskPrompt = fillPrompt(exercise.prompt, { topic, audience: talk?.audience });

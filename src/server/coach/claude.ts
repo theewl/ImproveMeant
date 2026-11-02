@@ -207,7 +207,7 @@ export function buildBriefing(doc: SourceDocument, out: BriefingOutput, model: s
   const inContext = out.keyTerm.inContext && quoteAppearsIn(out.keyTerm.inContext, doc.text) ? clamp(out.keyTerm.inContext, 240) : null;
   return {
     storyId: doc.storyId,
-    kind: "current",
+    kind: doc.storyId.startsWith("own-") ? "evergreen" : "current",
     title: clamp(out.title || doc.title, 120),
     points,
     mainIdea: clamp(out.mainIdea, 320),

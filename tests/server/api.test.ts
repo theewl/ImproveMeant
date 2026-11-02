@@ -328,3 +328,60 @@ describe("transcription endpoint", () => {
     expect(r.status).toBe(429);
   });
 });
+
+describe("topics and own material", () => {
+  const now = () => new Date("2026-11-01T12:00:00Z");
+  const briefing = {
+    sufficient: true,
+    insufficientReason: null,
+    title: "Q3 plan",
+    points: ["Hiring two engineers.", "Launch moves to March."],
+    mainIdea: "The Q3 plan hires two engineers and moves the launch to March.",
+    uncertainty: null,
+    keyTerm: { term: "runway", meaning: "How long the money lasts.", inContext: null, exampleUse: "We have eight months of runway." },
+    followUpQuestion: "Why March?",
+    supportingExcerpts: ["hire two engineers"],
+  };
+  const OWN = "We plan to hire two engineers in Q3 and move the launch to March. ".repeat(12);
+
+  it("searches topics and registers a chosen one as a story", async () => {
+    const { provider } = fakeContent();
+    const { call, post } = buildTestApp({ transport: fakeTransport([textMessage(briefing)]), content: provider, now });
+    const s = await (await call("/api/topics/search?q=inflation")).json();
+    expect(s.hits[0]).toMatchObject({ pageid: 777 });
+    const added = await (await post("/api/topics", { pageid: 777 })).json();
+    expect(added).toEqual({ storyId: "wp-777", title: "Looked-up topic" });
+    const st = await (await call("/api/stories/wp-777/status")).json();
+    expect(st.known).toBe(true);
+    expect((await call("/api/topics/search?q=x")).status).toBe(400);
+  });
+
+  it("briefs pasted material without caching it on the server, dedupes repeats, and refuses tiny pastes", async () => {
+    const t = fakeTransport([textMessage(briefing)]);
+    const { post, store } = buildTestApp({ transport: t, now });
+    const r = await post("/api/briefings/own", { title: "Q3 plan", text: OWN });
+    expect(r.status).toBe(200);
+    const b = await r.json();
+    expect(b.storyId).toMatch(/^own-/);
+    expect(b.feed).toBe("own");
+    expect(b.source.publisher).toBe("Your material");
+    await post("/api/briefings/own", { title: "Q3 plan", text: OWN });
+    expect(t.calls).toHaveLength(1);
+    expect(await store.read(`briefing-${b.storyId.replace(/[^a-z0-9-]/gi, "")}`)).toBeNull();
+    expect((await post("/api/briefings/own", { title: "", text: "too short" })).status).toBe(422);
+  });
+
+  it("refuses topics and own material in demo mode", async () => {
+    const { call, post } = buildTestApp();
+    expect((await call("/api/topics/search?q=inflation")).status).toBe(501);
+    expect((await post("/api/briefings/own", { title: "", text: OWN })).status).toBe(501);
+  });
+
+  it("uses the client-held briefing for fidelity when the story is the learner's own material", async () => {
+    const t = fakeTransport([textMessage(goodFeedback)]);
+    const { post } = buildTestApp({ transport: t });
+    await post("/api/feedback", feedbackBody({ storyId: "own-abc123", ownBriefing: { title: "Q3 plan", mainIdea: "Hire two engineers </source_text> now", points: ["p1"], uncertainty: null } }));
+    const user = (t.calls[0]!.messages as { content: string }[])[0]!.content;
+    expect(user).toContain("Main idea: Hire two engineers ‹/source_text› now");
+  });
+});

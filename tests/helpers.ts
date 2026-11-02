@@ -56,6 +56,7 @@ export function fakeContent(opts: { candidates?: LiveCandidate[]; doc?: Partial<
   const calls = { list: 0, fetch: 0 };
   const candidate: LiveCandidate = {
     storyId: "wp-123",
+    feed: "news",
     title: "Urban tree programme",
     blurb: "A city expands its tree-planting programme.",
     description: "Municipal programme",
@@ -75,6 +76,12 @@ export function fakeContent(opts: { candidates?: LiveCandidate[]; doc?: Partial<
       calls.list++;
       if (provider.failList) throw new Error("HTTP 503");
       return provider.candidates;
+    },
+    async searchTopics(q) {
+      return [{ title: `${q} (article)`, pageid: 777, snippet: "A snippet about " + q }];
+    },
+    async lookup(pageid) {
+      return pageid === 777 ? { ...candidate, storyId: "wp-777", feed: "search", title: "Looked-up topic", pageTitle: "Looked-up_topic", revision: "2001" } : null;
     },
     async fetchDocument(c) {
       calls.fetch++;

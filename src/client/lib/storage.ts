@@ -1,4 +1,4 @@
-import type { GuidedPlan, ImpactCheck, Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
+import type { Briefing, GuidedPlan, ImpactCheck, Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
 
 // Local persistence for a private single-user MVP.
 // Limitations (documented in README): data lives only in this browser profile,
@@ -16,6 +16,8 @@ export interface AppData {
   experiments: Experiment[];
   ladder: LadderStep[];
   reframes: Reframe[];
+  /** Briefings made from material the learner pasted. Local only; never on the server. */
+  ownBriefings: Record<string, Briefing>;
   /** Self-check history (non-diagnostic). */
   impactChecks: ImpactCheck[];
   /** Optional 4-week guided plan. */
@@ -39,6 +41,7 @@ export function emptyData(): AppData {
     ladder: [],
     reframes: [],
     impactChecks: [],
+    ownBriefings: {},
     confidenceIntroSeen: false,
     transcriptionConsent: false,
   };

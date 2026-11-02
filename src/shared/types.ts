@@ -33,6 +33,8 @@ export interface Preferences {
 // ---------- Content ----------
 
 export type StoryKind = "current" | "evergreen";
+/** Where a live story came from. */
+export type FeedKind = "news" | "trending" | "featured" | "search" | "own";
 
 /** Source metadata that must travel with every briefing. */
 export interface SourceMeta {
@@ -51,6 +53,7 @@ export interface SourceMeta {
 export interface StoryCard {
   id: string;
   kind: StoryKind;
+  feed?: FeedKind;
   title: string;
   description: string;
   interest: Interest;
@@ -74,6 +77,7 @@ export interface KeyTerm {
 export interface Briefing {
   storyId: string;
   kind: StoryKind;
+  feed?: FeedKind;
   title: string;
   points: string[];
   mainIdea: string;

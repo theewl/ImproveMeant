@@ -1,6 +1,6 @@
 import type { Interest } from "../../shared/types";
 import { boundText } from "../../shared/text";
-import type { ContentProvider, LiveCandidate, SourceDocument } from "./types";
+import type { ContentProvider, LiveCandidate, SourceDocument, TopicHit } from "./types";
 
 // Live content: Wikipedia's "In the news" via the Wikimedia featured-content feed,
 // with article text from the MediaWiki Action API (plain-text extracts).
@@ -30,7 +30,14 @@ interface FeedLink {
 
 interface FeedResponse {
   news?: { story?: string; links?: FeedLink[] }[];
+  mostread?: { articles?: (FeedLink & { views?: number; normalizedtitle?: string })[] };
+  tfa?: FeedLink & { normalizedtitle?: string };
 }
+
+/** Titles that are never good explain-it topics (lists, meta pages, death lists, bare dates). */
+const SKIP_TITLE = /^(List of|Lists of|Deaths in|Main Page|Wikipedia:|Special:|Portal:|\d{4}( in | )|[A-Z][a-z]+ \d{1,2}$|\d{1,2} [A-Z][a-z]+$)/;
+/** Descriptions typical of celebrity/film/sports bios, which are popular but rarely worth explaining at work. */
+const SKIP_DESC = /\b(actor|actress|singer|rapper|footballer|cricketer|basketball player|wrestler|model|television series|film|album|song|video game|boxer|influencer|youtuber|porn)\b/i;
 
 const SENSITIVE = /\b(killed|kills|dies|died|death|dead|massacre|shooting|bombing|attack|attacks|murder|suicide|crash)\b/i;
 
@@ -86,10 +93,39 @@ export class WikimediaProvider implements ContentProvider {
     return (await res.json()) as T;
   }
 
+  private candidateFromLink(link: FeedLink & { normalizedtitle?: string }, feed: LiveCandidate["feed"], blurb: string, dateIso: string): LiveCandidate | null {
+    if (!link?.title) return null;
+    const pageTitle = link.title;
+    const title = link.titles?.normalized ?? link.normalizedtitle ?? pageTitle.replaceAll("_", " ");
+    if (SKIP_TITLE.test(title)) return null;
+    const text = `${title} ${blurb} ${link.description ?? ""} ${link.extract ?? ""}`;
+    if (SENSITIVE.test(text)) return null;
+    return {
+      storyId: `wp-${link.pageid ?? encodeURIComponent(pageTitle).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      feed,
+      title,
+      blurb: blurb || (link.extract ? link.extract.split(/(?<=[.!?])\s/)[0]!.slice(0, 200) : link.description ?? ""),
+      description: link.description ?? "",
+      interest: classifyInterest(text),
+      pageTitle,
+      url: link.content_urls?.desktop?.page ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`,
+      revision: link.revision ?? "",
+      sourceUpdatedAt: link.timestamp,
+      featuredOn: dateIso.slice(0, 10),
+    };
+  }
+
   async listCandidates(dateIso: string): Promise<LiveCandidate[]> {
     const [y, m, d] = dateIso.slice(0, 10).split("-");
     const feed = await this.getJson<FeedResponse>(`https://api.wikimedia.org/feed/v1/wikipedia/en/featured/${y}/${m}/${d}`);
     const out: LiveCandidate[] = [];
+    const seen = new Set<string>();
+    const push = (c: LiveCandidate | null) => {
+      if (c && !seen.has(c.storyId)) {
+        seen.add(c.storyId);
+        out.push(c);
+      }
+    };
     for (const item of feed.news ?? []) {
       const storyHtml = item.story ?? "";
       const blurb = stripHtml(storyHtml);
@@ -98,23 +134,51 @@ export class WikimediaProvider implements ContentProvider {
       const boldTitle = mainLinkTitle(storyHtml);
       const link =
         links.find((l) => boldTitle && (l.title === boldTitle || l.titles?.normalized === boldTitle.replaceAll("_", " "))) ?? links[0];
-      if (!link?.title) continue;
-      const pageTitle = link.title;
-      const title = link.titles?.normalized ?? pageTitle.replaceAll("_", " ");
-      out.push({
-        storyId: `wp-${link.pageid ?? encodeURIComponent(pageTitle).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-        title,
-        blurb,
-        description: link.description ?? "",
-        interest: classifyInterest(`${blurb} ${link.description ?? ""}`),
-        pageTitle,
-        url: link.content_urls?.desktop?.page ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`,
-        revision: link.revision ?? "",
-        sourceUpdatedAt: link.timestamp,
-        featuredOn: dateIso.slice(0, 10),
-      });
+      if (!link) continue;
+      push(this.candidateFromLink(link, "news", blurb, dateIso));
+    }
+    // Today's featured article: well-written, long, usually evergreen.
+    if (feed.tfa) push(this.candidateFromLink(feed.tfa, "featured", "", dateIso));
+    // Most-read articles (yesterday's views): what people are looking up. Keep only
+    // items that fit an interest category and aren't celebrity/entertainment bios.
+    for (const a of (feed.mostread?.articles ?? []).slice(0, 40)) {
+      if (SKIP_DESC.test(a.description ?? "")) continue;
+      const c = this.candidateFromLink(a, "trending", "", dateIso);
+      if (c && c.interest) push(c);
     }
     return out;
+  }
+
+  async searchTopics(query: string): Promise<TopicHit[]> {
+    const params = new URLSearchParams({ action: "query", format: "json", formatversion: "2", list: "search", srsearch: query, srlimit: "6", srnamespace: "0" });
+    const data = await this.getJson<{ query?: { search?: { title: string; pageid: number; snippet?: string }[] } }>(`https://en.wikipedia.org/w/api.php?${params}`);
+    return (data.query?.search ?? [])
+      .filter((h) => !SKIP_TITLE.test(h.title))
+      .map((h) => ({ title: h.title, pageid: h.pageid, snippet: stripHtml(h.snippet ?? "").slice(0, 160) }));
+  }
+
+  async lookup(pageid: number): Promise<LiveCandidate | null> {
+    const params = new URLSearchParams({ action: "query", format: "json", formatversion: "2", pageids: String(pageid), prop: "description|revisions|info", rvprop: "ids|timestamp", inprop: "url" });
+    const data = await this.getJson<{ query?: { pages?: { pageid?: number; title?: string; missing?: boolean; description?: string; fullurl?: string; revisions?: { revid?: number; timestamp?: string }[] }[] } }>(
+      `https://en.wikipedia.org/w/api.php?${params}`,
+    );
+    const page = data.query?.pages?.[0];
+    if (!page || page.missing || !page.title) return null;
+    const rev = page.revisions?.[0];
+    return this.candidateFromLink(
+      {
+        title: page.title.replaceAll(" ", "_"),
+        titles: { normalized: page.title },
+        pageid: page.pageid,
+        description: page.description,
+        revision: rev?.revid ? String(rev.revid) : "",
+        timestamp: rev?.timestamp,
+        content_urls: { desktop: { page: page.fullurl } },
+      },
+      "search",
+      "",
+      new Date().toISOString(),
+    );
   }
 
   async fetchDocument(c: LiveCandidate, maxChars: number): Promise<SourceDocument> {
