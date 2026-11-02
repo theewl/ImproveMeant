@@ -289,7 +289,6 @@ export function Today() {
             {rotating ? "Finding others…" : "Show different stories"}
           </button>
         )}
-        <p className="hint">Read a two-minute briefing, then say it to the camera in your own words.</p>
         <AnyTopic live={status?.mode === "live"} />
       </section>
     </main>

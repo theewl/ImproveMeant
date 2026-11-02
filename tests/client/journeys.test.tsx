@@ -80,7 +80,7 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
     await user.click(screen.getByLabelText(/The word “proxy”/));
     await user.click(screen.getByRole("button", { name: "Finish session" }));
     await screen.findByText("Session complete");
-    expect(screen.getByText(/no need to replay it/)).toBeInTheDocument();
+    expect(screen.getByText(/One thing that worked/)).toBeInTheDocument();
 
     const d = stored();
     expect(d.sessions).toHaveLength(1);
@@ -121,8 +121,8 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
     expect(stored().sessions[0]!.attempts[0]!.feedbackRating).toBe("useful");
     cleanup();
     start("#/progress", stored());
-    expect(await screen.findByText(/rated 1 of 1 pieces of feedback useful/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Your reviews/ })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Reviews/ })).toHaveAttribute("href", "#/review");
+    expect(screen.getByText("Past takes and sessions")).toBeInTheDocument();
   });
 
   it("sends the edited answer, not a stale one, when resubmitting after an error", async () => {
@@ -261,7 +261,7 @@ describe("Review and history", () => {
     expect(d.ladder).toHaveLength(0);
   });
 
-  it("shows progress after a reload with spoken and written sessions counted separately", async () => {
+  it("shows past sessions on Progress after a reload", async () => {
     const mk = (modality: "spoken" | "typed", id: string) => ({
       id,
       mode: "learn" as const,
@@ -274,10 +274,9 @@ describe("Review and history", () => {
       usedLive: false,
     });
     start("#/progress", onboarded({ sessions: [mk("spoken", "s1"), mk("typed", "s2"), mk("typed", "s3")] }));
-    const stats = await screen.findByText("Spoken sessions");
-    const dl = stats.closest("dl")!;
-    expect(within(dl).getByText("Spoken sessions").nextSibling).toHaveTextContent("1");
-    expect(within(dl).getByText("Written sessions").nextSibling).toHaveTextContent("2");
+    await screen.findByText("Past takes and sessions");
+    expect(document.querySelectorAll("details.history")).toHaveLength(3);
+    expect(screen.getByText(/Record two takes to see/)).toBeInTheDocument();
   });
 });
 
@@ -311,8 +310,10 @@ describe("Confidence tools", () => {
     await user.type(screen.getByRole("textbox", { name: "One thing that went okay" }), "I asked it clearly");
     await user.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText(/What you feared didn't happen/);
-    expect(screen.getByText(/Real life:/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Say good morning to someone I don't usually talk to" })).toBeInTheDocument(); // next rung offered
+    cleanup();
+    start("#/progress", stored());
+    expect((await screen.findByText("Fears that didn't happen")).nextSibling).toHaveTextContent("1 of 1");
 
     const d = stored();
     expect(d.ladder).toHaveLength(2);
@@ -443,7 +444,7 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
   it("compares experiments with and without a dropped safety habit", async () => {
     const base = { createdAt: "2026-10-01T00:00:00Z", kind: "real-world" as const, situation: "s", prediction: "p", predictionLikelihood: 60, anxietyBefore: 7, completedAt: "2026-10-01T01:00:00Z" };
     start(
-      "#/confidence",
+      "#/progress",
       onboarded({
         confidenceIntroSeen: true,
         experiments: [
@@ -452,7 +453,7 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
         ],
       }),
     );
-    expect(await screen.findByText(/Without a safety habit, your anxiety during was 3\/10 on average \(1\); with your usual habits, 6\/10/)).toBeInTheDocument();
+    expect((await screen.findByText("Anxiety without a safety habit vs with")).nextSibling).toHaveTextContent("3 vs 6");
   });
 });
 

@@ -257,9 +257,9 @@ export function WrapUp({ attempts }: { attempts: Attempt[] }) {
   return (
     <div className="wrapup">
       <p>
-        <strong>That's done — no need to replay it.</strong> If your mind goes back to the awkward bits, come back to this instead:
+        <strong>Done.</strong> One thing that worked:
       </p>
-      <p className="wrapup-good">{strength ?? "You showed up and practiced out loud. That's the part that counts."}</p>
+      <p className="wrapup-good">{strength ?? "You did it out loud."}</p>
     </div>
   );
 }

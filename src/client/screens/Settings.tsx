@@ -15,43 +15,33 @@ export function Settings() {
 
   return (
     <main className="screen" id="main">
-      <h2>Settings</h2>
+      <h2 className="page-title">Settings</h2>
 
       <section aria-labelledby="pref-h">
-        <h3 id="pref-h">Preferences</h3>
-        <PreferencesForm submitLabel="Save preferences" onDone={() => setSaved(true)} />
+        <h3 id="pref-h" className="section-title">
+          You
+        </h3>
+        <PreferencesForm submitLabel="Save" onDone={() => setSaved(true)} />
         {saved && (
           <p className="notice ok" role="status">
             Saved.
           </p>
         )}
-      </section>
-
-      <section aria-labelledby="quiet-h">
-        <h3 id="quiet-h">Quiet mode</h3>
         <label className="option">
           <input type="checkbox" checked={!!data.prefs.quietMode} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, quietMode: e.target.checked } }))} />
-          Hide the timer and measurement numbers while I practice
+          Quiet mode: hide timers and numbers while I practice
         </label>
-        <p className="hint">Helpful if watching numbers makes you more self-conscious. Feedback on what you said still appears.</p>
       </section>
 
       <section aria-labelledby="mode-h">
-        <h3 id="mode-h">How this app is running</h3>
-        {status ? (
-          <ul>
-            <li>Coaching: {status.coaching === "claude" ? `Claude (${status.model})` : "Demo mode — illustrative feedback only"}</li>
-            <li>Content: {status.content === "wikipedia+evergreen" ? "Wikipedia “In the news” + curated library" : "Curated library"}</li>
-            <li>Transcription: {status.transcription === "deepgram" ? "Deepgram" : "Not configured — type what you said"}</li>
-            {status.mode === "live" && (
-              <li>
-                AI usage today: {status.usageToday.requests} requests, about ${status.usageToday.estimatedCostUsd.toFixed(2)} (limit ${status.limits.dailyCostUsd.toFixed(2)}/day)
-              </li>
-            )}
-          </ul>
-        ) : (
-          <p className="hint">Server status unavailable.</p>
-        )}
+        <h3 id="mode-h" className="section-title">
+          Connection
+        </h3>
+        <p className="hint">
+          {status
+            ? `AI coaching ${status.coaching === "claude" ? "on" : "off (demo)"} · transcription ${status.transcription === "deepgram" ? "on" : "off"}${status.mode === "live" ? ` · about $${status.usageToday.estimatedCostUsd.toFixed(2)} used today` : ""}`
+            : "Can't reach the server."}
+        </p>
         <div className="row wrap">
           <button
             className="secondary small"
@@ -84,7 +74,7 @@ export function Settings() {
             }}
           >
             <label className="label" htmlFor="token">
-              Access token for this server {data.prefs.accessToken ? `(saved: ${data.prefs.accessToken.length} characters)` : "(none saved)"}
+              Access token {data.prefs.accessToken ? `(saved, ${data.prefs.accessToken.length} characters)` : "(none saved)"}
             </label>
             <input id="token" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
             <button className="secondary" type="submit">
@@ -95,48 +85,47 @@ export function Settings() {
       </section>
 
       <section aria-labelledby="privacy-h">
-        <h3 id="privacy-h">Your data</h3>
-        <ul className="plain">
-          <li>Preferences, answers, transcripts, feedback and review dates are stored only in this browser (local storage). They aren't synced or backed up.</li>
-          <li>Confidence notes (brave steps, check-ins, thoughts) stay in this browser and are never sent to the AI service.</li>
-          <li>Recordings are not saved unless you tick “Keep this recording”. Saved recordings stay in this browser.</li>
-          <li>When AI coaching is on, your answer text (not audio) is sent to Anthropic's API to generate feedback.</li>
-          <li>When transcription is on and you choose to transcribe, the audio is sent to Deepgram. The server asks Deepgram not to retain it.</li>
-          <li>The app's server keeps usage counts and costs (no answer text) and shared story briefings (no personal data).</li>
-        </ul>
-        <label className="choice">
-          <input type="checkbox" checked={data.transcriptionConsent} onChange={(e) => update((d) => ({ ...d, transcriptionConsent: e.target.checked }))} />
-          I've read how transcription works (unticking shows the explanation again)
-        </label>
+        <h3 id="privacy-h" className="section-title">
+          Your data
+        </h3>
+        <p className="hint">Everything stays in this browser. Video never leaves your phone. Only your words, and three stills if you allow them, go to the AI.</p>
         <details className="more">
-          <summary>Get help now</summary>
-          <p className="hint">This app isn't a crisis service. If you're struggling, please reach out:</p>
+          <summary>The details</summary>
+          <ul className="plain">
+            <li>Preferences, transcripts, feedback and reviews are stored only in this browser. Not synced or backed up.</li>
+            <li>Check-ins and confidence notes are never sent to the AI.</li>
+            <li>Recordings are kept only if you tick “Keep this recording”.</li>
+            <li>With AI coaching on, your words (not audio) go to Anthropic. With transcription on, audio goes to Deepgram, which is asked not to keep it.</li>
+            <li>The server keeps usage counts and shared story briefings, with no personal data.</li>
+          </ul>
+          <label className="choice">
+            <input type="checkbox" checked={data.transcriptionConsent} onChange={(e) => update((d) => ({ ...d, transcriptionConsent: e.target.checked }))} />
+            I've read how transcription works
+          </label>
+        </details>
+        <details className="more">
+          <summary>Need support now?</summary>
+          <p className="hint">This app isn't a crisis service.</p>
           <CrisisList />
         </details>
-        <button
-          className="secondary"
-          type="button"
-          onClick={() => {
-            const blob = new Blob([exportJson(data)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `clearline-export-${localDayKey()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-          }}
-        >
-          Download my data
-        </button>
-        <p className="hint">A JSON file of everything stored in this browser (recordings aren't included).</p>
-        <div className="danger-zone">
-          <h4>Delete history</h4>
-          <p className="hint">
-            Deletes all sessions, transcripts, feedback, reviews, confidence notes, real-world logs and saved recordings from this browser. It can't delete copies already processed by
-            Anthropic or Deepgram under their own retention policies.
-          </p>
+        <div className="row wrap">
+          <button
+            className="secondary"
+            type="button"
+            onClick={() => {
+              const blob = new Blob([exportJson(data)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `clearline-export-${localDayKey()}.json`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            Download my data
+          </button>
           <button
             className="danger"
             type="button"
@@ -148,12 +137,12 @@ export function Settings() {
           >
             Delete all history
           </button>
-          {deleted && (
-            <p className="notice ok" role="status">
-              History deleted.
-            </p>
-          )}
         </div>
+        {deleted && (
+          <p className="notice ok" role="status">
+            History deleted.
+          </p>
+        )}
       </section>
     </main>
   );
