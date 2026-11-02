@@ -43,7 +43,7 @@ describe("ClaudeCoach.feedback", () => {
     expect(fb.kind).toBe("live");
     expect(fb.strength?.quote).toBe("only look at survivors");
     expect(fb.priority?.suggestion).toMatch(/Open with the lesson/);
-    const s = usage.summary();
+    const s = await usage.summary();
     expect(s.today.requests).toBe(1);
     // 1200 in * $4/M + 300 out * $20/M = 0.0048 + 0.006
     expect(s.today.costUsd).toBeCloseTo(0.0108, 6);
@@ -104,7 +104,7 @@ describe("ClaudeCoach.feedback", () => {
   it("maps provider failures (timeout) to a retryable error and records the failed call", async () => {
     const { coach, usage } = setup([new Anthropic.APIConnectionTimeoutError()]);
     await expect(coach.feedback(input())).rejects.toMatchObject({ code: "provider_timeout", retryable: true });
-    expect(usage.summary().today.requests).toBe(1);
+    expect((await usage.summary()).today.requests).toBe(1);
   });
 
   it("isolates untrusted text inside tags and states the data rule", async () => {

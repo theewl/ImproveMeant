@@ -75,7 +75,7 @@ export class ClaudeCoach implements CoachProvider {
       inputTokens: estimateTokens(spec.system + spec.user) + 200,
       outputTokens: spec.maxTokens,
     });
-    this.usage.assertClaudeAllowed(worstCase);
+    await this.usage.assertClaudeAllowed(worstCase);
 
     const format = betaZodOutputFormat(spec.schema as never) as { type: string; schema: unknown };
     const params: Record<string, unknown> = {
@@ -95,7 +95,7 @@ export class ClaudeCoach implements CoachProvider {
     try {
       msg = await this.transport.create(params, { timeout: this.cfg.claude.timeoutMs, maxRetries: this.cfg.claude.maxRetries });
     } catch (err) {
-      this.usage.record({ kind: spec.kind, provider: "claude", model: this.cfg.claude.model, costUsd: 0, ok: false });
+      await this.usage.record({ kind: spec.kind, provider: "claude", model: this.cfg.claude.model, costUsd: 0, ok: false });
       throw mapSdkError(err);
     }
 
@@ -108,7 +108,7 @@ export class ClaudeCoach implements CoachProvider {
     };
     const model = msg.model ?? this.cfg.claude.model;
     const okStop = msg.stop_reason === "end_turn" || msg.stop_reason === "stop_sequence";
-    this.usage.record({ kind: spec.kind, provider: "claude", model, ...tokens, costUsd: this.usage.claudeCost(tokens), ok: okStop });
+    await this.usage.record({ kind: spec.kind, provider: "claude", model, ...tokens, costUsd: this.usage.claudeCost(tokens), ok: okStop });
 
     if (msg.stop_reason === "refusal") {
       throw new AppError("provider_error", "The AI service declined this request. Try rephrasing, or continue without AI feedback.", 502, false);

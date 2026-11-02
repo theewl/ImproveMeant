@@ -67,6 +67,8 @@ function secret(env: NodeJS.ProcessEnv, key: string): string | null {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  // Vercel functions here are capped at 60s, so leave headroom and skip SDK retries.
+  const onVercel = !!env.VERCEL;
   return {
     host: env.HOST || "127.0.0.1",
     port: num(env, "PORT", 8787),
@@ -78,8 +80,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       effortCoaching: effort(env, "CLAUDE_EFFORT_COACHING", "medium"),
       effortLight: effort(env, "CLAUDE_EFFORT_LIGHT", "low"),
       refusalFallback: env.CLAUDE_REFUSAL_FALLBACK === "off" ? "off" : "default",
-      timeoutMs: num(env, "CLAUDE_TIMEOUT_MS", 60_000),
-      maxRetries: Math.min(3, num(env, "CLAUDE_MAX_RETRIES", 1)),
+      timeoutMs: num(env, "CLAUDE_TIMEOUT_MS", onVercel ? 50_000 : 60_000),
+      maxRetries: Math.min(3, num(env, "CLAUDE_MAX_RETRIES", onVercel ? 0 : 1)),
       // Pricing assumptions (USD per million tokens). Defaults match published
       // claude-opus-5-5 list prices as of 2026-11; verify before relying on them.
       priceInputPerMTok: num(env, "CLAUDE_PRICE_INPUT_PER_MTOK", 4),
@@ -104,7 +106,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       deepgramApiKey: secret(env, "DEEPGRAM_API_KEY"),
       model: env.DEEPGRAM_MODEL || "nova-3",
       pricePerMinuteUsd: num(env, "TRANSCRIPTION_PRICE_PER_MINUTE_USD", 0.0077),
-      timeoutMs: num(env, "TRANSCRIPTION_TIMEOUT_MS", 60_000),
+      timeoutMs: num(env, "TRANSCRIPTION_TIMEOUT_MS", onVercel ? 50_000 : 60_000),
     },
   };
 }

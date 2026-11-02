@@ -37,7 +37,11 @@ For a production build:
 npm run build && npm start   # serves dist/client + API on http://127.0.0.1:8787
 ```
 
-## Using it on your phone
+## Hosting on Vercel
+
+See [`docs/DEPLOY_VERCEL.md`](docs/DEPLOY_VERCEL.md): connect the repo, add Upstash Redis, and set `ANTHROPIC_API_KEY` and `APP_ACCESS_TOKEN`. The hosted app installs to your phone's home screen.
+
+## Using it on your phone (without hosting)
 
 Phone browsers only allow the microphone on HTTPS pages, so open the app through an HTTPS tunnel to your computer.
 
@@ -75,6 +79,7 @@ Setup steps for each provider are in [`docs/PROVIDERS.md`](docs/PROVIDERS.md).
 |---|---|
 | `npm run dev` | Server (tsx watch) and Vite dev server |
 | `npm run build` | Type-check and build the client |
+| `npm run build:vercel` | Build `.vercel/output` (static client + bundled API function) |
 | `npm start` | Production server (serves the built client and API on one port) |
 | `npm test` | Vitest: unit, API, jsdom journey and security tests |
 | `npm run typecheck` | `tsc --noEmit` |

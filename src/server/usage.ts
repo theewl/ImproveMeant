@@ -24,8 +24,9 @@ interface Ledger {
   records: UsageRecord[];
 }
 
-const KEY = "usage-ledger";
-const KEEP_DAYS = 120;
+// One ledger per calendar month (UTC): limits only need the current month,
+// and it keeps each stored value small.
+const keyFor = (iso: string) => `usage-ledger-${iso.slice(0, 7)}`;
 
 /**
  * Server-side usage ledger and limits. Every paid call is checked before it runs
@@ -38,8 +39,8 @@ export class UsageMeter {
     private now: () => Date = () => new Date(),
   ) {}
 
-  private ledger(): Ledger {
-    return this.store.read<Ledger>(KEY) ?? { records: [] };
+  private async ledger(): Promise<Ledger> {
+    return (await this.store.read<Ledger>(keyFor(this.now().toISOString()))) ?? { records: [] };
   }
 
   claudeCost(u: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }): number {
@@ -54,11 +55,11 @@ export class UsageMeter {
     );
   }
 
-  summary(): { today: { requests: number; costUsd: number; transcriptionMinutes: number }; month: { requests: number; costUsd: number }; byKind: Record<string, { requests: number; costUsd: number }> } {
+  async summary(): Promise<{ today: { requests: number; costUsd: number; transcriptionMinutes: number }; month: { requests: number; costUsd: number }; byKind: Record<string, { requests: number; costUsd: number }> }> {
     const now = this.now().toISOString();
     const day = now.slice(0, 10);
     const month = now.slice(0, 7);
-    const recs = this.ledger().records;
+    const recs = (await this.ledger()).records;
     const today = recs.filter((r) => r.at.startsWith(day));
     const mon = recs.filter((r) => r.at.startsWith(month));
     const byKind: Record<string, { requests: number; costUsd: number }> = {};
@@ -79,8 +80,8 @@ export class UsageMeter {
   }
 
   /** Throws AppError(usage_limit) if a call with this worst-case cost would exceed a limit. */
-  assertClaudeAllowed(worstCaseUsd: number): void {
-    const s = this.summary();
+  async assertClaudeAllowed(worstCaseUsd: number): Promise<void> {
+    const s = await this.summary();
     const l = this.cfg.limits;
     if (s.today.requests >= l.dailyRequests) {
       throw new AppError("usage_limit", `Daily AI request limit (${l.dailyRequests}) reached. It resets tomorrow (UTC).`, 429);
@@ -93,8 +94,8 @@ export class UsageMeter {
     }
   }
 
-  assertTranscriptionAllowed(seconds: number): void {
-    const s = this.summary();
+  async assertTranscriptionAllowed(seconds: number): Promise<void> {
+    const s = await this.summary();
     const limit = this.cfg.limits.dailyTranscriptionMinutes;
     if (s.today.transcriptionMinutes + seconds / 60 > limit) {
       throw new AppError("usage_limit", `Daily transcription limit (${limit} minutes) reached.`, 429);
@@ -104,12 +105,11 @@ export class UsageMeter {
     }
   }
 
-  record(r: Omit<UsageRecord, "at" | "costIsEstimate">): UsageRecord {
+  async record(r: Omit<UsageRecord, "at" | "costIsEstimate">): Promise<UsageRecord> {
     const rec: UsageRecord = { ...r, at: this.now().toISOString(), costIsEstimate: true };
-    const ledger = this.ledger();
-    const cutoff = new Date(this.now().getTime() - KEEP_DAYS * 86400_000).toISOString();
-    ledger.records = [...ledger.records.filter((x) => x.at >= cutoff), rec];
-    this.store.write(KEY, ledger);
+    const ledger = await this.ledger();
+    ledger.records.push(rec);
+    await this.store.write(keyFor(rec.at), ledger);
     return rec;
   }
 }

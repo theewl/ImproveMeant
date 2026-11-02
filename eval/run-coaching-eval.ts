@@ -54,7 +54,7 @@ if (!cfg.claude.apiKey) {
 
 const usage = new UsageMeter(new FileStore(cfg.dataDir), cfg);
 const coach = new ClaudeCoach(cfg, sdkTransport(cfg.claude.apiKey), usage);
-const before = usage.summary().month.costUsd;
+const before = (await usage.summary()).month.costUsd;
 const results: unknown[] = [];
 
 for (const c of cases) {
@@ -97,7 +97,7 @@ for (const c of cases) {
   }
 }
 
-const spent = usage.summary().month.costUsd - before;
+const spent = (await usage.summary()).month.costUsd - before;
 mkdirSync("eval/results", { recursive: true });
 const out = `eval/results/coaching-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
 writeFileSync(out, JSON.stringify({ model: cfg.claude.model, estimatedCostUsd: spent, results }, null, 2));

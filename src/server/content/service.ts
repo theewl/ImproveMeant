@@ -53,17 +53,17 @@ export class ContentService {
     }
     const nowD = this.now();
     const today = nowD.toISOString().slice(0, 10);
-    const cached = this.store.read<CachedList>(this.listKey(today));
+    const cached = await this.store.read<CachedList>(this.listKey(today));
     const fresh = cached && nowD.getTime() - new Date(cached.fetchedAt).getTime() < this.cfg.content.refreshHours * 3600_000;
     if (cached && fresh) return { list: cached, state: { status: "ok", fetchedAt: cached.fetchedAt } };
     try {
       const candidates = await this.dedupe.run(`list:${today}:${cached?.fetchedAt ?? ""}`, () => this.provider!.listCandidates(today));
       const list: CachedList = { fetchedAt: nowD.toISOString(), date: today, candidates: candidates.value, insufficient: cached?.insufficient ?? [] };
-      this.store.write(this.listKey(today), list);
-      this.store.write("live-list-latest", list);
+      await this.store.write(this.listKey(today), list);
+      await this.store.write("live-list-latest", list);
       return { list, state: { status: "ok", fetchedAt: list.fetchedAt } };
     } catch (err) {
-      const fallback = cached ?? this.store.read<CachedList>("live-list-latest");
+      const fallback = cached ?? (await this.store.read<CachedList>("live-list-latest"));
       const message = `Couldn't refresh today's news (${(err as Error).message}).`;
       if (fallback) return { list: fallback, state: { status: "stale", fetchedAt: fallback.fetchedAt, message: `${message} Showing stories fetched ${fallback.fetchedAt.slice(0, 16).replace("T", " ")} UTC.` } };
       return { list: null, state: { status: "unavailable", message } };
@@ -78,7 +78,7 @@ export class ContentService {
       const matched = usable.filter((c) => c.interest && interests.includes(c.interest));
       const chosen = [...matched, ...usable.filter((c) => !matched.includes(c))].slice(0, 2);
       for (const c of chosen) {
-        const cachedBriefing = this.store.read<Briefing>(this.briefingKey(c.storyId));
+        const cachedBriefing = await this.store.read<Briefing>(this.briefingKey(c.storyId));
         picks.push({
           id: c.storyId,
           kind: "current",
@@ -130,8 +130,8 @@ export class ContentService {
     if (!storyId.startsWith("wp-")) throw new AppError("not_found", "Story not found.", 404);
 
     const { list } = await this.liveList();
-    const candidate = list?.candidates.find((c) => c.storyId === storyId) ?? this.findInRecentLists(storyId);
-    const cached = this.store.read<Briefing>(this.briefingKey(storyId));
+    const candidate = list?.candidates.find((c) => c.storyId === storyId) ?? (await this.findInRecentLists(storyId));
+    const cached = await this.store.read<Briefing>(this.briefingKey(storyId));
     const changed = !!(cached && candidate && candidate.revision && cached.sourceVersion !== candidate.revision);
     if (cached && !(opts.refresh && changed)) return { ...cached, sourceChanged: changed };
     if (!candidate) throw new AppError("not_found", "This story is no longer in the news feed.", 404);
@@ -147,15 +147,15 @@ export class ContentService {
         throw new AppError("provider_error", `Couldn't fetch the source article (${(err as Error).message}).`, 502, true);
       }
       if (doc.text.length < this.cfg.content.minSourceChars) {
-        this.markInsufficient(storyId);
+        await this.markInsufficient(storyId);
         throw new AppError("insufficient_source", "This story doesn't have enough source text yet for a reliable briefing. Pick another story.", 422);
       }
       try {
         const b = await this.coach.briefing(doc);
-        this.store.write(this.briefingKey(storyId), b);
+        await this.store.write(this.briefingKey(storyId), b);
         return b;
       } catch (err) {
-        if (err instanceof AppError && err.code === "insufficient_source") this.markInsufficient(storyId);
+        if (err instanceof AppError && err.code === "insufficient_source") await this.markInsufficient(storyId);
         throw err;
       }
     });
@@ -167,27 +167,27 @@ export class ContentService {
     const eg = evergreenBriefing(storyId);
     if (eg) return { sourceVersion: eg.sourceVersion, known: true };
     const { list } = await this.liveList();
-    const c = list?.candidates.find((x) => x.storyId === storyId) ?? this.findInRecentLists(storyId);
+    const c = list?.candidates.find((x) => x.storyId === storyId) ?? (await this.findInRecentLists(storyId));
     if (!c) return { sourceVersion: null, known: false };
     return { sourceVersion: c.revision || null, sourceUpdatedAt: c.sourceUpdatedAt, known: true };
   }
 
-  private findInRecentLists(storyId: string): LiveCandidate | undefined {
+  private async findInRecentLists(storyId: string): Promise<LiveCandidate | undefined> {
     for (let i = 0; i < 7; i++) {
       const d = new Date(this.now().getTime() - i * 86400_000).toISOString().slice(0, 10);
-      const l = this.store.read<CachedList>(this.listKey(d));
+      const l = await this.store.read<CachedList>(this.listKey(d));
       const c = l?.candidates.find((x) => x.storyId === storyId);
       if (c) return c;
     }
     return undefined;
   }
 
-  private markInsufficient(storyId: string) {
+  private async markInsufficient(storyId: string) {
     const today = this.now().toISOString().slice(0, 10);
-    const l = this.store.read<CachedList>(this.listKey(today));
+    const l = await this.store.read<CachedList>(this.listKey(today));
     if (l && !l.insufficient.includes(storyId)) {
       l.insufficient.push(storyId);
-      this.store.write(this.listKey(today), l);
+      await this.store.write(this.listKey(today), l);
     }
   }
 }

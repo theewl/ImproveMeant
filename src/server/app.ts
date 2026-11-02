@@ -79,7 +79,7 @@ export function createApp(deps: AppDeps): Hono {
       // tunnels and port-forwarding, where the server still listens on loopback.
       if (paidConfigured && isRemoteRequest(c)) {
         return c.json(
-          new AppError("unauthorized", "This server can only be used from this computer until APP_ACCESS_TOKEN is set in .env.", 403).toJSON(),
+          new AppError("unauthorized", "This server can only be used from this computer until APP_ACCESS_TOKEN is set (in .env, or in your host's environment variables).", 403).toJSON(),
           403,
         );
       }
@@ -104,8 +104,8 @@ export function createApp(deps: AppDeps): Hono {
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
-  app.get("/api/status", (c) => {
-    const s = usage.summary();
+  app.get("/api/status", async (c) => {
+    const s = await usage.summary();
     const status: AppStatus = {
       mode: coach.kind === "claude" ? "live" : "demo",
       coaching: coach.kind,
@@ -120,8 +120,8 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(status);
   });
 
-  app.get("/api/usage", (c) => {
-    const s = usage.summary();
+  app.get("/api/usage", async (c) => {
+    const s = await usage.summary();
     return c.json({
       ...s,
       pricingAssumptions: {
@@ -218,10 +218,10 @@ export function createApp(deps: AppDeps): Hono {
     if (key.length < 8) throw new AppError("bad_request", "Missing idempotency key.", 400);
     const buf = new Uint8Array(await c.req.arrayBuffer());
     if (buf.byteLength < 1000) throw new AppError("empty_response", "The recording is empty or too short.", 422, true);
-    usage.assertTranscriptionAllowed(seconds);
+    await usage.assertTranscriptionAllowed(seconds);
     const { value } = await dedupe.run(`tx:${key}`, async () => {
       const r = await transcription.transcribe(buf, c.req.header("content-type") ?? contentType, seconds);
-      usage.record({
+      await usage.record({
         kind: "transcription",
         provider: "deepgram",
         model: cfg.transcription.model,

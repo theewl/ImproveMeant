@@ -298,7 +298,7 @@ describe("transcription endpoint", () => {
     expect((await r.json()).transcript).toBe("hello world from the test");
     await req();
     expect(n).toBe(1);
-    expect(deps.usage.summary().today.transcriptionMinutes).toBeCloseTo(0.5);
+    expect((await deps.usage.summary()).today.transcriptionMinutes).toBeCloseTo(0.5);
   });
 
   it("rejects empty recordings, bad types and missing keys", async () => {
