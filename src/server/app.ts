@@ -70,9 +70,17 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   // Routine request logging: method, path, status, duration. Never bodies, queries or headers.
+  // Security headers are set here so API and page responses get them on every host.
   app.use("*", async (c, next) => {
     const t0 = Date.now();
     await next();
+    c.header(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    );
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    c.header("Permissions-Policy", "microphone=(self), camera=(self), geolocation=()");
     log(`${c.req.method} ${new URL(c.req.url).pathname} ${c.res.status} ${Date.now() - t0}ms`);
   });
 
