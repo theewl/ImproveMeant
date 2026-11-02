@@ -124,6 +124,6 @@ export function loadDotEnv() {
     if (!m) continue;
     const [, k, raw] = m;
     if (process.env[k!] !== undefined) continue;
-    process.env[k!] = raw!.replace(/^["']|["']$/g, "");
+    process.env[k!] = raw!.trim().replace(/^["']|["']$/g, "");
   }
 }

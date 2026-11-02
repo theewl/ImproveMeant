@@ -9,13 +9,15 @@ import { Review } from "./screens/Review";
 import { Progress } from "./screens/Progress";
 import { Settings } from "./screens/Settings";
 import { Onboarding } from "./screens/Onboarding";
+import { Confidence } from "./screens/Confidence";
+import { Phrases } from "./screens/Phrases";
 
 const GEAR = "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z";
 
 const NAV: { route: Route; label: string; icon: string }[] = [
   { route: { name: "today" }, label: "Today", icon: "M4 11l8-7 8 7v9h-5v-6H9v6H4z" },
   { route: { name: "talk" }, label: "Talk", icon: "M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4" },
-  { route: { name: "review" }, label: "Review", icon: "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4" },
+  { route: { name: "confidence" }, label: "Confidence", icon: "M12 20s-7-4.4-7-9.6A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.4C19 15.6 12 20 12 20z" },
   { route: { name: "progress" }, label: "Progress", icon: "M5 20V10M12 20V4M19 20v-7" },
 ];
 
@@ -57,21 +59,23 @@ export function App() {
       {route.name === "onboarding" && <Onboarding />}
       {route.name === "today" && <Today />}
       {route.name === "learn" && <LearnSession key={route.storyId} storyId={route.storyId} />}
-      {route.name === "talk" && <TalkSession key={route.fromStoryId ?? "new"} fromStoryId={route.fromStoryId} />}
+      {route.name === "talk" && <TalkSession key={route.fromStoryId ?? route.scenario ?? "new"} fromStoryId={route.fromStoryId} scenario={route.scenario} />}
       {route.name === "review" && <Review />}
       {route.name === "progress" && <Progress />}
       {route.name === "settings" && <Settings />}
+      {route.name === "confidence" && <Confidence />}
+      {route.name === "phrases" && <Phrases />}
 
       <nav className="tabbar" aria-label="Main">
         {NAV.map((n) => {
-          const active = n.route.name === route.name;
+          const active = n.route.name === route.name || (n.route.name === "today" && route.name === "review") || (n.route.name === "progress" && route.name === "phrases");
           return (
             <a key={n.label} href={href(n.route)} aria-current={active ? "page" : undefined} className={active ? "on" : ""}>
               <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
                 <path d={n.icon} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>{n.label}</span>
-              {n.route.name === "review" && due > 0 && (
+              {n.route.name === "today" && due > 0 && (
                 <span className="count" aria-label={`${due} due`}>
                   {due}
                 </span>

@@ -1,4 +1,4 @@
-import type { Preferences, PracticeSession, RealWorldAttempt, ReviewItem } from "../../shared/types";
+import type { GuidedPlan, ImpactCheck, Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
 
 // Local persistence for a private single-user MVP.
 // Limitations (documented in README): data lives only in this browser profile,
@@ -12,6 +12,16 @@ export interface AppData {
   sessions: PracticeSession[];
   reviews: ReviewItem[];
   realWorld: RealWorldAttempt[];
+  /** Confidence tools (CBT-informed self-help). */
+  experiments: Experiment[];
+  ladder: LadderStep[];
+  reframes: Reframe[];
+  /** Self-check history (non-diagnostic). */
+  impactChecks: ImpactCheck[];
+  /** Optional 4-week guided plan. */
+  plan?: GuidedPlan;
+  /** User has seen the "self-help, not therapy" note. */
+  confidenceIntroSeen: boolean;
   /** User has acknowledged that audio is sent to the transcription provider. */
   transcriptionConsent: boolean;
 }
@@ -19,7 +29,19 @@ export interface AppData {
 export const DEFAULT_PREFS: Preferences = { interests: [], goal: "meetings", sessionMinutes: 5, onboarded: false };
 
 export function emptyData(): AppData {
-  return { version: 1, prefs: { ...DEFAULT_PREFS }, sessions: [], reviews: [], realWorld: [], transcriptionConsent: false };
+  return {
+    version: 1,
+    prefs: { ...DEFAULT_PREFS },
+    sessions: [],
+    reviews: [],
+    realWorld: [],
+    experiments: [],
+    ladder: [],
+    reframes: [],
+    impactChecks: [],
+    confidenceIntroSeen: false,
+    transcriptionConsent: false,
+  };
 }
 
 export function loadData(storage: Storage = localStorage): AppData {
@@ -50,4 +72,10 @@ export function clearData(storage: Storage = localStorage) {
 export function uid(prefix = ""): string {
   const r = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
   return prefix + r;
+}
+
+/** Everything the learner has stored, as a downloadable JSON string (access token excluded). */
+export function exportJson(data: AppData, now = new Date()): string {
+  const { accessToken: _omit, ...prefs } = data.prefs;
+  return JSON.stringify({ exportedAt: now.toISOString(), app: "Clearline", note: "Saved recordings are not included.", data: { ...data, prefs } }, null, 2);
 }

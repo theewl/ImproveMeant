@@ -1,0 +1,726 @@
+import { useId, useState, type ReactNode } from "react";
+import type { Experiment, LadderStep, Reframe, ThinkingTrap } from "../../shared/types";
+import {
+  OUTWARD_FOCUS_TIP,
+  SAFETY_BEHAVIOURS,
+  STARTER_STEPS,
+  THINKING_TRAPS,
+  activeLadder,
+  suggestNextStep,
+  summarizeExperiments,
+  compareSafetyBehaviours,
+  IMPACT_QUESTIONS,
+  IMPACT_SCALE,
+  impactGuidance,
+} from "../../shared/confidence";
+import { CrisisList, CrisisNotice } from "../components/Crisis";
+import { useApp } from "../lib/store";
+import { uid } from "../lib/storage";
+import { formatDate } from "../components/common";
+
+type View = { name: "home" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "ladder" } | { name: "reframe" } | { name: "selfcheck" };
+
+export function Confidence() {
+  const { data, update } = useApp();
+  const [view, setView] = useState<View>({ name: "home" });
+  const [flash, setFlash] = useState<string | null>(null);
+  const go = (v: View, msg: string | null = null) => {
+    setFlash(msg);
+    setView(v);
+    window.scrollTo?.({ top: 0 });
+  };
+
+  if (view.name === "plan")
+    return (
+      <PlanStep
+        step={view.step}
+        onCancel={() => go({ name: "home" })}
+        onSave={(e) => {
+          update((d) => ({ ...d, experiments: [...d.experiments, e] }));
+          go({ name: "home" }, "Saved. Come back afterwards and tell us how it went.");
+        }}
+      />
+    );
+  if (view.name === "checkin") {
+    const exp = data.experiments.find((e) => e.id === view.id);
+    if (!exp) return null;
+    return (
+      <CheckIn
+        exp={exp}
+        onCancel={() => go({ name: "home" })}
+        onSave={(done) => {
+          update((d) => ({ ...d, experiments: d.experiments.map((e) => (e.id === done.id ? done : e)) }));
+          go({ name: "home" }, resultMessage(done));
+        }}
+      />
+    );
+  }
+  if (view.name === "selfcheck") return <SelfCheck onBack={() => go({ name: "home" })} />;
+  if (view.name === "ladder") return <Ladder onBack={() => go({ name: "home" })} onPlan={(step) => go({ name: "plan", step })} />;
+  if (view.name === "reframe")
+    return (
+      <ReframeFlow
+        onCancel={() => go({ name: "home" })}
+        onSave={(r) => {
+          update((d) => ({ ...d, reframes: [...d.reframes, r] }));
+          go({ name: "home" }, "Saved. Nice work untangling that.");
+        }}
+      />
+    );
+
+  const next = suggestNextStep(data.ladder, data.experiments);
+  const pending = data.experiments.filter((e) => !e.completedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const real = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
+  const reh = summarizeExperiments(data.experiments.filter((e) => e.kind === "rehearsal"));
+  const cmp = compareSafetyBehaviours(data.experiments);
+
+  return (
+    <main className="screen" id="main">
+      <h2 className="page-title">Confidence</h2>
+      <p className="hint">Small brave steps, and a calmer way to think about them.</p>
+
+      {!data.confidenceIntroSeen && (
+        <div className="notice">
+          <p>
+            These are self-help tools based on techniques from cognitive behavioral therapy (CBT). They're not therapy or a diagnosis. If anxiety is getting in the
+            way of work, relationships or daily life, a doctor or licensed therapist can help.
+          </p>
+          <button className="secondary" type="button" onClick={() => update((d) => ({ ...d, confidenceIntroSeen: true }))}>
+            Got it
+          </button>
+        </div>
+      )}
+      {flash && (
+        <p className="notice ok" role="status">
+          {flash}
+        </p>
+      )}
+
+      {pending.map((e) => (
+        <button key={e.id} type="button" className="pill-link as-button" onClick={() => go({ name: "checkin", id: e.id })}>
+          <span>
+            <strong>How did it go?</strong> {e.situation}
+          </span>
+          <span aria-hidden="true">→</span>
+        </button>
+      ))}
+
+      <article className="featured">
+        <p className="eyebrow">Next brave step</p>
+        {next ? (
+          <>
+            <h3>{next.title}</h3>
+            <p className="hint">
+              {(() => {
+                return `Expected discomfort: ${next.expectedDiscomfort}/10. A step counts once you've tested it — your anxiety doesn't have to drop.`;
+              })()}
+            </p>
+            <button className="primary" type="button" onClick={() => go({ name: "plan", step: next })}>
+              Plan it
+            </button>
+          </>
+        ) : (
+          <>
+            <h3>Plan a speaking moment</h3>
+            <p className="hint">Predict what you're worried about, do it, then compare. It's how you find out what really happens.</p>
+            <button className="primary" type="button" onClick={() => go({ name: "plan" })}>
+              Plan one
+            </button>
+          </>
+        )}
+      </article>
+
+      {(real.tested > 0 || reh.tested > 0) && (
+        <p className="result-line">
+          {real.tested > 0 && (
+            <span>
+              Real life: <strong>{real.fearNotHappened} of {real.tested}</strong> feared outcome{real.tested === 1 ? "" : "s"} didn't happen
+              {real.fearPartly ? ` (${real.fearPartly} partly)` : ""}.
+            </span>
+          )}
+          {reh.tested > 0 && (
+            <span className="block">
+              Rehearsals: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
+            </span>
+          )}
+        </p>
+      )}
+
+      {cmp && (
+        <div className="compare-card">
+          <p className="eyebrow">Dropping safety habits · self-reported</p>
+          <div className="compare">
+            <div className="compare-col">
+              <p className="eyebrow">Dropped a habit ({cmp.dropped.count})</p>
+              <p>
+                Anxiety during: <strong>{cmp.dropped.avgAnxiety}/10</strong>
+              </p>
+              <p className="hint">Feared outcome happened {cmp.dropped.fearHappened}×</p>
+            </div>
+            <div className="compare-col">
+              <p className="eyebrow">Kept habits ({cmp.kept.count})</p>
+              <p>
+                Anxiety during: <strong>{cmp.kept.avgAnxiety}/10</strong>
+              </p>
+              <p className="hint">Feared outcome happened {cmp.kept.fearHappened}×</p>
+            </div>
+          </div>
+          <p className="hint">Small numbers and different situations — treat this as a hint, not proof. Many people find the habits weren't protecting them as much as they felt.</p>
+        </div>
+      )}
+
+      <ul className="rows tools">
+        <li className="row-item">
+          <button type="button" className="row-button" onClick={() => go({ name: "ladder" })}>
+            <span className="row-title">Brave steps ladder</span>
+            <span className="row-desc">Rank speaking situations from easier to harder, then climb one rung at a time.</span>
+          </button>
+        </li>
+        <li className="row-item">
+          <button type="button" className="row-button" onClick={() => go({ name: "reframe" })}>
+            <span className="row-title">Untangle a thought</span>
+            <span className="row-desc">Catch an anxious thought, spot the thinking trap, find a more balanced view.</span>
+          </button>
+        </li>
+        <li className="row-item">
+          <button type="button" className="row-button" onClick={() => go({ name: "selfcheck" })}>
+            <span className="row-title">How much is it getting in the way?</span>
+            <span className="row-desc">A short, private check-in — not a test or diagnosis — with guidance on when to get support.</span>
+          </button>
+        </li>
+      </ul>
+
+      <section className="support-row" aria-labelledby="support-h">
+        <h3 id="support-h" className="section-title">
+          Need support now?
+        </h3>
+        <CrisisList />
+      </section>
+    </main>
+  );
+}
+
+function resultMessage(e: Experiment): string {
+  const close = " That's logged — no need to replay it.";
+  if (e.outcome === "didnt-happen") return `What you feared didn't happen. You rated it ${e.predictionLikelihood}% likely beforehand.${close}`;
+  if (e.outcome === "partly") return `Part of it happened — and you got through it. That's useful evidence too.${close}`;
+  return `It happened, and you got through it. That's still a step taken. Next time, you could try a smaller version of this step.${close}`;
+}
+
+// ---------- Shared bits ----------
+
+function Slider({ label, value, onChange, min, max, suffix }: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; suffix?: string }) {
+  const id = useId();
+  return (
+    <div className="slider">
+      <div className="slider-head">
+        <label className="label" htmlFor={id}>
+          {label}
+        </label>
+        <output htmlFor={id} aria-live="polite">
+          {value}
+          {suffix}
+        </output>
+      </div>
+      <input id={id} type="range" min={min} max={max} step={max === 100 ? 5 : 1} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <div className="slider-ends" aria-hidden="true">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
+}
+
+function TextField({ label, value, onChange, rows = 2, hint }: { label: string; value: string; onChange: (s: string) => void; rows?: number; hint?: string }) {
+  const id = useId();
+  return (
+    <>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      {hint && <p className="hint">{hint}</p>}
+      <textarea id={id} rows={rows} maxLength={600} value={value} onChange={(e) => onChange(e.target.value)} />
+    </>
+  );
+}
+
+function SubScreen({ title, eyebrow, onBack, children }: { title: string; eyebrow: string; onBack: () => void; children: ReactNode }) {
+  return (
+    <main className="screen" id="main">
+      <button className="link back" type="button" onClick={onBack}>
+        ← Back
+      </button>
+      <p className="eyebrow">{eyebrow}</p>
+      <h2>{title}</h2>
+      {children}
+    </main>
+  );
+}
+
+// ---------- Plan a brave step (behavioral experiment) ----------
+
+function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () => void; onSave: (e: Experiment) => void }) {
+  const [situation, setSituation] = useState(step?.title ?? "");
+  const [prediction, setPrediction] = useState("");
+  const [likelihood, setLikelihood] = useState(60);
+  const [anxiety, setAnxiety] = useState(5);
+  const [drop, setDrop] = useState<string | undefined>();
+  const [obstacle, setObstacle] = useState("");
+  const [action, setAction] = useState("");
+  const [worry, setWorry] = useState(""); // deliberately not saved
+  const [page, setPage] = useState(1);
+  const ok = situation.trim().length > 2 && prediction.trim().length > 2;
+  const titles = ["", "What will you do?", "What are you worried will happen?", "Before you go"];
+  return (
+    <SubScreen eyebrow={`Brave step · ${page} of 3`} title={titles[page]!} onBack={page === 1 ? onCancel : () => setPage(page - 1)}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ok) return;
+          onSave({
+            id: uid("x-"),
+            createdAt: new Date().toISOString(),
+            kind: "real-world",
+            situation: situation.trim(),
+            ladderStepId: step?.id,
+            prediction: prediction.trim(),
+            predictionLikelihood: likelihood,
+            anxietyBefore: anxiety,
+            safetyBehaviourToDrop: drop,
+            ifThen: obstacle.trim() && action.trim() ? { obstacle: obstacle.trim(), action: action.trim() } : undefined,
+          });
+        }}
+      >
+        <div hidden={page !== 1}>
+          <TextField label="What will you do?" value={situation} onChange={setSituation} hint="e.g. Ask one question in Tuesday's team meeting" />
+          <div className="actions sticky">
+            <button className="primary" type="button" disabled={situation.trim().length < 3} onClick={() => setPage(2)}>
+              Next
+            </button>
+          </div>
+        </div>
+        <div hidden={page !== 2}>
+          <TextField label="What are you worried will happen?" value={prediction} onChange={setPrediction} hint="Be specific: 'My voice will shake and people will think I'm unprepared.'" />
+          <Slider label="How likely does that feel?" value={likelihood} onChange={setLikelihood} min={0} max={100} suffix="%" />
+          <Slider label="How anxious do you feel about it now?" value={anxiety} onChange={setAnxiety} min={0} max={10} suffix="/10" />
+          <div className="actions sticky">
+            <button className="primary" type="button" disabled={prediction.trim().length < 3} onClick={() => setPage(3)}>
+              Next
+            </button>
+          </div>
+        </div>
+        <div hidden={page !== 3}>
+        <fieldset className="pills">
+          <legend className="label">Optional: one habit to drop this time</legend>
+          {SAFETY_BEHAVIOURS.map((b) => (
+            <label key={b} className={drop === b ? "pill on" : "pill"}>
+              <input type="radio" name="drop" checked={drop === b} onChange={() => setDrop(b)} onClick={() => drop === b && setDrop(undefined)} />
+              {b}
+            </label>
+          ))}
+        </fieldset>
+        <div className="ifthen">
+          <p className="label">If something gets in the way, then I will… (optional)</p>
+          <p className="hint">Planning one obstacle and one response in advance makes follow-through more likely. Keep both short.</p>
+          <label className="sr-only" htmlFor="if-obstacle">
+            If
+          </label>
+          <div className="ifthen-row">
+            <span>If</span>
+            <input id="if-obstacle" value={obstacle} maxLength={160} placeholder="I'm asked a follow-up I can't answer" onChange={(e) => setObstacle(e.target.value)} />
+          </div>
+          <label className="sr-only" htmlFor="if-action">
+            then I will
+          </label>
+          <div className="ifthen-row">
+            <span>then I will</span>
+            <input id="if-action" value={action} maxLength={160} placeholder="say “Good question — the short answer is…”" onChange={(e) => setAction(e.target.value)} />
+          </div>
+        </div>
+        {anxiety >= 7 && (
+          <div className="worry-box">
+            <p className="label">Feeling very anxious about it? Write out your worries (optional)</p>
+            <p className="hint">Some people find that writing freely about their worries for a couple of minutes before a stressful moment takes the edge off. Optional. This box isn't saved anywhere.</p>
+            <textarea aria-label="Write out your worries" rows={5} value={worry} onChange={(e) => setWorry(e.target.value)} />
+          </div>
+        )}
+        <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
+        <div className="actions sticky">
+          <button className="primary" type="submit" disabled={!ok}>
+            Save my plan
+          </button>
+        </div>
+        </div>
+        <CrisisNotice texts={[situation, prediction, worry]} />
+      </form>
+    </SubScreen>
+  );
+}
+
+// ---------- Check in afterwards ----------
+
+function CheckIn({ exp, onCancel, onSave }: { exp: Experiment; onCancel: () => void; onSave: (e: Experiment) => void }) {
+  const [anxietyAfter, setAnxietyAfter] = useState(exp.anxietyBefore);
+  const [outcome, setOutcome] = useState<Experiment["outcome"]>();
+  const [whatHappened, setWhatHappened] = useState("");
+  const [wentOkay, setWentOkay] = useState("");
+  const [learned, setLearned] = useState("");
+  return (
+    <SubScreen eyebrow={formatDate(exp.createdAt)} title="How did it go?" onBack={onCancel}>
+      <p className="task">{exp.situation}</p>
+      <div className="callout">
+        <p className="eyebrow">You predicted ({exp.predictionLikelihood}% likely)</p>
+        <p>{exp.prediction}</p>
+        {exp.ifThen && (
+          <p className="hint">
+            Your plan: if {exp.ifThen.obstacle}, then {exp.ifThen.action}.
+          </p>
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!outcome) return;
+          onSave({ ...exp, completedAt: new Date().toISOString(), anxietyAfter, outcome, whatHappened: whatHappened.trim(), wentOkay: wentOkay.trim(), learned: learned.trim() });
+        }}
+      >
+        <fieldset className="options">
+          <legend className="label">Did what you feared happen?</legend>
+          {(
+            [
+              ["didnt-happen", "No, it didn't"],
+              ["partly", "Partly"],
+              ["happened", "Yes, it did"],
+            ] as const
+          ).map(([v, l]) => (
+            <label key={v} className={outcome === v ? "option on" : "option"}>
+              <input type="radio" name="outcome" checked={outcome === v} onChange={() => setOutcome(v)} />
+              {l}
+            </label>
+          ))}
+        </fieldset>
+        <Slider label="How anxious were you while doing it?" value={anxietyAfter} onChange={setAnxietyAfter} min={0} max={10} suffix="/10" />
+        <TextField label="What actually happened? (optional)" value={whatHappened} onChange={setWhatHappened} />
+        {outcome === "happened" && (
+          <p className="notice">
+            Getting through it when the thing you feared happened is hard, and you did. What helped you cope? If this step felt too big, the next one can be smaller.
+          </p>
+        )}
+        <TextField label="One thing that went okay" value={wentOkay} onChange={setWentOkay} hint="Replaying only the awkward bits keeps anxiety going. Name something that went fine." />
+        <TextField label="What did you learn? (optional)" value={learned} onChange={setLearned} />
+        <CrisisNotice texts={[whatHappened, wentOkay, learned]} />
+        <div className="actions sticky">
+          <button className="primary" type="submit" disabled={!outcome}>
+            Save
+          </button>
+        </div>
+      </form>
+    </SubScreen>
+  );
+}
+
+// ---------- Brave steps ladder (graded exposure) ----------
+
+function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep) => void }) {
+  const { data, update } = useApp();
+  const [title, setTitle] = useState("");
+  const [disc, setDisc] = useState(5);
+  const steps = activeLadder(data.ladder);
+  const suggestions = STARTER_STEPS.filter((s) => !steps.some((x) => x.title === s.title)).slice(0, steps.length === 0 ? 6 : 3);
+  const add = (t: string, d: number) =>
+    update((x) => ({ ...x, ladder: [...x.ladder, { id: uid("l-"), createdAt: new Date().toISOString(), title: t, expectedDiscomfort: d }] }));
+
+  return (
+    <SubScreen eyebrow="Confidence" title="Brave steps ladder" onBack={onBack}>
+      <p className="hint">
+        Start with steps that feel uncomfortable but doable. A step counts once you've tested what you feared — anxiety doesn't have to drop for it to count. Repeat any step
+        whenever you like.
+      </p>
+      {suggestions.length > 0 && (
+        <>
+          <p className="label">{steps.length === 0 ? "Quick start — tap to add" : "Suggestions"}</p>
+          <div className="pills">
+            {suggestions.map((s) => (
+              <button key={s.title} type="button" className="pill" onClick={() => add(s.title, s.expectedDiscomfort)}>
+                + {s.title}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {steps.length > 0 && (
+        <ol className="ladder">
+          {[...steps].reverse().map((s) => {
+            const tries = data.experiments.filter((e) => e.ladderStepId === s.id && e.completedAt);
+            const last = tries[tries.length - 1];
+            return (
+              <li key={s.id} className="rung">
+                <span className="rung-score" aria-label={`Expected discomfort ${s.expectedDiscomfort} out of 10`}>
+                  {s.expectedDiscomfort}
+                </span>
+                <span className="rung-body">
+                  <span className="rung-title">{s.title}</span>
+                  {last && (
+                    <span className="hint block">
+                      Tried {tries.length}× · last time {last.anxietyAfter}/10
+                    </span>
+                  )}
+                </span>
+                <span className="rung-actions">
+                  <button type="button" className="secondary small" onClick={() => onPlan(s)}>
+                    Plan
+                  </button>
+                  <button
+                    type="button"
+                    className="link small"
+                    aria-label={`Remove ${s.title}`}
+                    onClick={() => update((x) => ({ ...x, ladder: x.ladder.map((y) => (y.id === s.id ? { ...y, archived: true } : y)) }))}
+                  >
+                    Remove
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <form
+        className="add-step"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (title.trim().length < 3) return;
+          add(title.trim(), disc);
+          setTitle("");
+        }}
+      >
+        <label className="label" htmlFor="new-step">
+          Add your own step
+        </label>
+        <input id="new-step" value={title} maxLength={140} placeholder="e.g. Introduce myself at the all-hands" onChange={(e) => setTitle(e.target.value)} />
+        <Slider label="Expected discomfort" value={disc} onChange={setDisc} min={0} max={10} suffix="/10" />
+        <button className="secondary" type="submit" disabled={title.trim().length < 3}>
+          Add step
+        </button>
+      </form>
+    </SubScreen>
+  );
+}
+
+// ---------- Untangle a thought (cognitive restructuring) ----------
+
+function ReframeFlow({ onCancel, onSave }: { onCancel: () => void; onSave: (r: Reframe) => void }) {
+  const { data } = useApp();
+  const [step, setStep] = useState(1);
+  const [situation, setSituation] = useState("");
+  const [thought, setThought] = useState("");
+  const [beliefBefore, setBeliefBefore] = useState(70);
+  const [traps, setTraps] = useState<ThinkingTrap[]>([]);
+  const [evidenceAgainst, setEvidenceAgainst] = useState("");
+  const [friendAdvice, setFriendAdvice] = useState("");
+  const [balanced, setBalanced] = useState("");
+  const [beliefAfterRaw, setBeliefAfter] = useState<number | null>(null);
+  const beliefAfter = beliefAfterRaw ?? beliefBefore;
+  const all = [situation, thought, evidenceAgainst, friendAdvice, balanced];
+  const chosen = THINKING_TRAPS.filter((t) => traps.includes(t.id));
+
+  return (
+    <SubScreen eyebrow={`Untangle a thought · ${step} of 4`} title={["", "Catch the thought", "Spot the trap", "Check it", "A more balanced view"][step]!} onBack={step === 1 ? onCancel : () => setStep(step - 1)}>
+      <CrisisNotice texts={all} />
+      {step === 1 && (
+        <>
+          <TextField label="What's the situation?" value={situation} onChange={setSituation} hint="e.g. Presenting the quarterly numbers on Thursday" />
+          <TextField label="What's the anxious thought?" value={thought} onChange={setThought} hint="e.g. 'I'll go blank and everyone will think I don't know my job.'" />
+          <Slider label="How much do you believe it?" value={beliefBefore} onChange={setBeliefBefore} min={0} max={100} suffix="%" />
+          <div className="actions sticky">
+            <button className="primary" type="button" disabled={thought.trim().length < 3} onClick={() => setStep(2)}>
+              Next
+            </button>
+          </div>
+        </>
+      )}
+      {step === 2 && (
+        <>
+          <p className="hint">Which of these sound familiar? Pick any that fit — or none.</p>
+          <div className="trap-list">
+            {THINKING_TRAPS.map((t) => {
+              const on = traps.includes(t.id);
+              return (
+                <button key={t.id} type="button" className={on ? "trap on" : "trap"} aria-pressed={on} onClick={() => setTraps((xs) => (on ? xs.filter((x) => x !== t.id) : [...xs, t.id]))}>
+                  <strong>{t.name}</strong>
+                  <span>{t.plain}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="actions sticky">
+            <button className="primary" type="button" onClick={() => setStep(3)}>
+              Next
+            </button>
+          </div>
+        </>
+      )}
+      {step === 3 && (
+        <>
+          <p className="callout">“{thought}”</p>
+          {chosen.length > 0 && (
+            <ul className="plain">
+              {chosen.map((t) => (
+                <li key={t.id}>
+                  <strong>{t.name}:</strong> {t.question}
+                </li>
+              ))}
+            </ul>
+          )}
+          <TextField label="What doesn't fit the thought?" value={evidenceAgainst} onChange={setEvidenceAgainst} hint="Times it went fine, things people actually said, what you know about the topic." rows={3} />
+          <TextField
+            label="What would you tell a friend who thought this?"
+            value={friendAdvice}
+            onChange={setFriendAdvice}
+            rows={3}
+            hint="Or talk to yourself by name, as a friend would: “Sam, you've explained this before.” A little distance makes it easier to be fair."
+          />
+          <div className="actions sticky">
+            <button className="primary" type="button" onClick={() => setStep(4)}>
+              Next
+            </button>
+          </div>
+        </>
+      )}
+      {step === 4 && (
+        <>
+          <TextField
+            label="Write a more balanced thought"
+            value={balanced}
+            onChange={setBalanced}
+            rows={3}
+            hint="Not forced positivity — something realistic you could believe. e.g. 'I might stumble once, but I know this material and people mostly care about the numbers.'"
+          />
+          <Slider label="How much do you believe the original thought now?" value={beliefAfter} onChange={setBeliefAfter} min={0} max={100} suffix="%" />
+          <div className="actions sticky">
+            <button
+              className="primary"
+              type="button"
+              disabled={balanced.trim().length < 3}
+              onClick={() =>
+                onSave({
+                  id: uid("t-"),
+                  at: new Date().toISOString(),
+                  situation: situation.trim(),
+                  thought: thought.trim(),
+                  beliefBefore,
+                  traps,
+                  evidenceAgainst: evidenceAgainst.trim(),
+                  friendAdvice: friendAdvice.trim(),
+                  balanced: balanced.trim(),
+                  beliefAfter,
+                })
+              }
+            >
+              Save
+            </button>
+          </div>
+        </>
+      )}
+      {step === 1 && data.reframes.length > 0 && (
+        <details className="more">
+          <summary>Past thoughts ({data.reframes.length})</summary>
+          <ul className="plain">
+            {[...data.reframes].reverse().map((r) => (
+              <li key={r.id}>
+                <span className="hint">{formatDate(r.at)}</span> “{r.thought}” → <em>{r.balanced}</em>{" "}
+                <span className="hint">
+                  ({r.beliefBefore}% → {r.beliefAfter ?? "?"}%)
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </SubScreen>
+  );
+}
+
+// ---------- Self-check (non-diagnostic) ----------
+
+function SelfCheck({ onBack }: { onBack: () => void }) {
+  const { data, update } = useApp();
+  const [answers, setAnswers] = useState<(number | null)[]>(IMPACT_QUESTIONS.map(() => null));
+  const [result, setResult] = useState<"seek-support" | "self-help" | null>(null);
+  const [qi, setQi] = useState(0);
+  const last = data.impactChecks[data.impactChecks.length - 1];
+  const complete = answers.every((a) => a != null);
+
+  if (result) {
+    return (
+      <SubScreen eyebrow="Self-check" title="Thanks for checking in" onBack={onBack}>
+        {result === "seek-support" ? (
+          <div className="notice warn">
+            <p>
+              <strong>It sounds like anxiety is getting in the way a lot right now.</strong> That's worth raising with a doctor or a licensed therapist. They can help you work
+              out what's going on and what would help. Talking therapies such as CBT help many people who feel anxious about speaking or social situations.
+            </p>
+            <p>You can keep using these tools alongside that. They're practice, not a replacement for support.</p>
+          </div>
+        ) : (
+          <div className="notice ok">
+            <p>
+              The brave steps and thought tools here may help. If anxiety starts getting in the way more — at work, with friends, or by making you avoid things — a
+              doctor or licensed therapist can help.
+            </p>
+          </div>
+        )}
+        <p className="hint">This isn't a test or a diagnosis, and it isn't scored. Your answers stay on this device so you can see how things change over time.</p>
+        <details className="more">
+          <summary>Get help now</summary>
+          <CrisisList />
+        </details>
+        <div className="actions">
+          <button className="primary" type="button" onClick={onBack}>
+            Done
+          </button>
+        </div>
+      </SubScreen>
+    );
+  }
+
+  return (
+    <SubScreen eyebrow={`Self-check · ${qi + 1} of ${IMPACT_QUESTIONS.length} · not a diagnosis`} title={IMPACT_QUESTIONS[qi]!} onBack={qi === 0 ? onBack : () => setQi(qi - 1)}>
+      {qi === 0 && <p className="hint">Think about the last two weeks. There are no right answers.{last ? ` Last checked ${formatDate(last.at)}.` : ""}</p>}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!complete) return;
+          const a = answers as number[];
+          update((d) => ({ ...d, impactChecks: [...d.impactChecks, { at: new Date().toISOString(), answers: a }] }));
+          setResult(impactGuidance(a));
+        }}
+      >
+        {IMPACT_QUESTIONS.map((q, i) => (
+          <fieldset key={q} className="impact-q" hidden={i !== qi}>
+            <legend className="sr-only">{q}</legend>
+            <div className="options">
+              {IMPACT_SCALE.map((label, v) => (
+                <label key={label} className={answers[i] === v ? "option on" : "option"}>
+                  <input type="radio" name={`impact-${i}`} checked={answers[i] === v} onChange={() => setAnswers((xs) => xs.map((x, j) => (j === i ? v : x)))} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {last && <p className="hint small-hint">Last time: {IMPACT_SCALE[last.answers[i] ?? 0]}</p>}
+          </fieldset>
+        ))}
+        <div className="actions sticky">
+          {qi < IMPACT_QUESTIONS.length - 1 ? (
+            <button className="primary" type="button" disabled={answers[qi] == null} onClick={() => setQi(qi + 1)}>
+              Next
+            </button>
+          ) : (
+            <button className="primary" type="submit" disabled={!complete}>
+              See guidance
+            </button>
+          )}
+        </div>
+      </form>
+    </SubScreen>
+  );
+}

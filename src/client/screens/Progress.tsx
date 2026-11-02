@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import type { Attempt, PracticeSession } from "../../shared/types";
-import { MISSIONS, SKILLS, SKILL_ORDER, getScenario } from "../../shared/curriculum";
+import { SCENARIOS, SKILLS, SKILL_ORDER } from "../../shared/curriculum";
 import { audioStore } from "../lib/audioStore";
-import { addRealWorld, summarize, upsertSession } from "../lib/state";
+import { summarize, upsertSession } from "../lib/state";
+import { summarizeExperiments } from "../../shared/confidence";
+import { phraseBank } from "./Phrases";
+import { href } from "../lib/router";
+import { localDayKey } from "../../shared/dates";
 import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
@@ -15,6 +19,8 @@ export function Progress() {
   return (
     <main className="screen" id="main">
       <h2>Progress</h2>
+      <ActivityDots />
+
       <section aria-labelledby="counts-h">
         <h3 id="counts-h">Practice</h3>
         <dl className="stats">
@@ -31,8 +37,8 @@ export function Progress() {
             <dd>{sum.retries}</dd>
           </div>
           <div>
-            <dt>Real-world attempts</dt>
-            <dd>{sum.realWorld}</dd>
+            <dt>Brave steps taken</dt>
+            <dd>{summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world")).completed}</dd>
           </div>
         </dl>
         {sum.unfinished > 0 && <p className="hint">{sum.unfinished} unfinished session(s) aren't counted.</p>}
@@ -59,6 +65,11 @@ export function Progress() {
           </tbody>
         </table>
         <p className="hint">“Goal met” counts AI judgements on individual attempts, including retries of the same prompt. It isn't a measure of mastery.</p>
+        {sum.feedbackRated > 0 && (
+          <p>
+            You rated {sum.feedbackUseful} of {sum.feedbackRated} pieces of feedback useful.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="rev-h">
@@ -69,7 +80,28 @@ export function Progress() {
         <p className="hint">Self-assessed after revealing the answer.</p>
       </section>
 
-      <Missions />
+      <a className="pill-link" href={href({ name: "review" })}>
+        <span>
+          <strong>Your reviews</strong> · {data.reviews.filter((r) => r.status === "active").length} saved
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
+      <a className="pill-link" href={href({ name: "phrases" })}>
+        <span>
+          <strong>Phrase bank</strong> · {phraseBank(data.sessions).length} phrase{phraseBank(data.sessions).length === 1 ? "" : "s"}
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
+
+      <ConfidenceSummary />
+
+      <section aria-labelledby="real-h">
+        <h3 id="real-h">Try it for real</h3>
+        <p className="hint">The point of practice is the next real conversation. Plan one small brave step, predict what you fear, and see what happens.</p>
+        <a className="button secondary" href={href({ name: "confidence" })}>
+          Plan a brave step
+        </a>
+      </section>
 
       <section aria-labelledby="hist-h">
         <h3 id="hist-h">History</h3>
@@ -79,14 +111,94 @@ export function Progress() {
   );
 }
 
+/** Last four weeks as dots: a day is filled if anything was practiced. No streaks, no counts of misses. */
+function ActivityDots() {
+  const { data } = useApp();
+  const days = new Set<string>();
+  for (const s of data.sessions) if (s.completedAt) days.add(localDayKey(s.completedAt));
+  for (const e of data.experiments) if (e.completedAt) days.add(localDayKey(e.completedAt));
+  for (const r of data.reviews) for (const h of r.history) if (h.result !== "skipped") days.add(localDayKey(h.at));
+  for (const r of data.reframes) days.add(localDayKey(r.at));
+  const today = new Date();
+  const cells = Array.from({ length: 28 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (27 - i));
+    return { key: localDayKey(d), on: days.has(localDayKey(d)), label: d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) };
+  });
+  const active = cells.filter((c) => c.on).length;
+  return (
+    <section aria-labelledby="dots-h" className="dots-section">
+      <h3 id="dots-h" className="sr-only">
+        Last four weeks
+      </h3>
+      <ul className="dots" aria-label={`Days with practice in the last four weeks: ${active} of 28`}>
+        {cells.map((c) => (
+          <li key={c.key} className={c.on ? "dot-day on" : "dot-day"} title={c.label}>
+            <span className="sr-only">
+              {c.label}: {c.on ? "practiced" : "no practice"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">
+        {active} day{active === 1 ? "" : "s"} with practice in the last four weeks. Gaps are normal; what matters is coming back.
+      </p>
+    </section>
+  );
+}
+
+function ConfidenceSummary() {
+  const { data } = useApp();
+  const c = summarizeExperiments(data.experiments);
+  const views = data.sessions.flatMap((s) => s.attempts.map((a) => a.selfView).filter((v): v is NonNullable<typeof v> => !!v));
+  const better = views.filter((v) => v.observed > v.predicted).length;
+  if (c.completed === 0 && data.reframes.length === 0 && views.length === 0) return null;
+  return (
+    <section aria-labelledby="conf-h">
+      <h3 id="conf-h">Confidence</h3>
+      <dl className="stats">
+        <div>
+          <dt>Brave steps done</dt>
+          <dd>{c.completed}</dd>
+        </div>
+        <div>
+          <dt>Fears that didn't happen</dt>
+          <dd>
+            {c.fearNotHappened}
+            {c.completed ? <span className="of"> of {c.completed}</span> : null}
+          </dd>
+        </div>
+        <div>
+          <dt>Thoughts untangled</dt>
+          <dd>{data.reframes.length}</dd>
+        </div>
+        {c.avgBefore != null && c.avgAfter != null && (
+          <div>
+            <dt>Anxiety before → during</dt>
+            <dd className="small-dd">
+              {c.avgBefore} → {c.avgAfter}
+            </dd>
+          </div>
+        )}
+      </dl>
+      {views.length > 0 && (
+        <p>
+          Listened back as an observer {views.length} time{views.length === 1 ? "" : "s"} — came across better than expected in {better}.
+        </p>
+      )}
+      <p className="hint">Self-reported ratings, kept separate from coaching feedback. Averages across different situations, so treat them as a rough guide.</p>
+    </section>
+  );
+}
+
 function SessionEntry({ s }: { s: PracticeSession }) {
-  const title = s.mode === "learn" ? `Learn & Explain: ${s.storyTitle ?? "story"}` : `Talk: ${s.talk ? getScenario(s.talk.scenarioId).title : "rehearsal"}${s.talk?.topic ? ` — ${s.talk.topic}` : ""}`;
+  const scenarioTitle = s.talk ? (SCENARIOS.find((x) => x.id === s.talk?.scenarioId)?.title ?? "rehearsal") : "rehearsal";
+  const title = s.mode === "learn" ? `Learn & Explain: ${s.storyTitle ?? "story"}` : `Talk: ${scenarioTitle}${s.talk?.topic ? ` — ${s.talk.topic}` : ""}`;
   return (
     <details className="card history">
       <summary>
         <span>{title}</span>
         <span className="hint block">
-          {formatDate(s.startedAt)} · {SKILLS[s.skill].short} · {s.completedAt ? "completed" : "not finished"} · {s.usedLive ? "AI feedback" : "demo feedback"}
+          {formatDate(s.startedAt)} · {SKILLS[s.skill]?.short ?? s.skill} · {s.completedAt ? "completed" : "not finished"} · {s.usedLive ? "AI feedback" : "demo feedback"}
         </span>
       </summary>
       {s.attempts.map((a) => (
@@ -155,78 +267,5 @@ function AttemptEntry({ a, session }: { a: Attempt; session: PracticeSession }) 
         </div>
       )}
     </div>
-  );
-}
-
-function Missions() {
-  const { data, update } = useApp();
-  const [open, setOpen] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const [comfort, setComfort] = useState<number | undefined>();
-  return (
-    <section aria-labelledby="mis-h">
-      <h3 id="mis-h">Try it for real (optional)</h3>
-      <ul className="missions">
-        {MISSIONS.map((m) => {
-          const count = data.realWorld.filter((r) => r.missionId === m.id).length;
-          return (
-            <li key={m.id} className="card">
-              <strong>{m.title}</strong>
-              <p className="hint">{m.description}</p>
-              {count > 0 && <p className="hint">Logged {count} time(s).</p>}
-              {open === m.id ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    update((d) => addRealWorld(d, { at: new Date().toISOString(), missionId: m.id, note: note.slice(0, 1000), comfort }));
-                    setOpen(null);
-                    setNote("");
-                    setComfort(undefined);
-                  }}
-                >
-                  <label className="label" htmlFor={`note-${m.id}`}>
-                    What happened? (optional)
-                  </label>
-                  <textarea id={`note-${m.id}`} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-                  <fieldset className="choices inline">
-                    <legend className="label">How comfortable did you feel? (self-reported, optional)</legend>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <label key={n} className="choice">
-                        <input type="radio" name={`c-${m.id}`} checked={comfort === n} onChange={() => setComfort(n)} />
-                        {n}
-                      </label>
-                    ))}
-                  </fieldset>
-                  <div className="row">
-                    <button className="primary" type="submit">
-                      Log it
-                    </button>
-                    <button className="link" type="button" onClick={() => setOpen(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <button className="secondary" type="button" onClick={() => setOpen(m.id)}>
-                  I did this
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {data.realWorld.some((r) => r.comfort) && (
-        <p className="hint">
-          Self-reported comfort (1–5), most recent first:{" "}
-          {[...data.realWorld]
-            .reverse()
-            .filter((r) => r.comfort)
-            .slice(0, 8)
-            .map((r) => r.comfort)
-            .join(", ")}
-          . This is how you felt, kept separate from coaching observations.
-        </p>
-      )}
-    </section>
   );
 }

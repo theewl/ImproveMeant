@@ -44,7 +44,7 @@ export const FeedbackOutput = z.object({
     })
     .nullable()
     .describe("Null when the goal is met and there's nothing important to change. Do not invent a weakness."),
-  explanation: z.string().describe("Two or three sentences on why this matters for the listener."),
+  explanation: z.string().describe("One or two sentences on why this matters for the listener."),
   fidelity: z.object({
     status: z.enum(["accurate", "minor_gaps", "factual_error", "not_applicable"]),
     note: z.string().nullable().describe("If not accurate: what differs from the supplied source. Opinions are not factual errors."),

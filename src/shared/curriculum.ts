@@ -37,8 +37,7 @@ export const EXERCISES: Exercise[] = [
     difficulty: "starter",
     title: "Explain the main idea",
     prompt: "Without looking, explain the main idea of \"{topic}\" to a colleague who hasn't read it. Lead with the point.",
-    successDefinition:
-      "The first one or two sentences state the central idea in the speaker's own words; details come after, and nothing important is factually wrong.",
+    successDefinition: "The first one or two sentences state the central idea in the speaker's own words; details come after.",
     exampleFeedback:
       "Your main point (\"cheap batteries are changing who can store solar power\") arrives in your fourth sentence, after the history. Try opening with that sentence, then give the history as one supporting detail.",
     laterVariation:
@@ -61,7 +60,7 @@ export const EXERCISES: Exercise[] = [
     difficulty: "starter",
     title: "Introduce yourself with a point",
     prompt:
-      "Introduce yourself to {audience}. Instead of a list of facts, lead with one thing you want them to remember about you.",
+      "Introduce yourself to {audience} ({topic}). Instead of a list of facts, lead with one thing you want them to remember about you.",
     successDefinition:
       "The opening states what the listener should remember (a focus, strength or reason to talk to you) before background details.",
     exampleFeedback:
@@ -106,6 +105,19 @@ export const EXERCISES: Exercise[] = [
     laterVariation: "Explain a process you know well (e.g. onboarding a new hire) to a group of newcomers in three signposted steps.",
   },
   {
+    id: "org-what-so-what",
+    skill: "organize",
+    difficulty: "core",
+    title: "What? So what? Now what?",
+    prompt:
+      "Explain \"{topic}\" in three short parts, in this order: What (what it is), So what (why it matters to the listener), Now what (what to do or watch for). You can use the stems \"The idea is…\", \"This matters because…\", \"So the next step is…\".",
+    successDefinition:
+      "All three parts appear, in order, and each is one to three sentences. The 'so what' is about the listener, not a restatement of the 'what'.",
+    exampleFeedback:
+      "Your 'what' and 'so what' are clear. The 'now what' is missing: you ended on why it matters. Add one sentence on what the listener could do or watch for.",
+    laterVariation: "Someone asks what you've been working on. Answer in three parts: what it is, why it matters to them, what happens next.",
+  },
+  {
     id: "org-stretch-objection",
     skill: "organize",
     difficulty: "stretch",
@@ -128,6 +140,18 @@ export const EXERCISES: Exercise[] = [
     exampleFeedback:
       "\"It affects a lot of people\" is general. You mentioned the town in the article; naming it and the number of homes affected would make the point concrete.",
     laterVariation: "Explain why a habit of yours works, using one specific day when it helped.",
+  },
+  {
+    id: "ex-twelve",
+    skill: "example",
+    difficulty: "core",
+    title: "Explain it to a curious 12-year-old",
+    prompt: "Explain \"{topic}\" to a curious 12-year-old. No jargon; use one example from everyday life they'd recognize.",
+    successDefinition:
+      "No unexplained technical terms, at least one everyday example, and the main idea survives the simplification without becoming wrong.",
+    exampleFeedback:
+      "\"Incentives\" would need explaining to a 12-year-old. You could say \"rewards\" and keep your pocket-money example, which works well.",
+    laterVariation: "Explain what your job involves to a curious 12-year-old, with one example from their world.",
   },
   {
     id: "ex-analogy",
@@ -259,7 +283,7 @@ export const SCENARIOS: Scenario[] = [
       supportive: ["What first convinced you of this?", "Where would you start if we wanted to act on this?"],
       challenging: [
         "What's the strongest argument against your position?",
-        "Your example is one case. Why should we think it generalises?",
+        "Your example is one case. Why should we think it generalizes?",
       ],
     },
   },
@@ -298,17 +322,30 @@ export function getScenario(id: string): Scenario {
   return sc;
 }
 
-/** Exercises used for Learn & Explain recall, in a rotation that varies the skill. */
-export const LEARN_EXERCISE_ROTATION = ["mp-explain-story", "ex-concrete-case", "org-two-reasons", "con-takeaway"];
+/** Learn & Explain exercises per skill, easier first. Later entries are harder versions of the same skill. */
+export const LEARN_EXERCISES: Record<SkillId, string[]> = {
+  "main-point": ["mp-explain-story", "mp-one-sentence"],
+  organize: ["org-two-reasons", "org-what-so-what", "org-stretch-objection"],
+  example: ["ex-concrete-case", "ex-twelve", "ex-analogy"],
+  conclusion: ["con-takeaway", "con-call-to-action"],
+};
+
+/** Progress to the harder version once the goal has been met twice with real (live) feedback. */
+export const PROGRESSION_THRESHOLD = 2;
+
+export function pickLearnExerciseForSkill(skill: SkillId, goalMetLiveCount: number): Exercise {
+  const ids = LEARN_EXERCISES[skill];
+  const level = Math.min(ids.length - 1, Math.floor(goalMetLiveCount / PROGRESSION_THRESHOLD));
+  return getExercise(ids[level]!);
+}
 
 /**
- * Deterministic choice of the Learn & Explain exercise: start with the main point,
- * then rotate through skills as the learner completes sessions.
+ * Deterministic choice of the Learn & Explain exercise outside a plan: start with the
+ * main point, then rotate through skills; within a skill, progress by goals met.
  */
-export function pickLearnExercise(completedLearnSessions: number): Exercise {
-  if (completedLearnSessions < 2) return getExercise("mp-explain-story");
-  const id = LEARN_EXERCISE_ROTATION[completedLearnSessions % LEARN_EXERCISE_ROTATION.length]!;
-  return getExercise(id);
+export function pickLearnExercise(completedLearnSessions: number, goalMetBySkill: Partial<Record<SkillId, number>> = {}): Exercise {
+  const skill = completedLearnSessions < 2 ? "main-point" : SKILL_ORDER[completedLearnSessions % SKILL_ORDER.length]!;
+  return pickLearnExerciseForSkill(skill, goalMetBySkill[skill] ?? 0);
 }
 
 export function fillPrompt(template: string, vars: { topic?: string; audience?: string }): string {

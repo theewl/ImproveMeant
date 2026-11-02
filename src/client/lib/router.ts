@@ -1,24 +1,42 @@
+import type { ScenarioId } from "../../shared/types";
+
+const SCENARIO_IDS: ScenarioId[] = ["introduce", "explain-group", "propose-change", "persuade"];
 import { useEffect, useState } from "react";
 
 export type Route =
   | { name: "today" }
   | { name: "learn"; storyId: string }
-  | { name: "talk"; fromStoryId?: string }
+  | { name: "talk"; fromStoryId?: string; scenario?: ScenarioId }
   | { name: "review" }
   | { name: "progress" }
   | { name: "settings" }
+  | { name: "confidence" }
+  | { name: "phrases" }
   | { name: "onboarding" };
+
+function decode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   switch (parts[0]) {
     case "learn":
-      return parts[1] ? { name: "learn", storyId: decodeURIComponent(parts[1]) } : { name: "today" };
-    case "talk":
-      return { name: "talk", fromStoryId: parts[1] ? decodeURIComponent(parts[1]) : undefined };
+      return parts[1] ? { name: "learn", storyId: decode(parts[1]) } : { name: "today" };
+    case "talk": {
+      const p = parts[1] ? decode(parts[1]) : undefined;
+      if (p?.startsWith("s:") && SCENARIO_IDS.includes(p.slice(2) as ScenarioId)) return { name: "talk", scenario: p.slice(2) as ScenarioId };
+      return { name: "talk", fromStoryId: p };
+    }
     case "review":
     case "progress":
     case "settings":
+    case "confidence":
+    case "phrases":
     case "onboarding":
       return { name: parts[0] };
     default:
@@ -31,7 +49,7 @@ export function href(r: Route): string {
     case "learn":
       return `#/learn/${encodeURIComponent(r.storyId)}`;
     case "talk":
-      return r.fromStoryId ? `#/talk/${encodeURIComponent(r.fromStoryId)}` : "#/talk";
+      return r.scenario ? `#/talk/s:${r.scenario}` : r.fromStoryId ? `#/talk/${encodeURIComponent(r.fromStoryId)}` : "#/talk";
     default:
       return `#/${r.name}`;
   }

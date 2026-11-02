@@ -234,7 +234,7 @@ export function buildFeedback(out: FeedbackOutput, response: string, model: stri
   const verify = (q: string): string | null => {
     const t = q.trim();
     if (!t) return null;
-    if (quoteAppearsIn(t, response)) return clamp(t, 300);
+    if (quoteAppearsIn(t, response)) return clamp(t, 120);
     removed++;
     return null;
   };

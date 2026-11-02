@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import type { StoryCard } from "../../shared/types";
 import { dueQueue } from "../../shared/schedule";
+import { localDayKey } from "../../shared/dates";
 import { ALL_INTERESTS } from "../../shared/evergreen";
 import { api, type LiveFeedState } from "../lib/api";
 import { useApp } from "../lib/store";
 import { href } from "../lib/router";
 import { ErrorNotice, Loading, SourceLine } from "../components/common";
+import { PlanCard } from "../components/PlanCard";
 
 export function Today() {
   const { data } = useApp();
@@ -27,11 +29,14 @@ export function Today() {
   };
   useEffect(load, [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDayKey();
   const { queue } = dueQueue(data.reviews, new Date().toISOString());
-  const doneToday = data.sessions.filter((s) => s.completedAt?.slice(0, 10) === today).length;
+  const doneToday = data.sessions.filter((s) => s.completedAt && localDayKey(s.completedAt) === today).length;
   const max = data.prefs.sessionMinutes === 3 ? 3 : 4;
-  const [featured, ...rest] = cards?.slice(0, max) ?? [];
+  const planActive = !!data.plan;
+  const shown = cards?.slice(0, max) ?? [];
+  const featured = planActive ? undefined : shown[0];
+  const rest = planActive ? shown : shown.slice(1);
   const interestNames = data.prefs.interests.map((i) => ALL_INTERESTS.find((x) => x.id === i)?.label ?? i);
 
   return (
@@ -44,6 +49,8 @@ export function Today() {
             ? `Picked for you: ${interestNames.join(", ")}`
             : "A mix of ideas worth knowing"}
       </p>
+
+      <PlanCard learnStoryId={(featured ?? rest[0])?.id} />
 
       {queue.length > 0 && (
         <a className="pill-link" href={href({ name: "review" })}>
@@ -76,7 +83,7 @@ export function Today() {
       {rest.length > 0 && (
         <section aria-labelledby="more-h">
           <h3 id="more-h" className="section-title">
-            Or pick another
+            {planActive ? "Pick a story to explain" : "Or pick another"}
           </h3>
           <ul className="rows">
             {rest.map((c) => (

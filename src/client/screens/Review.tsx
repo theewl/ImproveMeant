@@ -7,7 +7,7 @@ import { useApp } from "../lib/store";
 import { deleteReview, dismissReview, markSourceChanged, recordReview } from "../lib/state";
 import { href } from "../lib/router";
 import { uid } from "../lib/storage";
-import { formatDate } from "../components/common";
+import { formatDate, safeHref } from "../components/common";
 
 export function Review() {
   const { data, update } = useApp();
@@ -94,7 +94,7 @@ function ReviewCard({
       {item.sourceChanged && (
         <p className="notice warn" role="status">
           The source article has been edited since you saved this, so the facts may have changed. Consider dismissing this item, or check the{" "}
-          <a href={item.source?.url} target="_blank" rel="noopener noreferrer">
+          <a href={safeHref(item.source?.url)} target="_blank" rel="noopener noreferrer">
             current source
           </a>
           .

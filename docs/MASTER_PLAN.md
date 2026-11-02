@@ -1,6 +1,8 @@
 # Master Plan: Clearline (working name)
 
 > **Stay informed. Remember what matters. Have something to say.**
+>
+> Update 2026-11-02: the scope now also includes CBT-informed self-help for speaking anxiety. See §9.
 
 **Status:** living document. First written 2026-11-02, alongside the private MVP on branch `claude/mvp-learn-explain`.
 
@@ -144,7 +146,7 @@ Target length is 3–5 minutes.
 - The audience is always labelled **simulated**.
 
 ### Later review and real-world application (built: basic)
-- **Scheduling:** deterministic Leitner ladder (1, 3, 7, 16 and 35 days), at most 5 reviews a day, and at most 60 active items.
+- **Scheduling:** FSRS via ts-fsrs (as of 2026-11-02, replacing a fixed 1/3/7/16/35-day ladder), at most 5 reviews a day, and at most 60 active items.
 - **Recall before reveal:** the learner recalls first, then sees the saved answer and self-assesses. Self-assessment accepts a paraphrase as a correct answer.
 - **Item controls:** skip, dismiss or delete.
 - **News items:** reviewed "as reported on {date}" and flagged if the source has been edited since.
@@ -442,6 +444,128 @@ These are estimates. **Measured usage: none yet.** No live calls were made durin
 - **Unsupported scoring:** any "confidence", "charisma" or mastery percentage.
 
 ---
+
+## 9. Confidence: CBT-informed self-help for speaking and social anxiety (added 2026-11-02)
+
+**Scope change [D].** The product goal now covers four areas, all aimed at one outcome: *getting your thoughts into a clear spoken explanation*.
+- Public speaking
+- Social and speaking anxiety
+- Memory
+- Vocabulary and verbalisation
+
+Anxiety support is **self-help based on CBT techniques**. It is not therapy, and it makes no diagnosis.
+
+Sources: `docs/research/2026-11-cbt-and-best-apps.md`, accessed 2026-11-02. Most items there are search-indexed rather than fetched, and some are marked as prior knowledge only. Verify them before using them in public copy.
+
+### Evidence we rely on
+- **[E] Guidelines.** NICE CG159 recommends individual CBT built specifically for social anxiety disorder (the Clark & Wells or Heimberg model) as the first choice for adults. Adults who decline it should be offered CBT-based supported self-help. That second role is the honest frame for Clearline.
+- **[E] Model components we can build features from** (Clark & Wells):
+  - self-focused attention
+  - safety behaviours
+  - behavioural experiments (predict, test, compare)
+  - video or recording feedback
+  - worry before and replay after a speaking event
+- **[E] Internet-delivered CBT** for social anxiety shows moderate-to-large effects against passive controls. Guided programmes beat unguided ones by only a small margin. Weaknesses in that evidence:
+  - many trials compare against waitlists
+  - participants are self-selected
+  - real-world dropout is higher than in trials
+  - we found no meta-analysis of apps alone
+- **[E] Exposure.** Current thinking favours designing exposure to break expectations, rather than waiting for anxiety to fade. That supports comparing predictions with outcomes.
+- **[E] Simulated or VR audiences** reduce public speaking anxiety compared with no treatment, but there are few randomised trials, and real-world exposure does slightly better.
+- **[E] Spaced practice** helps adults learn vocabulary.
+
+### What's built (deterministic, on-device, no AI)
+- **Behavioural experiments ("brave steps").** Before: what you'll do, what you fear, how likely it feels, and your anxiety (0–10). Optionally, one safety behaviour to drop and a tip to focus outward. Afterwards: did the feared outcome happen, anxiety during, one thing that went okay, what you learned. A "no need to replay it" close discourages going over it again afterwards. Over time the app shows "X of Y feared outcomes didn't happen".
+- **Brave steps ladder (graded exposure).** You rank situations by expected discomfort (0–10), starting from suggestions or your own. The app suggests the easiest step you haven't yet done at about 4/10 or lower, and explains that repeating a step is how it gets easier.
+- **Untangle a thought (cognitive restructuring).** Four steps:
+  1. Write the thought and how much you believe it.
+  2. Pick any thinking traps that fit, from eight described in our own words.
+  3. Answer questions matched to the traps you picked: what doesn't fit the thought, and what you'd tell a friend.
+  4. Write a balanced thought and re-rate how much you believe the original.
+- **Talk rehearsal check-in.** Optional, before and after a talk. It saves a rehearsal experiment.
+- **Safety.** A first-visit note: self-help, not therapy, see a professional if anxiety is affecting daily life. If crisis wording is typed, the app shows 988, findahelpline.com and a reminder to call emergency services. "Get help now" also appears in Confidence and Settings.
+- **Privacy.** Confidence data stays in the browser and is never sent to the AI. It's deleted with the rest of your history.
+
+### Claims we must not make [D]
+- That Clearline treats or diagnoses anything, or is therapy.
+- That it is clinically proven, FDA-cleared or endorsed by NICE.
+- Outcome numbers borrowed from other programmes' trials, or uncontrolled figures like "90% feel better".
+- That the simulated audience is VR exposure therapy.
+- That the AI is a counsellor, or that it watches for crises.
+- Any affiliation with Anxiety Canada, CCI or the NHS, or text copied from them.
+
+Why this matters: wording that implies treatment can bring an app under medical-device rules (FDA and MHRA guidance on intended purpose).
+
+### Measurement
+- Self-reported anxiety and predictions stay separate from coaching observations, and are labelled "self-reported".
+- **[Q] A validated questionnaire** (for example the Mini-SPIN) for a pilot study only. Check the licence first. It would never be used to diagnose, and it would point people to professional care.
+- **[Q] Clinical review.** Have a clinician review the content and safety copy before any public release.
+
+### Built in this round (borrowed from the most successful apps)
+
+| Feature | Borrowed from | Why |
+|---|---|---|
+| **Guided 4-week plan** | Toastmasters Pathways levels; Duolingo's visible path | People finish and come back when the next step is obvious and progress shows. |
+| **Observer review of recordings** | Video feedback in Clark & Wells | People with social anxiety usually rate themselves worse than they come across. Hearing yourself as the audience would corrects that. |
+| **Phrase bank** | Lexer and Anki | Vocabulary sticks when it's collected, reviewed and used in your own sentences. |
+
+**Guided plan**
+- Each week covers one skill: lead with your point, organise, make it concrete, land the ending.
+- Four tasks a week, ticked off automatically from what you actually do:
+  - explain a story
+  - rehearse a set scenario
+  - one real-world brave step
+  - one supporting task: build the ladder, untangle a thought, do reviews on two days, or the final look-back
+- A look-back after each week.
+- No streaks and no penalties for missing a week.
+
+**Observer review**
+1. After a talk recording, rate how you think you came across (0–10).
+2. Listen back "as an audience member" and rate again.
+3. The app shows the gap.
+
+It's optional and skippable. The ratings are self-reported and shown on the Progress page.
+
+**Phrase bank**
+- Every phrase from a Learn session is listed with its meaning and an example.
+- One tap adds it to reviews, which ask you to use it in a new sentence.
+
+### Also built: closing out the research recommendations
+
+| Feature | What it does |
+|---|---|
+| **FSRS review scheduling** | Uses the reference `ts-fsrs` library (MIT licence) with a 0.9 desired-retention target. Self-assessed results map to ratings: recalled → Good, partly → Hard, missed → Again. A skip postpones the item one day. Fuzz is off, same-day relearning steps are off, nothing is scheduled sooner than tomorrow, and the daily cap still applies. Existing items start fresh as new cards. |
+| **Safety-behaviour comparison** | Real-world steps and talk check-ins can both record a habit to drop. If "Holding notes" is the one dropped, the notes are hidden during the talk. Confidence then compares self-reported anxiety and outcomes with the habit dropped against kept, and says plainly that the numbers are small. |
+| **"No need to replay it" wrap-up** | Shown at the end of every Learn and Talk session. It anchors on the coach's "what worked" observation when there is one. |
+| **Quiet mode** | A Settings option that hides the timer and the measurement numbers. Feedback on what you said still appears. |
+| **Data export** | Settings → "Download my data" saves a JSON file of everything stored locally. The access token is left out, and so are recordings. |
+| **Self-check** | Four questions on avoidance, impact on work, impact on social life, and distress, answered on a five-point scale. It is our own wording, not a validated instrument. It produces no score, no "test" and no diagnosis. If any answer is "A lot" or higher, it suggests talking to a doctor or therapist and notes that CBT with a therapist is the recommended treatment. Each answer is shown next to your previous one. **[Q]** Have a clinician review the wording before public release. |
+
+### Round 3 (2026-11-02): design research, feature research, two independent code reviews
+
+Sources: `docs/research/2026-11-ui-ux-patterns.md`, `docs/research/2026-11-feature-ideas.md`, `docs/research/2026-11-code-review-A.md` (correctness and security), `docs/research/2026-11-code-review-B.md` (learning design and copy). The research is search-indexed, not fetched, and should be re-checked before public use.
+
+**Is it beneficial, or gimmicky? Honest assessment.**
+- **Likely helpful for ramblers:** the Learn loop (read → explain from memory → one grounded coaching point → retry → later application) is the part with the best evidence behind it, and the reviewer judged it sound. It rewards nothing but the exercise's definition of success, verifies every quote, and avoids scores and streaks.
+- **Plausible for anxious speakers, unproven:** the Confidence tools use the right model (behavioural experiments, graded steps, dropping safety behaviours, attention outward, reframing). Whether this app's self-help version helps is a hypothesis to test, not a claim to make.
+- **What we fixed because it would have faked progress [D]:** observer-review sliders and the thought tool's "after" rating now start where "before" started, and nothing is saved unless the learner moves a slider; a blank rehearsal prediction is no longer turned into a fabricated "it would go badly"; rehearsals and real-world steps are reported separately; the ladder no longer waits for anxiety to drop (a step counts once its prediction is tested, which matches the expectancy-violation evidence); exercise progression counts only first attempts, not retries or follow-ups.
+- **What makes it less gimmicky:** one connected transfer path (coaching → "plan a brave step" → predict → do it → compare), a "was this useful?" rating with reasons on every piece of live feedback, no outcome numbers in the UI, hedged wording for research-backed tips, and American English throughout.
+- **Still to validate:** everything in §7. A personal 4-week test is the next real signal.
+
+**Built this round.**
+- From the design research: live waveform with Stop in the record spot and a visible Pause; plan-as-hero on Today; 28-day activity dots with no streak count; one question per screen in check-ins; 56px tab targets; one subtle session-end animation.
+- From the feature research: What/So what/Now what and explain-to-a-12-year-old exercises; if-then plans and an unsaved worry write-out in brave steps; the "I'm excited" reappraisal line; name-based self-talk; a three-question weekly look-back; repeated-word and notes-coverage observations (missed lines only, hidden in quiet mode); share a clip to one person.
+- From review A (all high/medium items fixed): stale-resubmission bug; transcription limits now use a size-based estimate and the provider-reported duration; reviews are due by local day; every untrusted string in prompts is neutralised; talk recordings persist before feedback; error boundary and safe hash decoding; crisis detection on more fields; observer state reset on re-record; CSP and basic security headers; IndexedDB commits on transaction completion. Documented, not fixed: the usage ledger's read-modify-write can undercount under concurrent calls (a concern only when shared storage is skipped).
+- From review B (all high items fixed): the honesty defaults above; missions merged into brave steps; prompt rules (always a strength when on-topic, retries judged against the definition, minor_gaps means inaccuracy not omission, never suggest fancier vocabulary, short quotes); self-check wording no longer implies a diagnosis; missed-week handling and "redo this week"; week 3/4 order swapped so stretch work comes last; onboarding goal now picks the default scenario; per-skill real-world tips.
+
+**Deferred from this round [Q]:** agenda → predicted questions (AI cost); replay-timeline markers (needs word timestamps); PREP sentence stems as a separate exercise; a human-listener reply form (phase 3).
+
+### Backlog additions
+| When | Item |
+|---|---|
+| **Later** | Grow the 4-week plan into a 6–8 week programme with human check-ins, to test the $39 pilot offer. |
+| **Later** | Pairing exposure steps with the human-practice phases. |
+| **Avoid** | Live filler-word counters, streak loss-aversion, and AI-generated therapeutic dialogue. That last one carries safety, regulatory and cost risks. |
 
 ## Appendix A: Implementation plan used for the MVP
 1. **Shared domain:** types, curriculum, the evergreen library, scheduling, and text and measurement utilities.

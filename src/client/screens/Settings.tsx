@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useApp } from "../lib/store";
+import { exportJson } from "../lib/storage";
+import { localDayKey } from "../../shared/dates";
 import { PreferencesForm } from "./Onboarding";
+import { CrisisList } from "../components/Crisis";
 
 export function Settings() {
   const { data, update, deleteAll, status, refreshStatus } = useApp();
@@ -20,6 +23,15 @@ export function Settings() {
             Saved.
           </p>
         )}
+      </section>
+
+      <section aria-labelledby="quiet-h">
+        <h3 id="quiet-h">Quiet mode</h3>
+        <label className="option">
+          <input type="checkbox" checked={!!data.prefs.quietMode} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, quietMode: e.target.checked } }))} />
+          Hide the timer and measurement numbers while I practice
+        </label>
+        <p className="hint">Helpful if watching numbers makes you more self-conscious. Feedback on what you said still appears.</p>
       </section>
 
       <section aria-labelledby="mode-h">
@@ -61,6 +73,7 @@ export function Settings() {
         <h3 id="privacy-h">Your data</h3>
         <ul className="plain">
           <li>Preferences, answers, transcripts, feedback and review dates are stored only in this browser (local storage). They aren't synced or backed up.</li>
+          <li>Confidence notes (brave steps, check-ins, thoughts) stay in this browser and are never sent to the AI service.</li>
           <li>Recordings are not saved unless you tick “Keep this recording”. Saved recordings stay in this browser.</li>
           <li>When AI coaching is on, your answer text (not audio) is sent to Anthropic's API to generate feedback.</li>
           <li>When transcription is on and you choose to transcribe, the audio is sent to Deepgram. The server asks Deepgram not to retain it.</li>
@@ -70,10 +83,33 @@ export function Settings() {
           <input type="checkbox" checked={data.transcriptionConsent} onChange={(e) => update((d) => ({ ...d, transcriptionConsent: e.target.checked }))} />
           I've read how transcription works (unticking shows the explanation again)
         </label>
+        <details className="more">
+          <summary>Get help now</summary>
+          <p className="hint">This app isn't a crisis service. If you're struggling, please reach out:</p>
+          <CrisisList />
+        </details>
+        <button
+          className="secondary"
+          type="button"
+          onClick={() => {
+            const blob = new Blob([exportJson(data)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `clearline-export-${localDayKey()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }}
+        >
+          Download my data
+        </button>
+        <p className="hint">A JSON file of everything stored in this browser (recordings aren't included).</p>
         <div className="danger-zone">
           <h4>Delete history</h4>
           <p className="hint">
-            Deletes all sessions, transcripts, feedback, reviews, real-world logs and saved recordings from this browser. It can't delete copies already processed by
+            Deletes all sessions, transcripts, feedback, reviews, confidence notes, real-world logs and saved recordings from this browser. It can't delete copies already processed by
             Anthropic or Deepgram under their own retention policies.
           </p>
           <button

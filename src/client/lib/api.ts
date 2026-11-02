@@ -2,7 +2,7 @@ import type { ApiError, AppStatus, AudienceQuestion, Briefing, Feedback, Interes
 
 export class ApiRequestError extends Error {
   constructor(
-    public code: ApiError["code"] | "network",
+    public code: ApiError["code"] | "network" | "cancelled",
     message: string,
     public retryable: boolean,
     public status: number,
@@ -24,7 +24,7 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 90_0
     res = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     const name = (err as Error).name;
-    if (name === "AbortError") throw new ApiRequestError("network", "Cancelled.", true, 0);
+    if (name === "AbortError") throw new ApiRequestError("cancelled", "Cancelled.", true, 0);
     if (name === "TimeoutError") throw new ApiRequestError("provider_timeout", "The request took too long.", true, 0);
     throw new ApiRequestError("network", "Couldn't reach the app server. Is it running?", true, 0);
   }

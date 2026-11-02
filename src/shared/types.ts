@@ -24,6 +24,8 @@ export interface Preferences {
   goal: CommunicationGoal;
   sessionMinutes: SessionLength;
   onboarded: boolean;
+  /** Quiet mode: hide timers and delivery numbers to reduce self-monitoring. */
+  quietMode?: boolean;
   /** Optional access token for a protected deployment. Never a provider key. */
   accessToken?: string;
 }
@@ -130,7 +132,7 @@ export interface DeliveryMetrics {
   recordingSeconds: number;
   speakingSeconds?: number;
   wordsPerMinute?: number;
-  longPauses?: number; // gaps > 2s between recognised words
+  longPauses?: number; // gaps > 2s between recognized words
   limitations: string;
 }
 
@@ -150,7 +152,12 @@ export interface Attempt {
   delivery?: DeliveryMetrics;
   /** Key of a recording saved on this device (IndexedDB), only if user opted in. */
   savedAudioKey?: string;
+  /** Observer review (self-reported): how they thought they came across before vs after listening back. 0–10. */
+  selfView?: { predicted: number; observed: number };
   feedback?: Feedback;
+  /** Learner's rating of the feedback's usefulness (live feedback only). */
+  feedbackRating?: "useful" | "not-useful";
+  feedbackRatingReason?: "not-specific" | "missed-point" | "too-harsh" | "wrong";
 }
 
 export type FidelityStatus = "accurate" | "minor_gaps" | "factual_error" | "not_applicable";
@@ -207,6 +214,8 @@ export interface PracticeSession {
   storyId?: string;
   storyTitle?: string;
   storySource?: SourceMeta;
+  /** Learn mode: the phrase taught in the briefing, for the phrase bank. */
+  keyTerm?: KeyTerm;
   exerciseId: string;
   skill: SkillId;
   talk?: TalkSetup;
@@ -236,8 +245,10 @@ export interface ReviewItem {
   storyKind?: StoryKind;
   sourceVersion?: string;
   source?: SourceMeta;
-  /** Index into the interval ladder. */
+  /** Number of successful recalls so far (for display; scheduling uses `fsrs`). */
   step: number;
+  /** FSRS memory state (serialised ts-fsrs Card). Absent for items not yet reviewed. */
+  fsrs?: FsrsState;
   dueAt: string;
   lastReviewedAt?: string;
   history: { at: string; result: ReviewResult; response?: string }[];
@@ -293,4 +304,93 @@ export interface ApiError {
     | "too_large"
     | "empty_response";
   retryable: boolean;
+}
+
+// ---------- Confidence (CBT-informed self-help; not therapy) ----------
+
+export type ThinkingTrap =
+  | "mind-reading"
+  | "fortune-telling"
+  | "catastrophizing"
+  | "spotlight"
+  | "all-or-nothing"
+  | "discounting-positives"
+  | "shoulds"
+  | "emotional-reasoning"
+  | "labeling";
+
+/** "Untangle a thought": a cognitive-restructuring worksheet entry. */
+export interface Reframe {
+  id: string;
+  at: string;
+  situation: string;
+  thought: string;
+  /** How much the learner believed the thought, 0–100 (self-reported). */
+  beliefBefore: number;
+  traps: ThinkingTrap[];
+  evidenceAgainst: string;
+  friendAdvice: string;
+  balanced: string;
+  beliefAfter?: number;
+}
+
+/** A rung on the brave-steps ladder (graded exposure). */
+export interface LadderStep {
+  id: string;
+  createdAt: string;
+  title: string;
+  /** Expected discomfort, 0–10 (self-reported; same scale as anxiety check-ins). */
+  expectedDiscomfort: number;
+  archived?: boolean;
+}
+
+/** A behavioral experiment: predict, do it, compare. */
+export interface Experiment {
+  id: string;
+  createdAt: string;
+  kind: "real-world" | "rehearsal";
+  situation: string;
+  ladderStepId?: string;
+  sessionId?: string;
+  /** What the learner fears will happen. Empty for a rehearsal check-in without a prediction. */
+  prediction: string;
+  /** How likely they think it is, 0–100. */
+  predictionLikelihood: number;
+  /** Anxiety before, 0–10 (self-reported). */
+  anxietyBefore: number;
+  safetyBehaviourToDrop?: string;
+  /** Implementation intention: "If <obstacle>, then I will <action>". */
+  ifThen?: { obstacle: string; action: string };
+  completedAt?: string;
+  anxietyAfter?: number;
+  outcome?: "happened" | "partly" | "didnt-happen";
+  whatHappened?: string;
+  wentOkay?: string;
+  learned?: string;
+}
+
+// ---------- Guided plan ----------
+
+export interface GuidedPlan {
+  startedAt: string;
+  reflections: { week: number; at: string; text: string }[];
+}
+
+export interface FsrsState {
+  due: string;
+  stability: number;
+  difficulty: number;
+  elapsed_days: number;
+  scheduled_days: number;
+  learning_steps: number;
+  reps: number;
+  lapses: number;
+  state: number;
+  last_review?: string;
+}
+
+/** Non-diagnostic "how much does it get in the way?" check-in. Answers 0–4 per question. */
+export interface ImpactCheck {
+  at: string;
+  answers: number[];
 }

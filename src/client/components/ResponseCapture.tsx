@@ -1,10 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { DeliveryMetrics, Modality } from "../../shared/types";
 import { formatSeconds } from "../../shared/observations";
 import { wordCount } from "../../shared/text";
 import { api, ApiRequestError } from "../lib/api";
 import { uid } from "../lib/storage";
 import { useRecorder, recordingSupported } from "../lib/useRecorder";
+import { useApp } from "../lib/store";
 
 export interface AttemptDraft {
   modality: Modality;
@@ -16,6 +17,7 @@ export interface AttemptDraft {
   delivery?: DeliveryMetrics;
   audioBlob?: Blob;
   keepAudio: boolean;
+  selfView?: { predicted: number; observed: number };
 }
 
 interface Props {
@@ -89,13 +91,19 @@ function TypedAnswer(p: Props & { value: string; onChange: (v: string) => void }
 
 function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   const r = useRecorder();
-  const [showTimer, setShowTimer] = useState(true);
+  const { data } = useApp();
+  const [showTimer, setShowTimer] = useState(!data.prefs.quietMode);
   const [transcript, setTranscript] = useState<string>("");
   const [original, setOriginal] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<DeliveryMetrics | undefined>();
   const [txState, setTxState] = useState<"none" | "working" | "done" | "error" | "manual">("none");
   const [txError, setTxError] = useState<string | null>(null);
   const [keepAudio, setKeepAudio] = useState(false);
+  // Observer review (talk mode): rate how you came across, listen back as an audience member, rate again.
+  const [obs, setObs] = useState<"predict" | "listen" | "rate" | "done" | "off">(p.focused ? "predict" : "off");
+  const [predicted, setPredicted] = useState(5);
+  const [observed, setObserved] = useState(5);
+  const [obsTouched, setObsTouched] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const txKey = useRef(uid("tx-"));
   const tid = useId();
@@ -109,6 +117,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
     setTxState("none");
     setTxError(null);
     txKey.current = uid("tx-");
+    setObs(p.focused ? "predict" : "off");
   };
 
   const transcribe = async () => {
@@ -124,7 +133,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
       setTxState("done");
     } catch (e) {
       const err = e as ApiRequestError;
-      if (err.message === "Cancelled.") {
+      if (err.code === "cancelled") {
         setTxState("none");
         return;
       }
@@ -167,12 +176,14 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
     );
   }
 
-  if (r.state === "recording") {
+  if (r.state === "recording" || r.state === "paused") {
+    const paused = r.state === "paused";
     return (
-      <div className="rec-box live">
-        <p className="rec-indicator" aria-live="off">
-          <span className="dot pulse" aria-hidden="true" /> Recording
+      <div className={paused ? "rec-box live paused" : "rec-box live"}>
+        <p className="rec-indicator" aria-live="polite">
+          <span className={paused ? "dot" : "dot pulse"} aria-hidden="true" /> {paused ? "Paused" : "Recording"}
         </p>
+        <Waveform analyser={r.analyser} active={!paused} />
         {showTimer ? (
           <p className="timer" aria-label={`Elapsed ${Math.round(r.elapsed)} seconds`}>
             {formatSeconds(r.elapsed)}
@@ -182,9 +193,15 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           <p className="timer muted">Timer hidden</p>
         )}
         {overTarget && <p className="hint" role="status">Target reached — finish your thought.</p>}
+        <button className="mic stop" type="button" onClick={r.stop} aria-label="Finish recording">
+          <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+          </svg>
+        </button>
+        <p className="mic-caption">Tap to finish</p>
         <div className="row">
-          <button className="primary" type="button" onClick={r.stop}>
-            Finish
+          <button className="secondary small" type="button" onClick={paused ? r.resume : r.pause}>
+            {paused ? "Resume" : "Pause"}
           </button>
           <button className="link" type="button" onClick={r.cancel}>
             Cancel
@@ -199,15 +216,66 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
 
   // stopped (or error with recording)
   const rec = r.recording!;
+
+  if (obs === "predict" || obs === "listen" || obs === "rate") {
+    return (
+      <div className="rec-box done-rec observer">
+        <p className="eyebrow">Listen back as an observer · optional</p>
+        {obs === "predict" && (
+          <>
+            <ObserverSlider id="obs-pred" label="Before listening: how do you think you came across?" value={predicted} onChange={(v) => { setPredicted(v); setObsTouched(true); }} />
+            <div className="stack">
+              <button className="primary" type="button" onClick={() => setObs("listen")}>
+                Listen back
+              </button>
+              <button className="link" type="button" onClick={() => setObs("off")}>
+                Skip
+              </button>
+            </div>
+          </>
+        )}
+        {obs === "listen" && (
+          <>
+            <p className="hint">Listen as if you were in the audience, hearing someone else.</p>
+            <audio controls autoPlay src={rec.url} aria-label={`Play back your recording (${formatSeconds(rec.seconds)})`} onEnded={() => setObs("rate")} />
+            <button className="primary" type="button" onClick={() => setObs("rate")}>
+              Done listening
+            </button>
+          </>
+        )}
+        {obs === "rate" && (
+          <>
+            <ObserverSlider id="obs-seen" label="As an audience member: how did they come across?" value={observed} onChange={(v) => { setObserved(v); setObsTouched(true); }} />
+            <button className="primary" type="button" onClick={() => setObs("done")}>
+              Save
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+  const selfView = obs === "done" && obsTouched ? { predicted, observed } : undefined;
   const edited = original != null && transcript.trim() !== original.trim();
   const words = wordCount(transcript);
   const tooLong = transcript.length > p.maxChars;
   return (
     <div className="rec-box done-rec">
+      {selfView && (
+        <p className="notice ok" role="status">
+          {selfView.observed > selfView.predicted
+            ? `You expected ${selfView.predicted}/10 and heard ${selfView.observed}/10 — you came across better than it felt.`
+            : selfView.observed === selfView.predicted
+              ? `You expected ${selfView.predicted}/10 and heard the same. Your sense of yourself was accurate.`
+              : `You expected ${selfView.predicted}/10 and heard ${selfView.observed}/10. Worth noting what you'd change — then let it go.`}
+        </p>
+      )}
       <audio controls src={rec.url} aria-label={`Play back your recording (${formatSeconds(rec.seconds)})`} />
 
       {txState === "none" && (
         <div className="stack">
+          {p.transcriptionAvailable && (rec.seconds > 600 || rec.blob.size > 4_000_000) && (
+            <p className="hint">This recording is too long to transcribe automatically. Listen back and type what you said.</p>
+          )}
           {p.transcriptionAvailable ? (
             <>
               {!p.transcriptionConsent && <p className="hint">Transcribing sends this audio to Deepgram, which is asked not to keep it.</p>}
@@ -235,6 +303,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
             <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} />
             Keep this recording on this device
           </label>
+          <ShareClip blob={rec.blob} />
         </div>
       )}
       {txState === "working" && (
@@ -274,6 +343,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
               delivery: manual ? { basis: "recording-length-only", recordingSeconds: rec.seconds, limitations: "No automatic transcript, so pace and pauses weren't measured." } : delivery,
               audioBlob: rec.blob,
               keepAudio,
+              selfView,
             });
           }}
         >
@@ -291,4 +361,123 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
       )}
     </div>
   );
+}
+
+function ObserverSlider({ id, label, value, onChange }: { id: string; label: string; value: number; onChange: (n: number) => void }) {
+  return (
+    <div className="slider">
+      <div className="slider-head">
+        <label className="label" htmlFor={id}>
+          {label}
+        </label>
+        <output htmlFor={id}>{value}/10</output>
+      </div>
+      <input id={id} type="range" min={0} max={10} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <div className="slider-ends" aria-hidden="true">
+        <span>Nervous, unclear</span>
+        <span>Calm, clear</span>
+      </div>
+    </div>
+  );
+}
+
+/** Send the recording to one person and ask for one word back. Uses the device share sheet when available. */
+function ShareClip({ blob }: { blob: Blob }) {
+  const [status, setStatus] = useState<"idle" | "shared" | "failed">("idle");
+  const file = useMemo(() => {
+    const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+    return new File([blob], `practice.${ext}`, { type: blob.type });
+  }, [blob]);
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function" || typeof navigator.canShare !== "function") return null;
+  if (!navigator.canShare({ files: [file] })) return null;
+  return (
+    <div className="share-clip">
+      <button
+        type="button"
+        className="link"
+        onClick={async () => {
+          try {
+            await navigator.share({ files: [file], text: "Could you listen to this and tell me, in one word, how it came across? And one moment that was clearest?" });
+            setStatus("shared");
+          } catch (e) {
+            setStatus((e as Error).name === "AbortError" ? "idle" : "failed");
+          }
+        }}
+      >
+        Send to one person for a one-word reaction
+      </button>
+      {status === "shared" && <p className="hint">Sent. Real listeners are the best test of whether your point landed.</p>}
+      {status === "failed" && <p className="hint">Sharing didn't work on this device.</p>}
+    </div>
+  );
+}
+
+/** Live input level bars drawn on a canvas. Static (low-rate) when reduced motion is preferred; frozen while paused. */
+function Waveform({ analyser, active }: { analyser: AnalyserNode | null; active: boolean }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const bars = useRef<number[]>(Array(40).fill(0.05));
+  useEffect(() => {
+    const c = canvas.current;
+    if (!c) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    let raf = 0;
+    let timer = 0;
+    let last = 0;
+    const buf = analyser ? new Uint8Array(analyser.fftSize) : null;
+    const draw = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.clientWidth;
+      const h = c.clientHeight;
+      if (c.width !== w * dpr || c.height !== h * dpr) {
+        c.width = w * dpr;
+        c.height = h * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const color = getComputedStyle(c).color;
+      const n = bars.current.length;
+      const gap = 3;
+      const bw = (w - gap * (n - 1)) / n;
+      bars.current.forEach((v, i) => {
+        const bh = Math.max(3, v * h);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.35 + 0.65 * (i / n);
+        ctx.fillRect(i * (bw + gap), (h - bh) / 2, bw, bh);
+      });
+      ctx.globalAlpha = 1;
+    };
+    const sample = () => {
+      if (analyser && buf && active) {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const x = (buf[i]! - 128) / 128;
+          sum += x * x;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        bars.current = [...bars.current.slice(1), Math.min(1, 0.05 + rms * 3)];
+      }
+      draw();
+    };
+    if (reduced) {
+      timer = window.setInterval(sample, 250);
+    } else {
+      const loop = (t: number) => {
+        if (t - last > 50) {
+          last = t;
+          sample();
+        }
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+    }
+    draw();
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(timer);
+    };
+  }, [analyser, active]);
+  return <canvas ref={canvas} className="wave" aria-hidden="true" />;
 }

@@ -49,6 +49,7 @@ export function useSession(init: () => PracticeSession) {
       durationSeconds: draft.durationSeconds,
       delivery: draft.delivery,
       savedAudioKey,
+      selfView: draft.selfView,
     };
   }, []);
 
@@ -75,9 +76,22 @@ export function useSession(init: () => PracticeSession) {
     }
   }, []);
 
-  const addAttempt = useCallback((a: Attempt) => setSession((s) => ({ ...s, attempts: [...s.attempts.filter((x) => x.id !== a.id), a] })), []);
+  /** Add an attempt, or replace it in place if it already exists (keeps ordering stable). */
+  const addAttempt = useCallback(
+    (a: Attempt) => setSession((s) => (s.attempts.some((x) => x.id === a.id) ? { ...s, attempts: s.attempts.map((x) => (x.id === a.id ? a : x)) } : { ...s, attempts: [...s.attempts, a] })),
+    [],
+  );
+
+  const rateAttempt = useCallback(
+    (id: string, feedbackRating: Attempt["feedbackRating"], feedbackRatingReason?: Attempt["feedbackRatingReason"]) =>
+      setSession((s) => {
+        const patch = (a: Attempt): Attempt => (a.id === id ? { ...a, feedbackRating, feedbackRatingReason: feedbackRating === "not-useful" ? feedbackRatingReason : undefined } : a);
+        return { ...s, attempts: s.attempts.map(patch), followUps: s.followUps.map((f) => (f.answer ? { ...f, answer: patch(f.answer) } : f)) };
+      }),
+    [],
+  );
 
   const finish = useCallback(() => setSession((s) => ({ ...s, completedAt: s.completedAt ?? new Date().toISOString() })), []);
 
-  return { session, setSession, busy, setBusy, error, setError, makeAttempt, getFeedback, addAttempt, finish };
+  return { session, setSession, busy, setBusy, error, setError, makeAttempt, getFeedback, addAttempt, rateAttempt, finish };
 }

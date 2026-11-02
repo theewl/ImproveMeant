@@ -79,3 +79,17 @@ describe("local persistence", () => {
     expect(saveData(emptyData(), full)).toBe(false);
   });
 });
+
+import { exportJson } from "../../src/client/lib/storage";
+
+describe("data export", () => {
+  it("includes everything except the access token", () => {
+    const d = emptyData();
+    d.prefs.accessToken = "secret-token";
+    d.reframes.push({ id: "t", at: "2026-11-01", situation: "", thought: "x", beliefBefore: 50, traps: [], evidenceAgainst: "", friendAdvice: "", balanced: "y" });
+    const out = JSON.parse(exportJson(d, new Date("2026-11-02T00:00:00Z")));
+    expect(out.exportedAt).toBe("2026-11-02T00:00:00.000Z");
+    expect(out.data.reframes).toHaveLength(1);
+    expect(JSON.stringify(out)).not.toContain("secret-token");
+  });
+});
