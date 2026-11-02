@@ -10,9 +10,10 @@ import { addReviewItem, buildReviewItem } from "../lib/state";
 import { href } from "../lib/router";
 import { ResponseCapture, type AttemptDraft } from "../components/ResponseCapture";
 import { CompareAttempts, FeedbackPanel } from "../components/Feedback";
-import { ErrorNotice, Loading, StepHeader, formatDate } from "../components/common";
+import { ErrorNotice, Loading, SessionTop, StepHeader, formatDate, useFocusMode } from "../components/common";
 
-type Phase = "setup" | "prepare" | "present" | "question" | "feedback" | "second-question" | "finish" | "done";
+type Phase = "scenario" | "setup" | "prepare" | "present" | "question" | "feedback" | "finish" | "done";
+const TALK_STEP: Record<Phase, number> = { scenario: 1, setup: 1, prepare: 2, present: 2, question: 3, feedback: 4, finish: 4, done: 4 };
 const MAX_RETRIES = 2;
 
 function defaultSetup(id: ScenarioId, fromStoryId?: string): TalkSetup {
@@ -33,7 +34,8 @@ function defaultSetup(id: ScenarioId, fromStoryId?: string): TalkSetup {
 export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
   const { data, update, status } = useApp();
   const [setup, setSetup] = useState<TalkSetup>(() => defaultSetup(fromStoryId ? "explain-group" : "propose-change", fromStoryId));
-  const [phase, setPhase] = useState<Phase>("setup");
+  const [phase, setPhase] = useState<Phase>(fromStoryId ? "setup" : "scenario");
+  useFocusMode(phase !== "scenario");
   const [story, setStory] = useState<Briefing | null>(null);
   const [pending, setPending] = useState<Attempt | null>(null);
   const [questions, setQuestions] = useState<AudienceQuestion[]>([]);
@@ -190,17 +192,36 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
   const secondAnswer = questions[1] ? s.session.followUps.find((f) => f.question.question === questions[1]!.question)?.answer : undefined;
 
   return (
-    <main className={phase === "present" ? "screen presenting" : "screen"} id="main">
-      {phase !== "present" && (
-        <p className="crumb">
-          <a href={href({ name: "today" })}>Today</a> / Rehearse a talk
-        </p>
+    <main className={phase === "present" ? "screen session presenting" : "screen session"} id="main">
+      {phase !== "scenario" && <SessionTop step={TALK_STEP[phase]} total={4} label="rehearsal" />}
+
+      {phase === "scenario" && (
+        <section>
+          <StepHeader eyebrow="Rehearse a talk" title="What are you practising?" />
+          <ul className="scenario-list">
+            {SCENARIOS.map((sc) => (
+              <li key={sc.id}>
+                <button
+                  type="button"
+                  className="scenario"
+                  onClick={() => {
+                    setSetup((x) => ({ ...defaultSetup(sc.id, fromStoryId), topic: x.topic, notes: x.notes, targetSeconds: x.targetSeconds, questionStyle: x.questionStyle }));
+                    setPhase("setup");
+                  }}
+                >
+                  <strong>{sc.title}</strong>
+                  <span>{sc.description}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="hint">You'll speak to a simulated audience that asks you a question afterwards.</p>
+        </section>
       )}
 
       {phase === "setup" && (
         <section>
-          <StepHeader step={1} total={4} title="Set up your talk" />
-          <p className="notice">The audience in this rehearsal is simulated by the app. Its questions are practice, not real reactions.</p>
+          <StepHeader eyebrow={scenario.title} title="Set up your talk" />
           {story && <p className="hint">Based on: {story.title}</p>}
           <form
             onSubmit={(e) => {
@@ -209,94 +230,77 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
               setPhase("prepare");
             }}
           >
-            <fieldset className="choices scenarios">
-              <legend className="label">Scenario</legend>
-              {SCENARIOS.map((sc) => (
-                <label key={sc.id} className={setup.scenarioId === sc.id ? "choice card-choice on" : "choice card-choice"}>
-                  <input
-                    type="radio"
-                    name="scenario"
-                    value={sc.id}
-                    checked={setup.scenarioId === sc.id}
-                    onChange={() => setSetup((x) => ({ ...defaultSetup(sc.id, fromStoryId), topic: x.topic, notes: x.notes, targetSeconds: x.targetSeconds, questionStyle: x.questionStyle }))}
-                  />
-                  <span>
-                    <strong>{sc.title}</strong>
-                    <span className="hint block">{sc.description}</span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
             <label className="label" htmlFor="topic">
-              {setup.scenarioId === "propose-change" ? "The change you'll propose" : setup.scenarioId === "introduce" ? "Context (e.g. first team meeting)" : "Topic"}
+              {setup.scenarioId === "propose-change" ? "The change you'll propose" : setup.scenarioId === "introduce" ? "Where you're introducing yourself" : "Topic"}
             </label>
             <input id="topic" value={setup.topic} maxLength={300} required onChange={(e) => setSetup({ ...setup, topic: e.target.value })} />
             <label className="label" htmlFor="audience">
-              Audience
+              Who's listening
             </label>
             <input id="audience" value={setup.audience} maxLength={200} onChange={(e) => setSetup({ ...setup, audience: e.target.value })} />
-            <label className="label" htmlFor="knowledge">
-              What they already know
-            </label>
-            <select id="knowledge" value={setup.audienceKnowledge} onChange={(e) => setSetup({ ...setup, audienceKnowledge: e.target.value as TalkSetup["audienceKnowledge"] })}>
-              <option value="new-to-topic">New to the topic</option>
-              <option value="some-familiarity">Some familiarity</option>
-              <option value="experts">Experts</option>
-            </select>
-            <label className="label" htmlFor="outcome">
-              What you want to happen afterwards
-            </label>
-            <input id="outcome" value={setup.outcome} maxLength={200} onChange={(e) => setSetup({ ...setup, outcome: e.target.value })} />
-            <label className="label" htmlFor="notes">
-              Notes or bullet points (optional)
-            </label>
-            <textarea id="notes" rows={3} maxLength={1500} value={setup.notes} onChange={(e) => setSetup({ ...setup, notes: e.target.value })} />
-            <fieldset className="choices inline">
-              <legend className="label">Target length</legend>
+            <fieldset className="pills">
+              <legend className="label">Length</legend>
               {([60, 120, 180] as const).map((t) => (
-                <label key={t} className="choice">
+                <label key={t} className={setup.targetSeconds === t ? "pill on" : "pill"}>
                   <input type="radio" name="target" checked={setup.targetSeconds === t} onChange={() => setSetup({ ...setup, targetSeconds: t })} />
                   {t / 60} min
                 </label>
               ))}
             </fieldset>
-            <fieldset className="choices inline">
-              <legend className="label">Audience questions</legend>
-              {(["supportive", "challenging"] as const).map((q) => (
-                <label key={q} className="choice">
-                  <input type="radio" name="qstyle" checked={setup.questionStyle === q} onChange={() => setSetup({ ...setup, questionStyle: q })} />
-                  {q === "supportive" ? "Supportive" : "Challenging"}
-                </label>
-              ))}
-            </fieldset>
-            <div className="actions">
+            <details className="more">
+              <summary>More options</summary>
+              <label className="label" htmlFor="knowledge">
+                What they already know
+              </label>
+              <select id="knowledge" value={setup.audienceKnowledge} onChange={(e) => setSetup({ ...setup, audienceKnowledge: e.target.value as TalkSetup["audienceKnowledge"] })}>
+                <option value="new-to-topic">New to the topic</option>
+                <option value="some-familiarity">Some familiarity</option>
+                <option value="experts">Experts</option>
+              </select>
+              <label className="label" htmlFor="outcome">
+                What you want to happen afterwards
+              </label>
+              <input id="outcome" value={setup.outcome} maxLength={200} onChange={(e) => setSetup({ ...setup, outcome: e.target.value })} />
+              <label className="label" htmlFor="notes">
+                Notes (optional)
+              </label>
+              <textarea id="notes" rows={3} maxLength={1500} value={setup.notes} onChange={(e) => setSetup({ ...setup, notes: e.target.value })} />
+              <fieldset className="pills">
+                <legend className="label">Audience questions</legend>
+                {(["supportive", "challenging"] as const).map((q) => (
+                  <label key={q} className={setup.questionStyle === q ? "pill on" : "pill"}>
+                    <input type="radio" name="qstyle" checked={setup.questionStyle === q} onChange={() => setSetup({ ...setup, questionStyle: q })} />
+                    {q === "supportive" ? "Supportive" : "Challenging"}
+                  </label>
+                ))}
+              </fieldset>
+            </details>
+            <div className="actions sticky">
               <button className="primary" type="submit" disabled={!setup.topic.trim()}>
                 Continue
               </button>
+              {!fromStoryId && (
+                <button className="link" type="button" onClick={() => setPhase("scenario")}>
+                  Change scenario
+                </button>
+              )}
             </div>
           </form>
         </section>
       )}
 
       {phase === "prepare" && (
-        <Prepare
-          setup={setup}
-          task={task}
-          skillName={SKILLS[exercise.skill].name}
-          success={exercise.successDefinition}
-          retryFocus={isRetry ? last?.feedback?.retryFocus ?? null : null}
-          onReady={() => setPhase("present")}
-        />
+        <Prepare setup={setup} task={task} retryFocus={isRetry ? last?.feedback?.retryFocus ?? null : null} onReady={() => setPhase("present")} />
       )}
 
       {phase === "present" && (
         <section aria-label="Presentation" className="present">
           <p className="present-audience">
-            Speaking to <strong>{setup.audience}</strong> (simulated) · target {formatSeconds(setup.targetSeconds)} — finish whenever you're done
+            To {setup.audience} <span className="sim">simulated</span> · aim for {formatSeconds(setup.targetSeconds)}
           </p>
           <p className="present-task">{task}</p>
           {setup.notes.trim() && (
-            <details>
+            <details className="more">
               <summary>My notes</summary>
               <p className="notes">{setup.notes}</p>
             </details>
@@ -311,20 +315,17 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
             onSubmit={(d) => void submitTalk(d)}
           />
           {s.error != null && pending && <ErrorNotice error={s.error} onRetry={() => void requestTalkFeedback(pending, null)} />}
-          <button className="link" type="button" onClick={() => setPhase("prepare")}>
-            Back to preparation
-          </button>
         </section>
       )}
 
       {phase === "question" && (
         <section>
-          <StepHeader step={3} total={4} title="Audience question" />
-          {qLoading && <Loading label="The audience is thinking of a question…" />}
+          <StepHeader eyebrow="Q&A" title="A question from the audience" />
+          {qLoading && <Loading label="The audience is thinking…" />}
           {qError != null && (
             <ErrorNotice error={qError} onRetry={() => pending && void askQuestion(pending.text, [])}>
               <button className="link" type="button" onClick={() => void skipQuestion()}>
-                Skip the question and get feedback
+                Skip to feedback
               </button>
             </ErrorNotice>
           )}
@@ -343,11 +344,11 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
 
       {phase === "feedback" && last?.feedback && (
         <section>
-          <StepHeader step={4} total={4} title="Feedback" />
+          <StepHeader eyebrow={SKILLS[exercise.skill].name} title="Your feedback" />
           <FeedbackPanel feedback={last.feedback} attempt={last} />
           {first && first.id !== last.id && <CompareAttempts first={first} second={last} />}
           {questions[1] && <SecondQuestion q={questions[1]} audience={setup.audience} answer={secondAnswer} captureProps={captureProps} error={s.error} onSubmit={submitSecondAnswer} />}
-          <div className="actions">
+          <div className="actions sticky">
             <button className="primary" type="button" onClick={() => setPhase("finish")}>
               Finish
             </button>
@@ -361,27 +362,27 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
                   setPhase("prepare");
                 }}
               >
-                Retry the talk
-              </button>
-            )}
-            {!questions[1] && questions[0] && (
-              <button className="secondary" type="button" disabled={qLoading} onClick={() => first && void askQuestion(first.text, questions.map((q) => q.question))}>
-                {qLoading ? "Thinking…" : "Take one more question"}
+                Try again
               </button>
             )}
           </div>
-          {qError != null && phase === "feedback" && <ErrorNotice error={qError} />}
+          {!questions[1] && questions[0] && (
+            <button className="link" type="button" disabled={qLoading} onClick={() => first && void askQuestion(first.text, questions.map((q) => q.question))}>
+              {qLoading ? "Thinking…" : "Take one more question"}
+            </button>
+          )}
+          {qError != null && <ErrorNotice error={qError} />}
         </section>
       )}
 
       {phase === "finish" && (
         <section>
-          <h2>Wrap up</h2>
-          <label className="choice">
+          <StepHeader eyebrow="Last step" title="Practise this again later?" />
+          <label className={saveSkill ? "option on" : "option"}>
             <input type="checkbox" checked={saveSkill} onChange={(e) => setSaveSkill(e.target.checked)} />
-            Save “{SKILLS[exercise.skill].name}” to practise later in a different situation
+            Remind me to use “{SKILLS[exercise.skill].name}” in a new situation
           </label>
-          <div className="actions">
+          <div className="actions sticky">
             <button className="primary" type="button" onClick={finishSession}>
               Finish session
             </button>
@@ -391,17 +392,20 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
 
       {phase === "done" && (
         <section className="done" aria-live="polite">
+          <div className="done-mark" aria-hidden="true">
+            ✓
+          </div>
           <h2>Rehearsal complete</h2>
           <p>
-            You gave a {first?.modality === "spoken" ? "spoken" : "written"} {scenario.title.toLowerCase()} talk for {setup.audience}
-            {first?.durationSeconds ? ` (${formatSeconds(first.durationSeconds)})` : ""}
-            {retries ? `, with ${retries} retr${retries === 1 ? "y" : "ies"}` : ""}.
+            {scenario.title} for {setup.audience}
+            {first?.durationSeconds ? ` · ${formatSeconds(first.durationSeconds)}` : ""}
+            {retries ? ` · ${retries} retr${retries === 1 ? "y" : "ies"}` : ""}
           </p>
-          {saveMsg && <p>{saveMsg}</p>}
-          <p className="hint">Next real meeting: try opening with your main point. You can log how it went under Progress.</p>
+          {saveMsg && <p className="hint">{saveMsg}</p>}
+          <p className="hint">In your next real meeting, try opening with your main point.</p>
           <div className="actions">
             <a className="button primary" href={href({ name: "today" })}>
-              Back to today
+              Done
             </a>
           </div>
         </section>
@@ -412,11 +416,12 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
 
 function QuestionCard({ q, audience }: { q: AudienceQuestion; audience: string }) {
   return (
-    <div className="callout question-card">
-      <p className="hint">
-        Simulated audience member ({audience}){q.kind === "sample" ? " · sample question from the practice bank, not generated from your talk" : ""}
+    <div className="question-card">
+      <p className="eyebrow">
+        Simulated audience member · {audience}
       </p>
       <p className="question">“{q.question}”</p>
+      {q.kind === "sample" && <p className="hint">Demo: sample question from the practice bank, not based on your talk.</p>}
     </div>
   );
 }
@@ -437,7 +442,7 @@ function SecondQuestion({
   onSubmit: (d: AttemptDraft | null) => Promise<void>;
 }) {
   return (
-    <section className="card" aria-label="Second question">
+    <section className="second-q" aria-label="Second question">
       <QuestionCard q={q} audience={audience} />
       {answer?.feedback ? (
         <FeedbackPanel feedback={answer.feedback} attempt={answer} />
@@ -451,7 +456,7 @@ function SecondQuestion({
   );
 }
 
-function Prepare({ setup, task, skillName, success, retryFocus, onReady }: { setup: TalkSetup; task: string; skillName: string; success: string; retryFocus: string | null; onReady: () => void }) {
+function Prepare({ setup, task, retryFocus, onReady }: { setup: TalkSetup; task: string; retryFocus: string | null; onReady: () => void }) {
   const [prepLeft, setPrepLeft] = useState<number | null>(null);
   useEffect(() => {
     if (prepLeft == null || prepLeft <= 0) return;
@@ -460,37 +465,26 @@ function Prepare({ setup, task, skillName, success, retryFocus, onReady }: { set
   }, [prepLeft]);
   return (
     <section>
-      <StepHeader step={2} total={4} title={retryFocus ? "Prepare your retry" : "Prepare (optional)"} />
-      <div className="card">
-        <p className="task">{task}</p>
-        <p className="hint">
-          Skill: {skillName}. Success: {success}
+      <StepHeader eyebrow={retryFocus ? "Retry" : "Get ready"} title={retryFocus ? "Prepare your retry" : "Prepare (optional)"} />
+      <p className="task">{task}</p>
+      {retryFocus && <p className="focus-tip">Focus: {retryFocus}</p>}
+      <p className="hint">
+        About {setup.targetSeconds / 60} min. You won't be cut off.
+      </p>
+      {setup.notes.trim() && <p className="notes">{setup.notes}</p>}
+      {prepLeft != null && (
+        <p className="timer" role="timer" aria-live="off">
+          {prepLeft > 0 ? formatSeconds(prepLeft) : "Time's up"}
         </p>
-        {retryFocus && <p className="callout">Focus for this retry: {retryFocus}</p>}
-        <dl className="setup-summary">
-          <dt>Audience</dt>
-          <dd>
-            {setup.audience} ({setup.audienceKnowledge.replaceAll("-", " ")})
-          </dd>
-          <dt>Desired outcome</dt>
-          <dd>{setup.outcome}</dd>
-          <dt>Target</dt>
-          <dd>{setup.targetSeconds / 60} min — you won't be cut off</dd>
-        </dl>
-        {setup.notes.trim() && <p className="notes">{setup.notes}</p>}
-      </div>
-      <div className="actions">
+      )}
+      <div className="actions sticky">
         <button className="primary" type="button" onClick={onReady}>
           I'm ready to present
         </button>
-        {prepLeft == null ? (
+        {prepLeft == null && (
           <button className="secondary" type="button" onClick={() => setPrepLeft(60)}>
-            Give me 60 seconds to prepare
+            60 seconds to prepare
           </button>
-        ) : (
-          <p className="timer small" role="timer" aria-live="off">
-            {prepLeft > 0 ? `Preparation: ${formatSeconds(prepLeft)}` : "Preparation time's up — start when ready."}
-          </p>
         )}
       </div>
     </section>

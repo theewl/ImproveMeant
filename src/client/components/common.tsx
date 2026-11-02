@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { SourceMeta, StoryKind } from "../../shared/types";
 import { ApiRequestError } from "../lib/api";
+import { href } from "../lib/router";
 
 export function formatDate(s: string): string {
   if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return s; // human label for evergreen items
@@ -8,14 +9,16 @@ export function formatDate(s: string): string {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function SourceLine({ source, kind }: { source: SourceMeta; kind: StoryKind }) {
+/** One quiet line: label · publisher · date · source link. */
+export function SourceLine({ source, kind, minutes }: { source: SourceMeta; kind: StoryKind; minutes?: number }) {
   return (
-    <p className="source">
-      <span className={kind === "current" ? "tag current" : "tag evergreen"}>{kind === "current" ? "Current" : "Evergreen"}</span>{" "}
-      <span>{source.publisher}</span> · <span>{kind === "current" ? `In the news ${formatDate(source.publishedAt)}` : formatDate(source.publishedAt)}</span>
-      {source.sourceUpdatedAt && kind === "current" ? <span> · source last edited {formatDate(source.sourceUpdatedAt)}</span> : null} ·{" "}
+    <p className="meta-line">
+      <span className={kind === "current" ? "kind current" : "kind"}>{kind === "current" ? "Current" : "Evergreen"}</span>
+      <span>{source.publisher}</span>
+      <span>{formatDate(source.publishedAt)}</span>
+      {minutes ? <span>{minutes} min</span> : null}
       <a href={source.url} target="_blank" rel="noopener noreferrer">
-        Original source<span className="sr-only"> (opens in a new tab)</span>
+        Source<span className="sr-only"> (opens in a new tab)</span>
       </a>
     </p>
   );
@@ -47,17 +50,42 @@ export function ErrorNotice({ error, onRetry, children }: { error: unknown; onRe
   );
 }
 
-export function StepHeader({ step, total, title }: { step: number; total: number; title: string }) {
+/** Hide the tab bar while a practice session is in progress. */
+export function useFocusMode(on = true) {
+  useEffect(() => {
+    if (!on) return;
+    document.body.dataset.focus = "1";
+    return () => {
+      delete document.body.dataset.focus;
+    };
+  }, [on]);
+}
+
+/** Session chrome: exit button + slim progress bar. */
+export function SessionTop({ step, total, label }: { step: number; total: number; label: string }) {
+  return (
+    <div className="session-top">
+      <a className="icon-btn" href={href({ name: "today" })} aria-label={`Exit ${label}`}>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </a>
+      <div className="progress" role="progressbar" aria-label={`${label} progress`} aria-valuemin={1} aria-valuemax={total} aria-valuenow={step}>
+        <div className="progress-fill" style={{ width: `${(step / total) * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Screen heading that receives focus when the step changes (for keyboard and screen-reader users). */
+export function StepHeader({ title, eyebrow }: { title: string; eyebrow?: string }) {
   const h = useRef<HTMLHeadingElement>(null);
-  // Move focus to the new step's heading once per step, for screen-reader and keyboard users.
   useEffect(() => {
     h.current?.focus({ preventScroll: true });
-  }, [step, title]);
+  }, [title]);
   return (
     <header className="step-header">
-      <p className="step-count">
-        Step {step} of {total}
-      </p>
+      {eyebrow && <p className="eyebrow">{eyebrow}</p>}
       <h2 tabIndex={-1} ref={h}>
         {title}
       </h2>
