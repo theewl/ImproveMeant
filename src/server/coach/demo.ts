@@ -2,7 +2,7 @@ import type { AudienceQuestion, Briefing, Exercise, Feedback } from "../../share
 import { getScenario } from "../../shared/curriculum";
 import { AppError } from "../errors";
 import type { SourceDocument } from "../content/types";
-import type { AudienceInput, CoachProvider, FeedbackInput } from "./types";
+import type { AudienceInput, CameraFeedbackInput, CoachProvider, FeedbackInput } from "./types";
 
 /**
  * Demo provider. It never pretends to evaluate the learner's response:
@@ -18,6 +18,10 @@ export class DemoCoach implements CoachProvider {
 
   async feedback(input: FeedbackInput): Promise<Feedback> {
     return illustrativeFeedback(input.exercise);
+  }
+
+  async cameraFeedback(input: CameraFeedbackInput): Promise<Feedback> {
+    return { ...illustrativeFeedback(input.exercise), hook: null, camera: null };
   }
 
   async audienceQuestion(input: AudienceInput): Promise<AudienceQuestion> {

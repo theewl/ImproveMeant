@@ -11,7 +11,7 @@ export const SECURITY_HEADERS = {
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
-  "permissions-policy": "microphone=(self), camera=(), geolocation=()",
+  "permissions-policy": "microphone=(self), camera=(self), geolocation=()",
 };
 if (!existsSync("dist/client/index.html")) throw new Error("Run `vite build` first (dist/client missing).");
 rmSync(out, { recursive: true, force: true });

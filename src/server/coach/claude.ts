@@ -8,11 +8,13 @@ import type { AudienceQuestion, Briefing, Exercise, Feedback } from "../../share
 import { estimateTokens, quoteAppearsIn } from "../../shared/text";
 import { stableHash } from "../../shared/evergreen";
 import type { SourceDocument } from "../content/types";
-import type { AudienceInput, CoachProvider, CurateInput, CuratedTopics, FeedbackInput } from "./types";
-import { AudienceQuestionOutput, BriefingOutput, CurateOutput, FeedbackOutput, VariationOutput, clamp } from "./schemas";
+import type { AudienceInput, CameraFeedbackInput, CoachProvider, CurateInput, CuratedTopics, FeedbackInput } from "./types";
+import { AudienceQuestionOutput, BriefingOutput, CameraFeedbackOutput, CurateOutput, FeedbackOutput, VariationOutput, clamp } from "./schemas";
 import {
   AUDIENCE_SYSTEM,
   BRIEFING_SYSTEM,
+  CAMERA_SYSTEM,
+  cameraUser,
   CURATE_SYSTEM,
   curateUser,
   FEEDBACK_SYSTEM,
@@ -48,16 +50,26 @@ export function sdkTransport(apiKey: string): MessageTransport {
   };
 }
 
+/** A user turn: text, optionally preceded by a few JPEG stills. */
+type UserContent = string | Array<{ type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } }>;
+
 interface CallSpec<T> {
   kind: UsageKind;
   system: string;
-  user: string;
+  user: UserContent;
   schema: z.ZodType<T>;
   maxTokens: number;
   effort: Effort;
 }
 
-const MAX_TOKENS = { briefing: 6000, feedback: 5000, audience_question: 1500, variation: 1200, curation: 1500 } as const;
+const MAX_TOKENS = { briefing: 6000, feedback: 5000, camera_feedback: 6000, audience_question: 1500, variation: 1200, curation: 1500 } as const;
+/** Rough token cost of one downscaled still (about 640×480). */
+const IMAGE_TOKENS = 900;
+
+function userTokens(u: UserContent): number {
+  if (typeof u === "string") return estimateTokens(u);
+  return u.reduce((n, b) => n + (b.type === "text" ? estimateTokens(b.text) : IMAGE_TOKENS), 0);
+}
 
 export class ClaudeCoach implements CoachProvider {
   readonly kind = "claude" as const;
@@ -74,7 +86,7 @@ export class ClaudeCoach implements CoachProvider {
   /** One bounded, metered, validated call. */
   async call<T>(spec: CallSpec<T>): Promise<{ data: T; model: string }> {
     const worstCase = this.usage.claudeCost({
-      inputTokens: estimateTokens(spec.system + spec.user) + 200,
+      inputTokens: estimateTokens(spec.system) + userTokens(spec.user) + 200,
       outputTokens: spec.maxTokens,
     });
     await this.usage.assertClaudeAllowed(worstCase);
@@ -157,6 +169,22 @@ export class ClaudeCoach implements CoachProvider {
       effort: this.cfg.claude.effortCoaching,
     });
     return buildFeedback(data, input.response, model);
+  }
+
+  async cameraFeedback(input: CameraFeedbackInput): Promise<Feedback> {
+    const text = cameraUser({ ...input, frameTimes: input.frames.map((f) => f.at) });
+    const user: UserContent = input.frames.length
+      ? [...input.frames.map((f) => ({ type: "image" as const, source: { type: "base64" as const, media_type: "image/jpeg" as const, data: f.jpegBase64 } })), { type: "text" as const, text }]
+      : text;
+    const { data, model } = await this.call({
+      kind: "camera_feedback",
+      system: CAMERA_SYSTEM,
+      user,
+      schema: CameraFeedbackOutput,
+      maxTokens: MAX_TOKENS.camera_feedback,
+      effort: this.cfg.claude.effortCoaching,
+    });
+    return buildCameraFeedback(data, input.response, input.frames.length, model);
   }
 
   async audienceQuestion(input: AudienceInput): Promise<AudienceQuestion> {
@@ -272,6 +300,46 @@ export function buildFeedback(out: FeedbackOutput, response: string, model: stri
     unverifiedQuotesRemoved: removed,
     model,
     followUpNote: out.followUpNote ? clamp(out.followUpNote, 300) : null,
+  };
+}
+
+/** Post-validate camera feedback: verify quotes, clamp lengths, drop camera notes when no stills were sent. */
+export function buildCameraFeedback(out: CameraFeedbackOutput, response: string, framesSent: number, model: string): Feedback {
+  let removed = 0;
+  const verify = (q: string): string | null => {
+    const t = q.trim();
+    if (!t) return null;
+    if (quoteAppearsIn(t, response)) return clamp(t, 160);
+    removed++;
+    return null;
+  };
+  const strength = out.strength ? { observation: clamp(out.strength.observation, 400), quote: verify(out.strength.quote) } : null;
+  const priority = out.priority
+    ? { observation: clamp(out.priority.observation, 400), quote: verify(out.priority.quote), suggestion: clamp(out.priority.suggestion, 400) }
+    : null;
+  const hook = out.hook ? { observation: clamp(out.hook.observation, 400), quote: verify(out.hook.quote), rewrite: out.hook.rewrite ? clamp(out.hook.rewrite, 300) : null } : null;
+  const camera =
+    framesSent > 0 && out.camera
+      ? {
+          framesReviewed: framesSent,
+          observations: out.camera.observations.slice(0, 3).map((o) => ({ aspect: o.aspect, observation: clamp(o.observation, 300), fix: o.fix ? clamp(o.fix, 300) : null })),
+        }
+      : null;
+  return {
+    kind: "live",
+    goalMet: out.offTopic ? false : out.goalMet,
+    offTopic: out.offTopic,
+    strength,
+    priority,
+    hook,
+    camera,
+    explanation: clamp(out.explanation, 600),
+    fidelity: { status: "not_applicable", note: null },
+    opinionNote: null,
+    retryFocus: out.retryFocus ? clamp(out.retryFocus, 300) : null,
+    followUpNote: null,
+    unverifiedQuotesRemoved: removed,
+    model,
   };
 }
 

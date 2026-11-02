@@ -72,6 +72,7 @@ export const api = {
   briefing: (id: string, refresh = false) => request<Briefing & { sourceChanged: boolean }>(`/api/stories/${encodeURIComponent(id)}/briefing${refresh ? "?refresh=1" : ""}`),
   storyStatus: (id: string) => request<{ sourceVersion: string | null; sourceUpdatedAt?: string; known: boolean }>(`/api/stories/${encodeURIComponent(id)}/status`),
   feedback: (body: FeedbackBody) => request<{ feedback: Feedback; deduplicated: boolean }>("/api/feedback", json(body)),
+  cameraFeedback: (body: CameraFeedbackBody) => request<{ feedback: Feedback; deduplicated: boolean }>("/api/camera-feedback", json(body), 120_000),
   audienceQuestion: (body: { idempotencyKey: string; talk: TalkSetup; response: string; previousQuestions: string[] }) =>
     request<AudienceQuestion>("/api/audience-question", json(body)),
   variation: (body: { idempotencyKey: string; exerciseId: string; topic: string }) => request<{ prompt: string; kind: "live" | "reviewed" }>("/api/variation", json(body)),
@@ -94,6 +95,16 @@ export const topics = {
   add: (pageid: number) => request<{ storyId: string; title: string }>("/api/topics", json({ pageid })),
   briefOwn: (title: string, text: string) => request<Briefing>("/api/briefings/own", json({ title, text }), 120_000),
 };
+
+export interface CameraFeedbackBody {
+  idempotencyKey: string;
+  drillId: string;
+  topic: string;
+  notes: string;
+  response: { text: string; transcriptSource: "provider" | "browser-speech" | "typed-by-user"; transcriptEdited: boolean; durationSeconds: number | null };
+  frames: { at: number; jpegBase64: string }[];
+  previous?: { text: string; retryFocus: string | null } | null;
+}
 
 export interface FeedbackBody {
   idempotencyKey: string;

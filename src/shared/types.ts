@@ -15,7 +15,8 @@ export type CommunicationGoal =
   | "meetings"
   | "presentations"
   | "explaining"
-  | "persuading";
+  | "persuading"
+  | "camera";
 
 export type SessionLength = 3 | 5;
 
@@ -172,9 +173,22 @@ export interface QuotedObservation {
   quote: string | null;
 }
 
+/** What the coach can see in a still frame from a camera recording. */
+export type CameraAspect = "framing" | "eye-line" | "lighting" | "background" | "expression" | "stability";
+
+export interface CameraNotes {
+  /** How many still frames were reviewed (never the video itself). */
+  framesReviewed: number;
+  observations: { aspect: CameraAspect; observation: string; fix: string | null }[];
+}
+
 export interface Feedback {
   /** live = Claude evaluated this response. illustrative = canned example, did NOT evaluate it. */
   kind: "live" | "illustrative";
+  /** Camera drills: the opening a viewer hears before deciding to stay. */
+  hook?: { observation: string; quote: string | null; rewrite: string | null } | null;
+  /** Camera drills: what the coach saw in a few still frames. Null when no frames were sent. */
+  camera?: CameraNotes | null;
   goalMet: boolean | null;
   strength: QuotedObservation | null;
   priority: (QuotedObservation & { suggestion: string }) | null;
@@ -196,7 +210,20 @@ export interface AudienceQuestion {
   intent: string;
 }
 
-export type SessionMode = "learn" | "talk";
+export type SessionMode = "learn" | "talk" | "camera";
+
+/** Settings for a talk-to-camera drill. */
+export interface CameraSetup {
+  drillId: string;
+  topic: string;
+  /** Three talking points shown near the lens (not a script). */
+  notes: string;
+  /** Self-reported comfort on camera before and after, 0–10. */
+  comfortBefore?: number;
+  comfortAfter?: number;
+  /** Number of still frames sent to the coach with the last attempt. */
+  framesSent?: number;
+}
 
 export interface TalkSetup {
   scenarioId: ScenarioId;
@@ -223,6 +250,7 @@ export interface PracticeSession {
   exerciseId: string;
   skill: SkillId;
   talk?: TalkSetup;
+  camera?: CameraSetup;
   attempts: Attempt[];
   /** Follow-up / audience question answers. */
   followUps: { question: AudienceQuestion; answer?: Attempt }[];
@@ -352,7 +380,7 @@ export interface LadderStep {
 export interface Experiment {
   id: string;
   createdAt: string;
-  kind: "real-world" | "rehearsal";
+  kind: "real-world" | "rehearsal" | "camera";
   situation: string;
   ladderStepId?: string;
   sessionId?: string;

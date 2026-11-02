@@ -58,6 +58,50 @@ export const FeedbackOutput = z.object({
 });
 export type FeedbackOutput = z.infer<typeof FeedbackOutput>;
 
+export const CameraFeedbackOutput = z.object({
+  goalMet: z.boolean().describe("Did the take meet the drill's definition of success?"),
+  offTopic: z.boolean().describe("True if the transcript is empty of substance or unrelated to the drill."),
+  strength: z
+    .object({
+      observation: z.string().describe("One specific thing that worked for a viewer, tied to the drill."),
+      quote: z.string().describe("Exact words copied from the transcript that show it."),
+    })
+    .nullable(),
+  priority: z
+    .object({
+      observation: z.string().describe("The single most useful change for this drill."),
+      quote: z.string().describe("Exact words from the transcript it refers to; empty string if it concerns something missing."),
+      suggestion: z.string().describe("A concrete, short suggestion in the speaker's own voice."),
+    })
+    .nullable()
+    .describe("Null when the goal is met and nothing important would help. Never invent a weakness."),
+  hook: z
+    .object({
+      observation: z.string().describe("Would a viewer keep watching after the first ten seconds? Why?"),
+      quote: z.string().describe("The exact opening words (first sentence or two) from the transcript."),
+      rewrite: z.string().nullable().describe("If the opening could be stronger: a one-sentence opening in the speaker's words and register, using only material from their take. Null if the opening already works."),
+    })
+    .nullable()
+    .describe("Null only for drills where the opening is irrelevant."),
+  camera: z
+    .object({
+      observations: z
+        .array(
+          z.object({
+            aspect: z.enum(["framing", "eye-line", "lighting", "background", "expression", "stability"]),
+            observation: z.string().describe("What is visible in the stills, stated plainly."),
+            fix: z.string().nullable().describe("One practical adjustment, or null if it's fine."),
+          }),
+        )
+        .describe("Up to 3, most useful first. Only what the stills show."),
+    })
+    .nullable()
+    .describe("Null when no stills were supplied."),
+  explanation: z.string().describe("One or two sentences on why the priority matters for someone watching on a phone."),
+  retryFocus: z.string().nullable().describe("One sentence telling the speaker what to try in the next take, or null."),
+});
+export type CameraFeedbackOutput = z.infer<typeof CameraFeedbackOutput>;
+
 export const AudienceQuestionOutput = z.object({
   question: z.string().describe("One question this simulated audience member would realistically ask. One or two sentences."),
   intent: z.string().describe("Very short note on what the asker wants to know."),

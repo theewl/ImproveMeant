@@ -468,3 +468,42 @@ describe("onboarding", () => {
     expect(stored().prefs.onboarded).toBe(true);
   });
 });
+
+describe("Camera drills (demo mode, no camera in jsdom)", () => {
+  it("lists the ladder, falls back to typing when there is no camera, and records comfort", async () => {
+    const user = userEvent.setup();
+    start("#/camera", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "camera" } }));
+    await screen.findByRole("heading", { name: "Camera" });
+    expect(screen.getByRole("heading", { name: "Just press record" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Hook in ten seconds/ })).toHaveAttribute("href", "#/camera/cam-hook");
+
+    await user.click(screen.getByRole("link", { name: /^Start/ }));
+    await screen.findByRole("heading", { name: "Just press record" });
+    // Press record needs no topic. jsdom has no camera, so the typed fallback appears.
+    await user.click(screen.getByRole("button", { name: "Open the camera" }));
+    await screen.findByRole("heading", { name: "Camera not available" });
+    await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "I am Eric, in my kitchen, and I had toast.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByRole("heading", { name: "Your feedback" });
+    expect(screen.getByText("Example feedback")).toBeInTheDocument();
+    expect(screen.getByText(/Your first ten seconds/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    await screen.findByRole("heading", { name: "Take done" });
+    fireEvent.change(screen.getByLabelText(/And now: how comfortable/), { target: { value: "7" } });
+    expect(screen.getByRole("link", { name: "Next drill" })).toHaveAttribute("href", "#/camera/cam-one-person");
+
+    const saved = stored().sessions.find((s) => s.mode === "camera")!;
+    expect(saved.completedAt).toBeTruthy();
+    expect(saved.camera?.drillId).toBe("cam-press-record");
+    expect(saved.camera?.comfortAfter).toBe(7);
+    expect(saved.attempts[0]?.feedback?.kind).toBe("illustrative");
+  });
+
+  it("puts today's camera drill first on Today when the goal is the camera", async () => {
+    start("#/today", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "camera" } }));
+    const pill = await screen.findByRole("link", { name: /Today's camera drill/ });
+    expect(pill).toHaveAttribute("href", "#/camera/cam-press-record");
+    expect(screen.getByRole("link", { name: "Camera" })).toBeInTheDocument();
+  });
+});

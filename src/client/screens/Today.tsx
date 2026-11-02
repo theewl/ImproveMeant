@@ -8,6 +8,8 @@ import { useApp } from "../lib/store";
 import { href, navigate } from "../lib/router";
 import { ErrorNotice, Loading, SourceLine } from "../components/common";
 import { PlanCard } from "../components/PlanCard";
+import { nextCameraDrill } from "../../shared/camera";
+import { formatSeconds } from "../../shared/observations";
 
 /** Type a topic (Wikipedia search) or paste your own material to explain. Live mode only. */
 function AnyTopic({ live }: { live: boolean }) {
@@ -140,6 +142,22 @@ function AnyTopic({ live }: { live: boolean }) {
   );
 }
 
+/** For learners whose goal is the camera: today's drill, first. */
+function CameraPill() {
+  const { data } = useApp();
+  const next = nextCameraDrill(data.sessions);
+  const today = localDayKey();
+  const doneToday = data.sessions.some((s) => s.mode === "camera" && s.completedAt && localDayKey(s.completedAt) === today);
+  return (
+    <a className="pill-link" href={href({ name: "camera", drillId: next.id })}>
+      <span>
+        <strong>{doneToday ? "Another take?" : "Today's camera drill"}</strong> · {next.title} · {formatSeconds(next.seconds)}
+      </span>
+      <span aria-hidden="true">→</span>
+    </a>
+  );
+}
+
 export function Today() {
   const { data, status } = useApp();
   const [cards, setCards] = useState<StoryCard[] | null>(null);
@@ -195,6 +213,7 @@ export function Today() {
             : "A mix of ideas worth knowing"}
       </p>
 
+      {data.prefs.goal === "camera" && <CameraPill />}
       <PlanCard learnStoryId={(featured ?? rest[0])?.id} />
 
       {queue.length > 0 && (
@@ -267,6 +286,14 @@ export function Today() {
         </span>
         <span aria-hidden="true">→</span>
       </a>
+      {data.prefs.goal !== "camera" && (
+        <a className="pill-link subtle tight" href={href({ name: "camera" })}>
+          <span>
+            <strong>Talk to a camera</strong> · short drills for vlogs and videos
+          </span>
+          <span aria-hidden="true">→</span>
+        </a>
+      )}
     </main>
   );
 }

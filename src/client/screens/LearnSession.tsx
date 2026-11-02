@@ -360,6 +360,9 @@ export function LearnSession({ storyId }: { storyId: string }) {
             <a className="button secondary" href={href({ name: "talk", fromStoryId: storyId })}>
               Practice it as a talk
             </a>
+            <a className="button secondary" href={href({ name: "camera", drillId: "cam-unscripted", fromStoryId: storyId })}>
+              Say it to a camera
+            </a>
           </div>
         </section>
       )}
