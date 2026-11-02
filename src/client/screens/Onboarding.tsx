@@ -5,6 +5,7 @@ import { useApp } from "../lib/store";
 import { navigate } from "../lib/router";
 
 export const GOALS: { id: CommunicationGoal; label: string }[] = [
+  { id: "camera", label: "Get comfortable talking to a camera (vlogs, videos)" },
   { id: "meetings", label: "Speak up clearly in meetings" },
   { id: "presentations", label: "Give better presentations" },
   { id: "explaining", label: "Explain ideas without rambling" },

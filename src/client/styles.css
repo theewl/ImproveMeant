@@ -1492,3 +1492,189 @@ button.small {
 .live-transcript .interim {
   opacity: 0.6;
 }
+
+/* ---------- Camera drills ---------- */
+.cam-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  max-height: 62vh;
+  margin: 0.5rem auto;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #0b0f12;
+}
+.cam-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  display: block;
+}
+.cam-guide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.cam-guide line {
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 0.012;
+}
+.cam-guide line.eye {
+  stroke: rgb(255 214 110 / 0.8);
+  stroke-dasharray: 0.08 0.06;
+}
+.cam-notes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(rgb(0 0 0 / 0.65), transparent);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  white-space: pre-line;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+}
+.cam-timer {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.6rem;
+  margin: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font: 600 0.95rem/1.4 var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+.cam-timer .dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #e5484d;
+  vertical-align: middle;
+}
+.cam-hook {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.6rem;
+  margin: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(255 214 110 / 0.9);
+  color: #1b1b1b;
+  font: 600 0.8rem/1.4 var(--sans);
+  max-width: 55%;
+}
+.cam-task {
+  text-align: center;
+  margin: 0.5rem 0;
+  font-size: 1.02rem;
+}
+.cam-controls {
+  text-align: center;
+  padding: 0.5rem 0 1rem;
+}
+.playback {
+  width: 100%;
+  max-height: 62vh;
+  border-radius: var(--radius);
+  background: #0b0f12;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.hook-line {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+.hook-line .eyebrow {
+  margin: 0 0 0.25rem;
+}
+.hook-quote {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.08rem;
+  line-height: 1.4;
+}
+.ladder {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.ladder-item a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+  min-height: 56px;
+}
+.ladder-item a:hover {
+  border-color: var(--accent);
+}
+.ladder-level {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.ladder-item.done .ladder-level {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.ladder-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.ladder-body .row-desc {
+  margin: 0;
+}
+.checks {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.5rem 0 1rem;
+}
+.checks li {
+  padding-left: 1.25rem;
+  position: relative;
+}
+.checks li::before {
+  content: "•";
+  position: absolute;
+  left: 0.3rem;
+  color: var(--accent);
+}
+.pill-link.tight {
+  margin-top: 0.75rem;
+}
+.tabbar a {
+  font-size: 0.68rem;
+}
+.viewer-checks {
+  border: 0;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: grid;
+  gap: 0.35rem;
+}

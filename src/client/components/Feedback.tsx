@@ -3,6 +3,15 @@ import { measureAttempt } from "../../shared/observations";
 import { useApp } from "../lib/store";
 import { href } from "../lib/router";
 
+const CAMERA_ASPECT: Record<NonNullable<Feedback["camera"]>["observations"][number]["aspect"], string> = {
+  framing: "Framing",
+  "eye-line": "Eye line",
+  lighting: "Light",
+  background: "Background",
+  expression: "Expression",
+  stability: "Steadiness",
+};
+
 /** Only the flags that change how to read an attempt. Spoken/typed is implied elsewhere. */
 export function AttemptTags({ a }: { a: Attempt }) {
   const flags: string[] = [];
@@ -57,6 +66,19 @@ export function FeedbackPanel({
         </div>
       )}
 
+      {f.hook && (f.hook.observation || f.hook.rewrite) && (
+        <div className="fb-block">
+          <h3>Your opening</h3>
+          <p>{f.hook.observation}</p>
+          {f.hook.quote && <blockquote>“{f.hook.quote}”</blockquote>}
+          {f.hook.rewrite && (
+            <p className="suggestion">
+              Try opening with: <em>“{f.hook.rewrite}”</em>
+            </p>
+          )}
+        </div>
+      )}
+
       {f.priority && (
         <div className="fb-block try">
           <h3>Try this next</h3>
@@ -86,6 +108,20 @@ export function FeedbackPanel({
             {f.fidelity.status === "factual_error" ? "Differs from the briefing" : "Mostly matches the briefing"}
             {f.fidelity.note ? `: ${f.fidelity.note}` : "."}
           </p>
+        </div>
+      )}
+      {f.camera && f.camera.observations.length > 0 && (
+        <div className="fb-block">
+          <h3>On camera</h3>
+          <p className="hint">From {f.camera.framesReviewed} still frame{f.camera.framesReviewed === 1 ? "" : "s"}, not the video.</p>
+          <ul className="plain checks">
+            {f.camera.observations.map((o) => (
+              <li key={o.aspect + o.observation}>
+                <strong>{CAMERA_ASPECT[o.aspect]}.</strong> {o.observation}
+                {o.fix ? ` ${o.fix}` : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {f.opinionNote && (
@@ -155,7 +191,11 @@ export function FeedbackPanel({
         </dl>
         {!quiet && attempt.delivery?.limitations && <p className="hint">{attempt.delivery.limitations}</p>}
         {f.unverifiedQuotesRemoved > 0 && <p className="hint">{f.unverifiedQuotesRemoved} quote(s) the coach attributed to you weren't in your answer and were removed.</p>}
-        {live && <p className="hint">AI feedback{f.model ? ` (${f.model})` : ""} on your words only — it can't hear tone or pace, and it can be wrong.</p>}
+        {live && (
+          <p className="hint">
+            AI feedback{f.model ? ` (${f.model})` : ""} on your words{f.camera ? ` and ${f.camera.framesReviewed} still frame${f.camera.framesReviewed === 1 ? "" : "s"}` : " only"} — it can't hear tone or pace, and it can be wrong.
+          </p>
+        )}
       </details>
     </section>
   );

@@ -5,6 +5,7 @@ import { timingSafeEqual, createHash } from "node:crypto";
 import { z } from "zod";
 import type { AppStatus, Briefing, Interest } from "../shared/types";
 import { fillPrompt, getExercise, getScenario, EXERCISES } from "../shared/curriculum";
+import { getCameraDrill, isCameraDrill } from "../shared/camera";
 import { wordCount } from "../shared/text";
 import { ALL_INTERESTS } from "../shared/evergreen";
 import type { Config } from "./config";
@@ -216,6 +217,53 @@ export function createApp(deps: AppDeps): Hono {
         previous: req.previous ?? null,
         followUp: req.followUp ?? null,
         target: req.target,
+      }),
+    );
+    return c.json({ feedback: value, deduplicated });
+  });
+
+  // Talk-to-camera feedback: transcript plus up to three small JPEG stills (never the video).
+  const FRAME_MAX_CHARS = 200_000; // ~150 KB of JPEG, base64
+  const CameraFeedbackRequest = z.object({
+    idempotencyKey: idemKey,
+    drillId: z.string().refine(isCameraDrill, "Unknown drill"),
+    topic: z.string().max(300).default(""),
+    notes: z.string().max(600).default(""),
+    response: z.object({
+      text: z.string(),
+      transcriptSource: z.enum(["provider", "browser-speech", "typed-by-user"]),
+      transcriptEdited: z.boolean(),
+      durationSeconds: z.number().min(0).max(3600).nullable().default(null),
+    }),
+    frames: z
+      .array(z.object({ at: z.number().min(0).max(3600), jpegBase64: z.string().max(FRAME_MAX_CHARS).regex(/^\/9j\//, "Not a JPEG") }))
+      .max(3)
+      .default([]),
+    previous: z.object({ text: z.string().max(maxChars), retryFocus: z.string().max(400).nullable() }).nullable().optional(),
+  });
+
+  app.post("/api/camera-feedback", bodyLimit({ maxSize: 700 * 1024, onError: tooLarge }), async (c) => {
+    const req = CameraFeedbackRequest.parse(await readJson(c));
+    const text = req.response.text.trim();
+    if (text.length > maxChars) throw new AppError("too_large", `Responses are limited to ${maxChars} characters.`, 413);
+    if (wordCount(text) < 3) throw new AppError("empty_response", "There's nothing to give feedback on yet. Record a take first.", 422);
+    const drill = getCameraDrill(req.drillId);
+    const taskPrompt = fillPrompt(drill.prompt, { topic: req.topic });
+    // Stills are never stored and never part of the dedupe key.
+    const key = `cam:${req.idempotencyKey}:${hash(JSON.stringify({ ...req, frames: req.frames.map((f) => f.at) }))}`;
+    const { value, deduplicated } = await dedupe.run(key, () =>
+      coach.cameraFeedback({
+        exercise: drill.exercise,
+        drill: { id: drill.id, title: drill.title, focus: drill.focus, seconds: drill.seconds, goodLooksLike: drill.goodLooksLike },
+        taskPrompt,
+        topic: req.topic,
+        notes: req.notes,
+        response: text,
+        durationSeconds: req.response.durationSeconds,
+        transcriptSource: req.response.transcriptSource,
+        transcriptEdited: req.response.transcriptEdited,
+        frames: req.frames,
+        previous: req.previous ?? null,
       }),
     );
     return c.json({ feedback: value, deduplicated });

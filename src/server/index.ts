@@ -28,7 +28,7 @@ if ((process.env.NODE_ENV === "production" || process.argv.includes("--serve-cli
     );
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "strict-origin-when-cross-origin");
-    c.header("Permissions-Policy", "microphone=(self), camera=(), geolocation=()");
+    c.header("Permissions-Policy", "microphone=(self), camera=(self), geolocation=()");
   });
   app.use("/*", serveStatic({ root: "./dist/client" }));
   app.get("*", (c) => c.html(readFileSync(resolve(clientDir, "index.html"), "utf8")));

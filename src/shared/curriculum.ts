@@ -1,4 +1,5 @@
 import type { Exercise, Mission, Scenario, SkillId } from "./types";
+import { CAMERA_EXERCISES } from "./camera";
 
 // Reviewed curriculum. AI may adapt the wording of an exercise to a topic,
 // but the skill, success definition and teaching approach live here.
@@ -311,7 +312,7 @@ export const MISSIONS: Mission[] = [
 ];
 
 export function getExercise(id: string): Exercise {
-  const ex = EXERCISES.find((e) => e.id === id);
+  const ex = EXERCISES.find((e) => e.id === id) ?? CAMERA_EXERCISES.find((e) => e.id === id);
   if (!ex) throw new Error(`Unknown exercise ${id}`);
   return ex;
 }

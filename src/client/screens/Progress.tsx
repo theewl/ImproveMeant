@@ -10,6 +10,11 @@ import { localDayKey } from "../../shared/dates";
 import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
+import { CAMERA_DRILLS, cameraProgress, fillerWords, viewerAddress, wordsPerMinute } from "../../shared/camera";
+
+function getCameraDrillTitle(id?: string): string {
+  return CAMERA_DRILLS.find((d) => d.id === id)?.title ?? "drill";
+}
 
 export function Progress() {
   const { data } = useApp();
@@ -43,6 +48,8 @@ export function Progress() {
         </dl>
         {sum.unfinished > 0 && <p className="hint">{sum.unfinished} unfinished session(s) aren't counted.</p>}
       </section>
+
+      <OnCamera />
 
       <section aria-labelledby="skills-h">
         <h3 id="skills-h">Skills practiced</h3>
@@ -192,7 +199,12 @@ function ConfidenceSummary() {
 
 function SessionEntry({ s }: { s: PracticeSession }) {
   const scenarioTitle = s.talk ? (SCENARIOS.find((x) => x.id === s.talk?.scenarioId)?.title ?? "rehearsal") : "rehearsal";
-  const title = s.mode === "learn" ? `Learn & Explain: ${s.storyTitle ?? "story"}` : `Talk: ${scenarioTitle}${s.talk?.topic ? ` — ${s.talk.topic}` : ""}`;
+  const title =
+    s.mode === "learn"
+      ? `Learn & Explain: ${s.storyTitle ?? "story"}`
+      : s.mode === "camera"
+        ? `Camera: ${getCameraDrillTitle(s.camera?.drillId)}${s.camera?.topic ? ` — ${s.camera.topic}` : ""}`
+        : `Talk: ${scenarioTitle}${s.talk?.topic ? ` — ${s.talk.topic}` : ""}`;
   return (
     <details className="card history">
       <summary>
@@ -267,5 +279,82 @@ function AttemptEntry({ a, session }: { a: Attempt; session: PracticeSession }) 
         </div>
       )}
     </div>
+  );
+}
+
+function OnCamera() {
+  const { data } = useApp();
+  const takes = data.sessions.filter((s) => s.mode === "camera" && s.completedAt);
+  if (takes.length === 0) return null;
+  const minutes = takes.reduce((n, s) => n + s.attempts.reduce((m, a) => m + (a.durationSeconds ?? 0), 0), 0) / 60;
+  const rated = takes.filter((s) => s.camera?.comfortBefore != null && s.camera.comfortAfter != null);
+  const avg = (xs: number[]) => (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1);
+  const drills = cameraProgress(data.sessions).filter((p) => p.completed > 0).length;
+  const recent = [...takes]
+    .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!))
+    .map((s) => ({ s, a: s.attempts.filter((x) => x.text.trim()).pop() }))
+    .filter((x): x is { s: (typeof takes)[number]; a: NonNullable<(typeof x)["a"]> } => !!x.a)
+    .slice(0, 6);
+  return (
+    <section aria-labelledby="camera-h">
+      <h3 id="camera-h">On camera</h3>
+      <dl className="stats">
+        <div>
+          <dt>Takes</dt>
+          <dd>{takes.length}</dd>
+        </div>
+        <div>
+          <dt>Minutes on camera</dt>
+          <dd>{minutes < 1 ? "<1" : Math.round(minutes)}</dd>
+        </div>
+        <div>
+          <dt>Drills tried</dt>
+          <dd>
+            {drills} of {CAMERA_DRILLS.length}
+          </dd>
+        </div>
+        {rated.length >= 2 && (
+          <div>
+            <dt>Comfort, before → after</dt>
+            <dd>
+              {avg(rated.map((s) => s.camera!.comfortBefore!))} → {avg(rated.map((s) => s.camera!.comfortAfter!))}
+            </dd>
+          </div>
+        )}
+      </dl>
+      <p className="hint">Comfort is self-reported, 0–10, on each take.</p>
+      {recent.length > 0 && (
+        <details className="more">
+          <summary>Last takes, measured here</summary>
+          <table className="compare-table">
+            <thead>
+              <tr>
+                <th scope="col">Drill</th>
+                <th scope="col">Pace</th>
+                <th scope="col">Fillers</th>
+                <th scope="col">“You”</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recent.map(({ s, a }) => {
+                const wpm = wordsPerMinute(a.text, a.durationSeconds);
+                return (
+                  <tr key={a.id}>
+                    <th scope="row">
+                      {getCameraDrillTitle(s.camera?.drillId)}
+                      <span className="basis">{formatDate(s.completedAt!)}</span>
+                    </th>
+                    <td>{wpm != null ? `${wpm} wpm` : "—"}</td>
+                    <td>{fillerWords(a.text).total}</td>
+                    <td>{viewerAddress(a.text)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="hint">Pace is words over recording length. Fillers are counted in the transcript, which often omits them. Not a score; a direction.</p>
+        </details>
+      )}
+    </section>
   );
 }

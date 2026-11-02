@@ -28,6 +28,8 @@ export interface AppData {
   confidenceIntroSeen: boolean;
   /** User has acknowledged that audio is sent to the transcription provider. */
   transcriptionConsent: boolean;
+  /** User has agreed to send a few still frames from camera takes to the AI. */
+  cameraFramesConsent: boolean;
 }
 
 export const DEFAULT_PREFS: Preferences = { interests: [], goal: "meetings", sessionMinutes: 5, onboarded: false };
@@ -46,6 +48,7 @@ export function emptyData(): AppData {
     ownBriefings: {},
     confidenceIntroSeen: false,
     transcriptionConsent: false,
+    cameraFramesConsent: false,
   };
 }
 

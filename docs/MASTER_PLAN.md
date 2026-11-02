@@ -587,6 +587,63 @@ Sources: `docs/research/2026-11-ui-ux-patterns.md`, `docs/research/2026-11-featu
 | **Later** | Pairing exposure steps with the human-practice phases. |
 | **Avoid** | Live filler-word counters, streak loss-aversion, and AI-generated therapeutic dialogue. That last one carries safety, regulatory and cost risks. |
 
+## 10. Camera: getting natural on video (added 2026-11-02)
+
+**Why this track.** The owner is starting a vlogging channel. Talking to a camera shares the app's core loop (do it, get one specific note, do it again, review later) but adds two things text can't teach: comfort being watched, and the habits that make a video watchable in the first ten seconds. It is also a more specific niche than "communication skills", which matters for a product.
+
+### 10.1 What makes a good vlogger, according to the sources
+
+Synthesised from YouTube's own Creator Playbook post on the first 15 seconds, talking-head framing and lighting guides, food and travel narration guides, on-camera confidence coaching, and analyses of Casey Neistat's and Emma Chamberlain's styles. Practitioner advice, not research; treated as reviewed rules of thumb.
+
+| Principle | What the sources say | Where it is in the app |
+|---|---|---|
+| Talk to one person | Treat the lens as one friend on a video call; "hello everyone" flattens delivery into announcement mode. | Drill 2 "Hello, one person"; coach rubric item 1; "you" count in measures. |
+| Hook before hello | YouTube: the first 15 seconds "make or break" a video; skip greetings and channel intros; open with the viewer's payoff; first line under about 12 words. | Drill 5 "Hook in ten seconds"; the hook-window badge while recording; "Your first ten seconds" shown above every feedback; the coach's "hook" field with an optional one-line rewrite in the speaker's words. |
+| Specific beats impressive | "Breathtaking" and "delicious" convey nothing; name textures, sounds, smells, numbers, comparisons; food creators describe the first bite and amplify sound because taste can't cross the screen. | Drills 3 "Where I am" and 4 "Describe what you ate"; "general words" measure. |
+| Shape, even for a day | Every vlog needs setup, tension, payoff (Neistat's three-act daily vlog); failure creates authenticity and comedy (Chamberlain). | Drill 6 "Tell a 60-second story"; drill 10 "A full vlog opening". |
+| A point of view | Personality reads as opinions with reasons and first-hand examples; hedging reads as nothing. | Drill 7 "An opinion with a reason". |
+| Pause, don't fill | Replace fillers with silence; if you stumble, pause and keep going rather than restart; fix one habit at a time. | Drill 8 "Pause, don't fill"; filler measure with an honest basis note; one priority per feedback. |
+| Be yourself plus ten percent | Video flattens energy; project slightly more than feels natural; let hands move. | Principle shown on the Camera tab; the coach never scores "energy" from text. |
+| Cues, not a script | Memorised scripts sound read; two or three bullet points near the lens beat a teleprompter for short takes. | "Three talking points" rendered at the top of the preview, next to the front camera. |
+| Framing and light | Lens at eye level; eyes about a third of the way down; a hand's width of headroom; soft light from the camera's direction (face a window); an arm's length from the wall; look at the lens, not the screen. | Five pre-record checks; thirds grid and eye-line guide over the preview; the coach's camera notes from three stills. |
+| Repetition over gear | Comfort comes from daily short takes; record-and-delete drills remove the pressure to be good; actors report noticeable change in 8–12 weeks. | Drill 1 "Just press record" (deleted unwatched); comfort before/after on every take; next-drill suggestion on Today. |
+
+### 10.2 What competitors do, and what we took
+
+Reviewed: Yoodli, Speeko, Orai, SpeakVibe, SpikApp, SpeakApp (AI speech coaches); Captions, BIGVU, Teleprompter.com (creator recording tools); Poised (live-call coach, reported as shutting down October 2026).
+
+- **They measure filler words, pace and (via webcam) eye contact, as scores and percentages, with session-to-session trends.** We count fillers, pace and "you" deterministically and show the basis every time (browser transcripts usually drop "um"), and we track them per take in Progress. We don't produce an eye-contact percentage: reviews of Yoodli report the estimate is unreliable in poor light, with glasses or off-centre cameras, and no independent validation was found. The coach instead describes eye line in plain words from three stills.
+- **They offer roleplays and scenario practice.** Our equivalent is the drill ladder, ordered by comfort rather than by topic, so the first take is deliberately trivial.
+- **Captions, BIGVU and Teleprompter.com bundle a teleprompter and AI eye-contact correction (post-production gaze editing).** We chose cues near the lens over a teleprompter, following the practitioner consensus that scripts sound read, and we don't edit gaze: the goal is the habit, not the clip. **[Q]** A scrolling cue mode for longer scripted videos is a reasonable later addition.
+- **Yoodli's "watch it back" and self-rating loops** match our observer step; we added a three-item viewer checklist during playback (reason to stay, eyes on the lens, talking to one person).
+- **Speeko-style real-time energy and pitch meters** need audio analysis we don't do; the honest text-only rubric says so on every feedback.
+
+What we avoided: scores out of 100, "confidence" or "charisma" ratings, synthetic eye contact, and any comment on appearance. The system prompt forbids remarks on looks, body, age, clothing taste, identity or health, and only describes framing, eye line, light, background, expression and steadiness.
+
+### 10.3 What was built
+
+- **Camera tab** with an eleven-drill ladder (20 s to 2 min), the next drill chosen automatically, five pre-record checks, the principles above, and a 30-second warm-up.
+- **Recording screen:** front-camera preview (mirrored) with a thirds grid and an eye-line guide; talking points at the top of the frame near the lens; timer; a "hook window" badge for the first ten seconds; the browser's speech recognition running alongside where the platform allows it.
+- **Stills, not video, go to the coach.** Three downscaled JPEG stills (about 640 px, roughly 30–60 KB each) are captured locally at 2 s, every 8 s and on stop; start, middle and end are sent only after the learner opts in. The video stays on the device and can be saved to the camera roll. Stills aren't stored server-side and aren't part of the dedupe key. Cost per feedback with stills is about 3–4 cents at the configured model.
+- **Feedback:** the existing panel plus "Your opening" (hook, exact quote, optional one-line rewrite in the speaker's register) and "On camera" (up to three observations with one practical fix each, labelled as coming from stills). Quotes are verified against the transcript as before.
+- **Transcripts:** Chrome and Android run speech recognition alongside the video recorder. Apple WebKit can't, so iPhone records video without audio and transcribes live (silent playback) unless a Deepgram key is set, in which case a small audio-only companion recording is transcribed instead of uploading the video (Vercel's request limit is 4.5 MB).
+- **Honest measures:** pace, fillers, general words and "you" count, each with its basis; a per-take table in Progress; comfort before and after each take, self-reported.
+- **Integration:** a "Get comfortable talking to a camera" goal in onboarding puts today's drill first on Today; the Learn flow ends with "Say it to a camera", which opens drill 11 on the story just studied.
+- **Fix found by the browser pass:** the server's own Permissions-Policy header disallowed the camera (`camera=()`), so no page could have opened it. Now `camera=(self)` on both the Node server and the Vercel build.
+- **[Q]** Untested on a real iPhone in this session; the flow was verified in headless Chromium with a fake camera. The iPhone-specific path (video-only recording plus live speech recognition) is the riskiest assumption.
+
+### 10.4 Camera backlog
+| When | Item |
+|---|---|
+| **Next** | Real-iPhone test of the video-only + speech path; if WebKit refuses, fall back to "record, then type". |
+| **Next** | A "camera week" in the guided plan, and a 7-day "one take a day" option without streak pressure. |
+| **Later** | Two-openings drill: record two hooks for the same video, pick one, say why. |
+| **Later** | Scrolling cue mode near the lens for longer scripted pieces. |
+| **Later** | Optional audio measures (pauses over 2 s, pitch range) computed on-device, never scored. |
+| **Avoid** | Eye-contact percentages, AI gaze correction, charisma or confidence scores, comments on appearance. |
+
+Sources: YouTube Creator Playbook on the first 15 seconds (blog.youtube), Backlinko and Uscreen on audience retention, Teleprompter.com and Vidpros on talking-head framing, FrameOS on lighting, Crafted Films and No Fuss Video on sounding natural, Natasha Lane and Bernard Hiller on camera shyness, Hollyland and The World of Chinese on food vlogging language, Vloggingpro on Casey Neistat's structure, Everything-PR and Decker on Yoodli/Poised/Orai, and the vendors' own pages for Captions, BIGVU and Yoodli. Links in the PR description.
+
 ## Appendix A: Implementation plan used for the MVP
 1. **Shared domain:** types, curriculum, the evergreen library, scheduling, and text and measurement utilities.
 2. **Server:**

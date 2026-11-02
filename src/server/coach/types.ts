@@ -15,6 +15,27 @@ export interface FeedbackInput {
   target: "main" | "followup";
 }
 
+export interface CameraFrame {
+  /** Seconds into the take. */
+  at: number;
+  /** JPEG, base64 without a data: prefix. */
+  jpegBase64: string;
+}
+
+export interface CameraFeedbackInput {
+  exercise: Exercise;
+  drill: { id: string; title: string; focus: string; seconds: number; goodLooksLike: string[] };
+  taskPrompt: string;
+  topic: string;
+  notes: string;
+  response: string;
+  durationSeconds: number | null;
+  transcriptSource: "provider" | "browser-speech" | "typed-by-user";
+  transcriptEdited: boolean;
+  frames: CameraFrame[];
+  previous: { text: string; retryFocus: string | null } | null;
+}
+
 export interface CurateInput {
   interests: string[];
   candidates: { title: string; description: string; feed: string }[];
@@ -39,6 +60,7 @@ export interface CoachProvider {
   readonly model?: string;
   briefing(doc: SourceDocument): Promise<Briefing>;
   feedback(input: FeedbackInput): Promise<Feedback>;
+  cameraFeedback(input: CameraFeedbackInput): Promise<Feedback>;
   audienceQuestion(input: AudienceInput): Promise<AudienceQuestion>;
   variation(exercise: Exercise, topic: string): Promise<{ prompt: string; kind: "live" | "reviewed" }>;
   curateTopics(input: CurateInput): Promise<CuratedTopics>;

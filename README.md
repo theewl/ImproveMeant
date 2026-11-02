@@ -17,6 +17,8 @@ A 4-week guided plan, spaced reviews (FSRS), a phrase bank and an optional obser
 - **A graded "brave steps" ladder:** speaking situations ranked from easier to harder.
 - **"Untangle a thought":** catch an anxious thought, spot the thinking trap, and write a more balanced one.
 
+The **Camera** tab is for getting natural on video (vlogs, YouTube): eleven short drills from "just press record" to a two-minute unscripted take, a front-camera preview with a framing guide and your talking points near the lens, playback as a viewer, and feedback on your opening, your words and (from three still frames, with your consent) framing, light and eye line. Measures such as pace and fillers are shown with their basis, never as a score. See [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) §10 for the research behind it.
+
 This is a **private MVP**. For the product plan, evidence, roadmap and backlog, see [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
 
 ## Quick start
@@ -104,6 +106,7 @@ docs/         master plan, provider setup, pilot plan, research notes
 ## Data and privacy (MVP limits)
 
 - **Local only.** Preferences, transcripts, feedback, history and review dates are saved in this browser's `localStorage`. Nothing is synced or backed up, and clearing site data removes it.
+- **Video never leaves the device.** Camera takes stay in memory until you leave the screen (you can save one to your camera roll). If you opt in, three small still frames go to Anthropic with the transcript for camera feedback; they aren't stored.
 - **Audio is not saved by default.** If you tick "Keep this recording", it is stored in IndexedDB on this device and can be deleted.
 - **What leaves the device when live providers are on:**
   - Answer text goes to Anthropic.
