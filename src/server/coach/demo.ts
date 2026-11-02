@@ -28,6 +28,10 @@ export class DemoCoach implements CoachProvider {
     return { kind: "sample", question, intent: "Sample question from the reviewed practice bank (not generated from your talk)." };
   }
 
+  async curateTopics(): Promise<{ picks: []; suggestions: [] }> {
+    return { picks: [], suggestions: [] };
+  }
+
   async variation(exercise: Exercise, _topic: string): Promise<{ prompt: string; kind: "reviewed" }> {
     return { prompt: exercise.laterVariation, kind: "reviewed" };
   }

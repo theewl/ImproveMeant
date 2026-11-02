@@ -9,6 +9,7 @@ export function AttemptTags({ a }: { a: Attempt }) {
   if (a.isRetry) flags.push("Retry");
   if (a.assisted) flags.push("Assisted — briefing reopened");
   if (a.transcriptEdited) flags.push(a.transcriptSource === "typed-by-user" ? "Transcript typed by you" : "Transcript edited");
+  else if (a.transcriptSource === "browser-speech") flags.push("Browser transcript");
   if (flags.length === 0) return null;
   return (
     <p className="flags">

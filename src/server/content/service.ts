@@ -32,6 +32,7 @@ const FEED_LABEL: Record<LiveCandidate["feed"], string> = {
   news: "In the news today",
   trending: "Widely read today",
   featured: "Today's featured article",
+  timeless: "A timeless topic for your interests",
   search: "A topic you chose",
   own: "Your material",
 };
@@ -57,7 +58,7 @@ export class ContentService {
     return `live-list-${date}`;
   }
 
-  private async liveList(): Promise<{ list: CachedList | null; state: LiveFeedState }> {
+  private async liveList(force = false): Promise<{ list: CachedList | null; state: LiveFeedState }> {
     if (!this.liveEnabled() || !this.provider) {
       return { list: null, state: { status: "disabled" } };
     }
@@ -65,9 +66,9 @@ export class ContentService {
     const today = nowD.toISOString().slice(0, 10);
     const cached = await this.store.read<CachedList>(this.listKey(today));
     const fresh = cached && nowD.getTime() - new Date(cached.fetchedAt).getTime() < this.cfg.content.refreshHours * 3600_000;
-    if (cached && fresh) return { list: cached, state: { status: "ok", fetchedAt: cached.fetchedAt } };
+    if (cached && fresh && !force) return { list: cached, state: { status: "ok", fetchedAt: cached.fetchedAt } };
     try {
-      const candidates = await this.dedupe.run(`list:${today}:${cached?.fetchedAt ?? ""}`, () => this.provider!.listCandidates(today));
+      const candidates = await this.dedupe.run(`list:${today}:${force ? nowD.getTime() : (cached?.fetchedAt ?? "")}`, () => this.provider!.listCandidates(today));
       const list: CachedList = { fetchedAt: nowD.toISOString(), date: today, candidates: candidates.value, insufficient: cached?.insufficient ?? [] };
       await this.store.write(this.listKey(today), list);
       await this.store.write("live-list-latest", list);
@@ -80,22 +81,80 @@ export class ContentService {
     }
   }
 
-  async listStories(interests: Interest[]): Promise<{ cards: StoryCard[]; live: LiveFeedState }> {
+  /**
+   * Once a day per interest set, ask the coach to pick the most interesting, explainable
+   * items from everything in the feed, plus a few timeless topics. Picks are validated
+   * against real candidates (exact titles) and suggestions are resolved through the
+   * provider, so nothing made up can reach the learner. Falls back to the plain
+   * interest match if curation fails.
+   */
+  private async curatedPicks(list: CachedList, interests: Interest[]): Promise<{ storyId: string; why: string }[] | null> {
+    const usable = list.candidates.filter((c) => !list.insufficient.includes(c.storyId));
+    if (usable.length === 0) return null;
+    const key = `picks-${list.date}-${[...interests].sort().join("+") || "any"}`;
+    const cached = await this.store.read<{ fetchedAt: string; picks: { storyId: string; why: string }[] }>(key);
+    if (cached && cached.fetchedAt === list.fetchedAt) return cached.picks;
+    const candidates = usable.slice(0, 40).map((c) => ({ title: c.title, description: c.description || c.blurb, feed: c.feed }));
+    try {
+      const { value: out } = await this.dedupe.run(`curate:${key}:${list.fetchedAt}`, () =>
+        this.coach.curateTopics({ interests: interests.map((i) => interestLabel(i)), candidates }),
+      );
+      const byTitle = new Map(usable.map((c) => [c.title.toLowerCase(), c]));
+      const picks: { storyId: string; why: string }[] = [];
+      for (const p of out.picks) {
+        const c = byTitle.get(p.title.trim().toLowerCase());
+        if (c && !picks.some((x) => x.storyId === c.storyId)) picks.push({ storyId: c.storyId, why: p.why });
+      }
+      // Timeless suggestions: resolve each title through the provider; keep only real articles.
+      const extra: LiveCandidate[] = [];
+      for (const sug of out.suggestions.slice(0, 3)) {
+        try {
+          const hit = (await this.provider!.searchTopics(sug.title))[0];
+          const c = hit ? await this.provider!.lookup(hit.pageid) : null;
+          if (c && !byTitle.has(c.title.toLowerCase()) && !picks.some((x) => x.storyId === c.storyId)) {
+            extra.push({ ...c, feed: "timeless" });
+            picks.push({ storyId: c.storyId, why: sug.why });
+          }
+        } catch {
+          /* skip this suggestion */
+        }
+      }
+      if (extra.length) {
+        const custom = (await this.store.read<LiveCandidate[]>("custom-topics")) ?? [];
+        await this.store.write("custom-topics", [...extra, ...custom.filter((x) => !extra.some((e) => e.storyId === x.storyId))].slice(0, 200));
+      }
+      await this.store.write(key, { fetchedAt: list.fetchedAt, picks });
+      return picks;
+    } catch {
+      return null;
+    }
+  }
+
+  async listStories(interests: Interest[], opts: { refresh?: boolean; seed?: number } = {}): Promise<{ cards: StoryCard[]; live: LiveFeedState }> {
     const picks: StoryCard[] = [];
-    const { list, state } = await this.liveList();
+    const { list, state } = await this.liveList(!!opts.refresh);
     if (list) {
       const usable = list.candidates.filter((c) => !list.insufficient.includes(c.storyId));
-      const matched = usable.filter((c) => c.interest && interests.includes(c.interest));
-      // Up to 4 live stories: interest matches first, at most 2 per feed, so news, trending and featured all get a look-in.
-      const chosen: LiveCandidate[] = [];
-      const perFeed: Record<string, number> = {};
-      for (const c of [...matched, ...usable.filter((c) => !matched.includes(c))]) {
-        if (chosen.length >= 4) break;
-        if ((perFeed[c.feed] ?? 0) >= 2) continue;
-        perFeed[c.feed] = (perFeed[c.feed] ?? 0) + 1;
-        chosen.push(c);
+      const curated = await this.curatedPicks(list, interests);
+      const custom = (await this.store.read<LiveCandidate[]>("custom-topics")) ?? []; // after curation, which may add timeless topics
+      let chosen: { c: LiveCandidate; why: string }[] = [];
+      if (curated && curated.length) {
+        for (const p of curated) {
+          const c = usable.find((x) => x.storyId === p.storyId) ?? custom.find((x) => x.storyId === p.storyId);
+          if (c) chosen.push({ c, why: p.why });
+        }
       }
-      for (const c of chosen) {
+      if (chosen.length === 0) {
+        const matched = usable.filter((c) => c.interest && interests.includes(c.interest));
+        const perFeed: Record<string, number> = {};
+        for (const c of [...matched, ...usable.filter((c) => !matched.includes(c))]) {
+          if (chosen.length >= 4) break;
+          if ((perFeed[c.feed] ?? 0) >= 2) continue;
+          perFeed[c.feed] = (perFeed[c.feed] ?? 0) + 1;
+          chosen.push({ c, why: `${FEED_LABEL[c.feed]}${c.interest && interests.includes(c.interest) ? ` · matches your interest in ${interestLabel(c.interest)}` : ""}.` });
+        }
+      }
+      for (const { c, why } of chosen.slice(0, 6)) {
         const cachedBriefing = await this.store.read<Briefing>(this.briefingKey(c.storyId));
         picks.push({
           id: c.storyId,
@@ -106,13 +165,13 @@ export class ContentService {
           interest: c.interest ?? "culture",
           source: {
             url: c.url,
-            publisher: "Wikipedia — \"In the news\"",
+            publisher: "Wikipedia",
             publishedAt: c.featuredOn,
             retrievedAt: list.fetchedAt,
             sourceUpdatedAt: c.sourceUpdatedAt,
           },
           estimatedMinutes: 5,
-          whySelected: `${FEED_LABEL[c.feed]}${c.interest && interests.includes(c.interest) ? ` · matches your interest in ${interestLabel(c.interest)}` : ""}.`,
+          whySelected: why,
           briefingReady: !!cachedBriefing,
         });
       }
@@ -120,8 +179,8 @@ export class ContentService {
     const evergreen = evergreenCards();
     const want = interests.length ? interests : ["business", "culture", "science"];
     const ordered: StoryCard[] = [];
-    // Round-robin across chosen interests, then everything else; rotate daily for variety.
-    const dayIndex = Math.floor(this.now().getTime() / 86400_000);
+    // Round-robin across chosen interests, then everything else; rotate daily (or by seed) for variety.
+    const dayIndex = Math.floor(this.now().getTime() / 86400_000) + (opts.seed ?? 0);
     const byInterest = want.map((i) => rotate(evergreen.filter((c) => c.interest === i), dayIndex));
     for (let round = 0; ordered.length < 3 && round < 4; round++) {
       for (const group of byInterest) {
@@ -133,7 +192,7 @@ export class ContentService {
       if (ordered.length >= 3) break;
       if (!ordered.some((o) => o.id === c.id)) ordered.push({ ...c, whySelected: "Curated idea worth knowing." });
     }
-    return { cards: [...picks, ...ordered].slice(0, 7), live: state };
+    return { cards: [...picks, ...ordered].slice(0, 9), live: state };
   }
 
   async searchTopics(query: string): Promise<TopicHit[]> {

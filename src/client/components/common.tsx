@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { FeedKind, SourceMeta, StoryKind } from "../../shared/types";
 
-const FEED_BADGE: Record<FeedKind, string> = { news: "In the news", trending: "Widely read", featured: "Featured", search: "Your topic", own: "Your material" };
+const FEED_BADGE: Record<FeedKind, string> = { news: "In the news", trending: "Widely read", featured: "Featured", timeless: "Timeless", search: "Your topic", own: "Your material" };
 import { ApiRequestError } from "../lib/api";
 import { href } from "../lib/router";
 
