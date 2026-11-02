@@ -36,6 +36,7 @@ export function useRecorder() {
   const finalizeRef = useRef<(() => void) | null>(null);
   const watchdog = useRef<number | null>(null);
   const pausedTotal = useRef(0);
+  const tornDown = useRef(false);
   const audioCtx = useRef<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
@@ -56,6 +57,7 @@ export function useRecorder() {
   useEffect(
     () => () => {
       cancelled.current = true;
+      tornDown.current = true;
       try {
         rec.current?.stop();
       } catch {
@@ -79,7 +81,12 @@ export function useRecorder() {
     setRecording(null);
     setState("requesting");
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const got = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (tornDown.current) {
+        got.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream.current = got;
     } catch (err) {
       const name = (err as Error).name;
       setState(name === "NotAllowedError" || name === "SecurityError" ? "denied" : "error");
@@ -137,7 +144,14 @@ export function useRecorder() {
     pausedAt.current = null;
     pausedTotal.current = 0;
     setElapsed(0);
-    mr.start(1000);
+    try {
+      mr.start(1000);
+    } catch {
+      cleanupStream();
+      setState("error");
+      setError("The microphone stopped before recording could start. Try again, or type your answer.");
+      return;
+    }
     timer.current = window.setInterval(() => setElapsed(elapsedNow()), 250);
     // Live level meter for the waveform (optional; recording works without it).
     try {

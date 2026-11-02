@@ -66,7 +66,7 @@ export function stepRecord(step: Step, d: StepData): StepRecord {
       break;
     case "camera": {
       const id = step.target.drillId;
-      done = d.sessions.filter((s) => s.mode === "camera" && s.camera?.drillId === id && s.completedAt).map((s) => ({ at: s.completedAt!, anxiety: anxietyFor(d, s.id) }));
+      done = d.sessions.filter((s) => s.mode === "camera" && s.camera?.drillId === id && !s.camera.promptId && s.completedAt).map((s) => ({ at: s.completedAt!, anxiety: anxietyFor(d, s.id) }));
       break;
     }
     case "talk": {

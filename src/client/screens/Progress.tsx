@@ -157,17 +157,22 @@ function ActivityDots() {
 
 function ConfidenceSummary() {
   const { data } = useApp();
-  const c = summarizeExperiments(data.experiments);
+  const c = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
+  const checkins = data.experiments.filter((e) => e.kind !== "real-world" && e.completedAt).length;
   const views = data.sessions.flatMap((s) => s.attempts.map((a) => a.selfView).filter((v): v is NonNullable<typeof v> => !!v));
   const better = views.filter((v) => v.observed > v.predicted).length;
-  if (c.completed === 0 && data.reframes.length === 0 && views.length === 0) return null;
+  if (c.completed === 0 && checkins === 0 && data.reframes.length === 0 && views.length === 0) return null;
   return (
     <section aria-labelledby="conf-h">
       <h3 id="conf-h">Confidence</h3>
       <dl className="stats">
         <div>
-          <dt>Brave steps done</dt>
+          <dt>Real-life steps done</dt>
           <dd>{c.completed}</dd>
+        </div>
+        <div>
+          <dt>Session check-ins</dt>
+          <dd>{checkins}</dd>
         </div>
         <div>
           <dt>Fears that didn't happen</dt>

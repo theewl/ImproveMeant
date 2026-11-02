@@ -166,5 +166,5 @@ export function checkinExperiment(p: { kind: Experiment["kind"]; sessionId: stri
 export function checkinSavedMessage(before: number, after: number, outcome?: Experiment["outcome"]): string {
   const base = outcome === "didnt-happen" ? "What you worried about didn't happen. " : outcome === "partly" ? "Part of it happened and you got through it. " : outcome === "happened" ? "It happened and you got through it. " : "";
   const trend = after < before ? `Anxiety ${before} → ${after}/10.` : after === before ? `Anxiety stayed at ${after}/10; a step still counts.` : `Anxiety ${before} → ${after}/10. Harder than expected, and you still did it.`;
-  return `${base}${trend} Logged under Steps.`;
+  return `${base}${trend} Logged under Progress.`;
 }

@@ -29,7 +29,7 @@ export function App() {
   const route = useRoute();
   const { data, status, statusError, saveFailed } = useApp();
   const due = dueQueue(data.reviews, new Date().toISOString()).queue.length;
-  const inSession = route.name === "learn" || (route.name === "camera" && !!route.drillId) || route.name === "take";
+  const inSession = route.name === "learn" || (route.name === "camera" && !!route.drillId) || (route.name === "take" && !!getPrompt(route.promptId));
 
   useEffect(() => {
     if (!data.prefs.onboarded && route.name === "today") navigate({ name: "onboarding" });

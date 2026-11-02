@@ -73,6 +73,8 @@ export function useVideoRecorder(opts: { videoOnly: boolean }) {
   const finalized = useRef(false);
   const finalizeRef = useRef<(() => void) | null>(null);
   const cancelled = useRef(false);
+  const tornDown = useRef(false);
+  const [errorKind, setErrorKind] = useState<"short" | "other" | null>(null);
   const videoOnly = opts.videoOnly;
 
   const elapsedNow = () => (performance.now() - startedAt.current) / 1000;
@@ -93,6 +95,7 @@ export function useVideoRecorder(opts: { videoOnly: boolean }) {
   useEffect(
     () => () => {
       cancelled.current = true;
+      tornDown.current = true;
       clearTimers();
       try {
         rec.current?.stop();
@@ -125,13 +128,20 @@ export function useVideoRecorder(opts: { videoOnly: boolean }) {
       return;
     }
     setError(null);
+    setErrorKind(null);
     setRecording(null);
     setState("requesting");
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({
+      const got = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: !videoOnly ? true : false,
       });
+      if (tornDown.current) {
+        // The screen was left while the permission prompt was open: don't leave the camera on.
+        got.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream.current = got;
     } catch (err) {
       const name = (err as Error).name;
       const blocked = name === "NotAllowedError" || name === "SecurityError";
@@ -224,6 +234,7 @@ export function useVideoRecorder(opts: { videoOnly: boolean }) {
         const blob = new Blob(chunks.current, { type });
         if (blob.size < 2000 || seconds < 1) {
           setState("error");
+          setErrorKind("short");
           setError("That take was empty or too short. Try again.");
           return;
         }
@@ -240,7 +251,15 @@ export function useVideoRecorder(opts: { videoOnly: boolean }) {
     audioRec.current = ar;
     startedAt.current = performance.now();
     setElapsed(0);
-    mr.start(1000);
+    try {
+      mr.start(1000);
+    } catch {
+      releaseCamera();
+      setState("error");
+      setErrorKind("other");
+      setError("The camera stopped before recording could start. Try again.");
+      return;
+    }
     try {
       ar?.start(1000);
     } catch {
@@ -291,5 +310,5 @@ export function useVideoRecorder(opts: { videoOnly: boolean }) {
     setState(videoRecordingSupported() ? "idle" : "unsupported");
   }, []);
 
-  return { state, elapsed, recording, error, attachPreview, open, start, stop, cancel, reset, release: releaseCamera };
+  return { state, elapsed, recording, error, errorKind, attachPreview, open, start, stop, cancel, reset, release: releaseCamera };
 }

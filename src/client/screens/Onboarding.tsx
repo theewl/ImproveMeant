@@ -22,10 +22,13 @@ export function VlogSetup({ submitLabel, onDone, secondary, showMore = false }: 
   const [goal, setGoal] = useState<CommunicationGoal>(data.prefs.goal);
   const [interests, setInterests] = useState<Interest[]>(data.prefs.interests);
   const [len, setLen] = useState<SessionLength>(data.prefs.sessionMinutes);
-  const [more, setMore] = useState(false);
+  const [interestsTouched, setInterestsTouched] = useState(false);
 
   const toggleNiche = (n: Niche) => setNiches((xs) => (xs.includes(n) ? xs.filter((x) => x !== n) : xs.length >= 3 ? xs : [...xs, n]));
-  const toggleInterest = (i: Interest) => setInterests((xs) => (xs.includes(i) ? xs.filter((x) => x !== i) : xs.length >= 3 ? xs : [...xs, i]));
+  const toggleInterest = (i: Interest) => {
+    setInterestsTouched(true);
+    setInterests((xs) => (xs.includes(i) ? xs.filter((x) => x !== i) : xs.length >= 3 ? xs : [...xs, i]));
+  };
 
   return (
     <form
@@ -34,7 +37,7 @@ export function VlogSetup({ submitLabel, onDone, secondary, showMore = false }: 
         const derived = interestsForNiches(niches);
         update((d) => ({
           ...d,
-          prefs: { ...d.prefs, viewerName: viewer.trim() || undefined, niches, weeklyTakes: weekly, goal, interests: more && interests.length ? interests : derived.length ? derived : d.prefs.interests, sessionMinutes: len, onboarded: true },
+          prefs: { ...d.prefs, viewerName: viewer.trim() || undefined, niches, weeklyTakes: weekly, goal, interests: interestsTouched && interests.length ? interests : derived.length ? derived : d.prefs.interests, sessionMinutes: len, onboarded: true },
         }));
         onDone();
       }}
@@ -70,7 +73,7 @@ export function VlogSetup({ submitLabel, onDone, secondary, showMore = false }: 
       </fieldset>
 
       {showMore && (
-        <details className="more" onToggle={(e) => setMore((e.target as HTMLDetailsElement).open)}>
+        <details className="more">
           <summary>More options</summary>
           <fieldset className="choices">
             <legend className="label">Main goal</legend>

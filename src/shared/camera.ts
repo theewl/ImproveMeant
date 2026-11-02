@@ -322,7 +322,7 @@ export interface DrillProgress {
 
 export function cameraProgress(sessions: PracticeSession[]): DrillProgress[] {
   return CAMERA_DRILLS.map((drill) => {
-    const done = sessions.filter((s) => s.mode === "camera" && s.camera?.drillId === drill.id && s.completedAt);
+    const done = sessions.filter((s) => s.mode === "camera" && s.camera?.drillId === drill.id && !s.camera.promptId && s.completedAt);
     const lastAt = done.map((s) => s.completedAt!).sort().pop();
     return { drill, completed: done.length, lastAt };
   });
@@ -400,7 +400,7 @@ export function measureCameraTake(text: string, seconds: number | undefined, tra
     out.push({
       label: "Pace",
       value: `about ${wpm} words per minute`,
-      basis: wpm < 110 ? "Word count over recording length. Conversational video usually sits around 140–170; under 110 can feel slow." : wpm > 185 ? "Word count over recording length. Over about 185 is fast for most viewers; pauses help." : "Word count over recording length. This is a comfortable range for talking to camera.",
+      basis: wpm < 120 ? "Word count over recording length. Conversational video usually sits around 140–170; under 120 can feel slow." : wpm > 180 ? "Word count over recording length. Over about 180 is fast for most viewers; pauses help." : "Word count over recording length. This is a comfortable range for talking to camera.",
     });
   }
   const f = fillerWords(text);

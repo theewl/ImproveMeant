@@ -82,6 +82,11 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   const maxChars = status?.maxResponseChars ?? 6000;
 
   const submitTake = async (take: TakeResult) => {
+    // A resubmit after a failed request reuses the pending attempt instead of adding another.
+    if (pending && pending.text === take.text.trim()) {
+      await requestFeedback(pending, take.frames);
+      return;
+    }
     const attempt = await s.makeAttempt(
       {
         modality: "spoken",
@@ -104,7 +109,8 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
     setBusy(true);
     setError(null);
     try {
-      const prev = attempt.isRetry ? last : undefined;
+      const before = attempts.slice(0, Math.max(0, attempts.findIndex((a) => a.id === attempt.id)));
+      const prev = attempt.isRetry ? [...before].reverse().find((a) => a.text.trim()) : undefined;
       const res = await api.cameraFeedback({
         idempotencyKey: attempt.id,
         drillId: drill.id,
@@ -145,7 +151,14 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
     .find((a) => a.text.trim());
   const improvement = firstEver && last?.text.trim() ? improvementSince(takeStats(firstEver.text, firstEver.durationSeconds), takeStats(last.text, last.durationSeconds)) : [];
   const doneIds = data.sessions.filter((x) => x.mode === "camera" && x.completedAt && x.camera?.promptId).map((x) => x.camera!.promptId!);
-  const anotherPrompt = todayPrompt((data.prefs.niches ?? []) as never, [...doneIds, ...(prompt ? [prompt.id] : [])], nowIso, 1);
+  const anotherPrompt = (() => {
+    const exclude = [...doneIds, ...(prompt ? [prompt.id] : [])];
+    for (let k = 1; k < 6; k++) {
+      const cand = todayPrompt((data.prefs.niches ?? []) as never, exclude, nowIso, k);
+      if (cand.id !== prompt?.id) return cand;
+    }
+    return todayPrompt((data.prefs.niches ?? []) as never, exclude, nowIso, 1);
+  })();
   const next = nextCameraDrill([...data.sessions.filter((x) => x.id !== s.session.id), { ...s.session, completedAt: s.session.completedAt ?? new Date().toISOString() }]);
 
   return (
@@ -275,6 +288,10 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
           busy={busy}
           error={error}
           onRetryFeedback={() => pending && void requestFeedback(pending, lastFrames.current)}
+          onFinishWithout={() => {
+            finish();
+            setPhase("done");
+          }}
           onDeleted={() => {
             s.addAttempt({ id: uid("a-"), createdAt: new Date().toISOString(), modality: "spoken", text: "", transcriptEdited: false, assisted: false, isRetry: false });
             finish();
@@ -447,6 +464,8 @@ interface TakeProps {
   busy: boolean;
   error: unknown;
   onRetryFeedback: () => void;
+  /** Keep the take and end the session when feedback can't be had. */
+  onFinishWithout: () => void;
   onDeleted: () => void;
   onSubmit: (t: TakeResult) => void;
 }
@@ -492,7 +511,7 @@ function CameraTake(p: TakeProps) {
       p.onDeleted();
       return;
     }
-    const t = speech.text.trim();
+    const t = [speech.text, speech.interim].filter(Boolean).join(" ").trim();
     if (!speech.failed && wordCount(t) >= 3) {
       setTranscript(t);
       setOriginal(t);
@@ -500,6 +519,16 @@ function CameraTake(p: TakeProps) {
       setTxState("done");
     }
   }, [r.state, r.recording, speech.text, speech.failed, txState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The recogniser finalises the last sentence a moment after stop: keep the transcript in sync until the learner edits it.
+  useEffect(() => {
+    if (txState !== "done" || source !== "browser-speech" || original == null) return;
+    const t = [speech.text, speech.interim].filter(Boolean).join(" ").trim();
+    if (t && t !== original && transcript === original) {
+      setTranscript(t);
+      setOriginal(t);
+    }
+  }, [speech.text, speech.interim]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const transcribe = async () => {
     if (!r.recording?.audio) return;
@@ -517,6 +546,17 @@ function CameraTake(p: TakeProps) {
     }
   };
 
+  if (r.state === "error" && !r.recording && r.errorKind === "short") {
+    return (
+      <section>
+        <StepHeader eyebrow="Camera" title="Too short" />
+        <p className="notice">{r.error}</p>
+        <button className="primary" type="button" onClick={() => void r.open()}>
+          Try again
+        </button>
+      </section>
+    );
+  }
   if (!supported || r.state === "unsupported" || r.state === "denied" || (r.state === "error" && !r.recording)) {
     return (
       <section>
@@ -568,6 +608,11 @@ function CameraTake(p: TakeProps) {
         )}
         <div className="cam-controls">
           {r.state === "requesting" && <p className="hint">Waiting for the camera…</p>}
+          {r.state === "idle" && (
+            <button className="secondary" type="button" onClick={() => void r.open()}>
+              Open the camera
+            </button>
+          )}
           {r.state === "ready" && (
             <>
               <button className="mic" type="button" onClick={r.start} aria-label="Start recording">
@@ -587,7 +632,14 @@ function CameraTake(p: TakeProps) {
                 </svg>
               </button>
               <p className="mic-caption">Tap to finish</p>
-              <button className="link" type="button" onClick={r.cancel}>
+              <button
+                className="link"
+                type="button"
+                onClick={() => {
+                  r.cancel();
+                  void r.open();
+                }}
+              >
                 Cancel
               </button>
             </>
@@ -728,7 +780,13 @@ function CameraTake(p: TakeProps) {
           <button className="primary" type="submit" disabled={words < 3 || tooLong || p.busy} aria-busy={p.busy}>
             {p.busy ? "Getting feedback…" : "Get feedback"}
           </button>
-          {p.error != null && <ErrorNotice error={p.error} onRetry={p.onRetryFeedback} />}
+          {p.error != null && (
+            <ErrorNotice error={p.error} onRetry={p.onRetryFeedback}>
+              <button className="link" type="button" onClick={p.onFinishWithout}>
+                Finish without feedback
+              </button>
+            </ErrorNotice>
+          )}
           {!data.prefs.quietMode && <p className="hint">Measured here: pace, fillers, general words, and how often you said “you”.</p>}
         </form>
       )}
@@ -756,7 +814,13 @@ function TypedTake(p: TakeProps) {
       <button className="primary" type="submit" disabled={words < 3 || p.busy} aria-busy={p.busy}>
         {p.busy ? "Getting feedback…" : "Get feedback"}
       </button>
-      {p.error != null && <ErrorNotice error={p.error} onRetry={p.onRetryFeedback} />}
+      {p.error != null && (
+        <ErrorNotice error={p.error} onRetry={p.onRetryFeedback}>
+          <button className="link" type="button" onClick={p.onFinishWithout}>
+            Finish without feedback
+          </button>
+        </ErrorNotice>
+      )}
     </form>
   );
 }

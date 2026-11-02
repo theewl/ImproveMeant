@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { StoryCard } from "../../shared/types";
 import { dueQueue } from "../../shared/schedule";
 import { localDayKey } from "../../shared/dates";
 import { nextStep } from "../../shared/steps";
-import { fillPromptText, takesThisWeek, todayPrompt, type Niche } from "../../shared/vlog";
+import { fillPromptText, getPrompt, takesThisWeek, todayPrompt, type Niche } from "../../shared/vlog";
 import { formatSeconds } from "../../shared/observations";
 import { api, topics, type LiveFeedState, type TopicHit } from "../lib/api";
 import { useApp } from "../lib/store";
@@ -141,26 +141,39 @@ export function Today() {
   const [live, setLive] = useState<LiveFeedState | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [offset, setOffset] = useState(0);
+  const [seed, setSeed] = useState(0);
+  const [rotating, setRotating] = useState(false);
   const interestsKey = data.prefs.interests.join(",");
+  const requestId = useRef(0);
 
-  const load = () => {
+  /** First load: the plain list, then the AI's picks on top. A rotation (seed > 0) shows the server's rotated list as is. */
+  const load = (nextSeed = 0) => {
+    const id = ++requestId.current;
     setError(null);
-    setCards(null);
+    if (nextSeed === 0) setCards(null);
+    else setRotating(true);
     api
-      .stories(data.prefs.interests)
+      .stories(data.prefs.interests, nextSeed > 0 ? { refresh: true, seed: nextSeed } : {})
       .then((r) => {
+        if (id !== requestId.current) return;
         setCards(r.cards);
         setLive(r.live);
-        if (r.curation === "available") {
+        setRotating(false);
+        if (nextSeed === 0 && r.curation === "available") {
           api
             .storyPicks(data.prefs.interests)
             .then((p) => {
+              if (id !== requestId.current) return;
               if (p.cards.length) setCards((cur) => [...p.cards, ...(cur ?? []).filter((c) => c.kind !== "current")]);
             })
             .catch(() => undefined);
         }
       })
-      .catch(setError);
+      .catch((e) => {
+        if (id !== requestId.current) return;
+        setRotating(false);
+        setError(e);
+      });
   };
   useEffect(() => load(), [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -173,7 +186,8 @@ export function Today() {
   const prompt = todayPrompt((data.prefs.niches ?? []) as Niche[], doneIds, nowIso, offset);
   const viewer = data.prefs.viewerName?.trim();
   const target = data.prefs.weeklyTakes ?? 5;
-  const week = takesThisWeek(cameraDone.map((s) => s.completedAt!), nowIso);
+  const week = takesThisWeek(cameraDone.filter((s) => s.camera?.promptId).map((s) => s.completedAt!), nowIso);
+  const donePrompt = takeToday ? getPrompt(takeToday.camera!.promptId!) : undefined;
   const due = dueQueue(data.reviews, nowIso).queue.length;
   const step = nextStep(data, data.prefs.goal);
   const stories = (cards ?? []).slice(0, 3);
@@ -192,10 +206,11 @@ export function Today() {
 
       <article className="take-card">
         <p className="eyebrow">
-          {takeToday ? "Done today" : "Today's take"} · about {formatSeconds(prompt.seconds)}
+          {takeToday ? "Done today" : "Today's take"} · about {formatSeconds((donePrompt ?? prompt).seconds)}
           {viewer ? ` · to ${viewer}` : ""}
         </p>
-        <p className="take-prompt">{fillPromptText(prompt, viewer)}</p>
+        <p className="take-prompt">{fillPromptText(donePrompt ?? prompt, viewer)}</p>
+        {donePrompt && <p className="hint">Next up: {fillPromptText(prompt, viewer)}</p>}
         <div className="row wrap">
           <a className="button primary" href={href({ name: "take", promptId: prompt.id })}>
             {takeToday ? "One more take" : "Record"}
@@ -259,6 +274,20 @@ export function Today() {
               </li>
             ))}
           </ul>
+        )}
+        {cards && (
+          <button
+            className="link"
+            type="button"
+            disabled={rotating}
+            onClick={() => {
+              const s = seed + 1;
+              setSeed(s);
+              load(s);
+            }}
+          >
+            {rotating ? "Finding others…" : "Show different stories"}
+          </button>
         )}
         <p className="hint">Read a two-minute briefing, then say it to the camera in your own words.</p>
         <AnyTopic live={status?.mode === "live"} />

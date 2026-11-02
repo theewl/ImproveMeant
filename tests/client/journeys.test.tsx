@@ -375,7 +375,7 @@ describe("Confidence tools", () => {
     await screen.findByText(/Before, you felt 8\/10/);
     await user.click(screen.getByLabelText("No"));
     await user.click(screen.getByRole("button", { name: "Save check-in" }));
-    await screen.findByText(/Logged under Steps/);
+    await screen.findByText(/Logged under Progress/);
     expect(stored().experiments[0]).toMatchObject({ kind: "rehearsal", anxietyBefore: 8, prediction: "I'll lose my thread", outcome: "didnt-happen" });
   });
 });
@@ -616,5 +616,50 @@ describe("Today's take from a prompt", () => {
     expect(screen.getByRole("link", { name: "Done for today" })).toHaveAttribute("href", "#/today");
     const saved = stored().sessions.find((s) => s.camera?.promptId === "f1")!;
     expect(saved.camera).toMatchObject({ throughline: "Order the dumplings, skip the soup.", hookPattern: "claim" });
+  });
+});
+
+describe("Camera take when feedback is unavailable", () => {
+  it("does not duplicate the attempt on resubmit and can finish without feedback", async () => {
+    const user = userEvent.setup();
+    const { app } = buildTestApp();
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      if (url.startsWith("/api/camera-feedback")) return new Response(JSON.stringify({ error: "Daily limit reached.", code: "usage_limit", retryable: false }), { status: 429, headers: { "Content-Type": "application/json" } });
+      const { signal: _signal, ...rest } = init;
+      return app.request(new Request(`http://localhost${url}`, rest as RequestInit));
+    });
+    start("#/take/s1", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["culture"], viewerName: "Sam", niches: ["stories"], goal: "camera" } }));
+    await screen.findByRole("heading", { name: "Talk to Sam" });
+    await user.click(screen.getByRole("button", { name: "Open the camera" }));
+    await screen.findByRole("heading", { name: "Camera not available" });
+    await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "So the key snapped in the lock and I was outside in the rain with the shopping.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByText(/Daily limit reached/);
+    await user.click(screen.getByRole("button", { name: "Get feedback" })); // resubmit: same attempt, not a second one
+    await screen.findByText(/Daily limit reached/);
+    expect(stored().sessions.find((s) => s.camera?.promptId === "s1")!.attempts).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Finish without feedback" }));
+    await screen.findByRole("heading", { name: "Take done" });
+    const saved = stored().sessions.find((s) => s.camera?.promptId === "s1")!;
+    expect(saved.completedAt).toBeTruthy();
+    expect(saved.attempts).toHaveLength(1);
+  });
+});
+
+describe("Today's stories and week count", () => {
+  it("rotates the stories and counts only prompt takes toward the week", async () => {
+    const user = userEvent.setup();
+    const now = new Date().toISOString();
+    const warmup: AppData["sessions"][number] = { id: "s-w", mode: "camera", startedAt: now, completedAt: now, exerciseId: "cam-press-record", skill: "main-point", camera: { drillId: "cam-press-record", topic: "", notes: "" }, attempts: [], followUps: [], usedLive: false };
+    const take: AppData["sessions"][number] = { id: "s-t", mode: "camera", startedAt: now, completedAt: now, exerciseId: "cam-story", skill: "organize", camera: { drillId: "cam-story", promptId: "s1", topic: "", notes: "" }, attempts: [{ id: "a-t", createdAt: now, modality: "spoken", text: "A take with enough words to count as a take.", transcriptEdited: false, assisted: false, isRetry: false, durationSeconds: 30 }], followUps: [], usedLive: false };
+    start("#/today", onboarded({ sessions: [warmup, take] }));
+    await screen.findByText(/1 of 5 takes this week/);
+    expect(screen.getByRole("heading", { name: "Take done" })).toBeInTheDocument();
+    expect(screen.getByText(/Tell your one viewer about the most embarrassing thing/)).toBeInTheDocument(); // the finished prompt, not a new one
+    const first = (await screen.findAllByRole("link", { name: /Source/ }))[0]!.closest("li")!.querySelector(".row-title")!.textContent;
+    await user.click(await screen.findByRole("button", { name: "Show different stories" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Show different stories" })).toBeEnabled());
+    const second = screen.getAllByRole("link", { name: /Source/ })[0]!.closest("li")!.querySelector(".row-title")!.textContent;
+    expect(second).not.toBe(first);
   });
 });

@@ -5,7 +5,8 @@ import { timingSafeEqual, createHash } from "node:crypto";
 import { z } from "zod";
 import type { AppStatus, Briefing, Interest } from "../shared/types";
 import { fillPrompt, getExercise, getScenario, EXERCISES } from "../shared/curriculum";
-import { getCameraDrill, isCameraDrill } from "../shared/camera";
+import { CAMERA_EXERCISES, getCameraDrill, isCameraDrill } from "../shared/camera";
+import { HOOK_PATTERNS } from "../shared/vlog";
 import { wordCount } from "../shared/text";
 import { ALL_INTERESTS } from "../shared/evergreen";
 import type { Config } from "./config";
@@ -198,7 +199,7 @@ export function createApp(deps: AppDeps): Hono {
       req.storyId?.startsWith("own-") && req.ownBriefing
         ? ({ ...req.ownBriefing, storyId: req.storyId, kind: "evergreen", keyTerm: { term: "", meaning: "", inContext: null, exampleUse: "" }, followUpQuestion: "", source: { url: "", publisher: "Your material", publishedAt: "", retrievedAt: "" }, supportingExcerpts: [], coverage: "curated", generatedBy: "claude", generatedAt: "", sourceVersion: "" } satisfies Briefing)
         : req.storyId
-          ? await content.getBriefing(req.storyId).catch(() => null)
+          ? await content.cachedBriefing(req.storyId) // never a paid briefing as a side effect of feedback
           : null;
     const talk = req.talk ?? null;
     const topic = talk?.topic || briefing?.title || "";
@@ -230,7 +231,7 @@ export function createApp(deps: AppDeps): Hono {
     topic: z.string().max(300).default(""),
     notes: z.string().max(600).default(""),
     throughline: z.string().max(300).default(""),
-    hookPattern: z.string().max(40).default(""),
+    hookPattern: z.enum(["", ...HOOK_PATTERNS.map((h) => h.id)] as [string, ...string[]]).default(""),
     response: z.object({
       text: z.string(),
       transcriptSource: z.enum(["provider", "browser-speech", "typed-by-user"]),
@@ -289,7 +290,11 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(value);
   });
 
-  const VariationRequest = z.object({ idempotencyKey: idemKey, exerciseId: z.string(), topic: z.string().min(2).max(200) });
+  const VariationRequest = z.object({
+    idempotencyKey: idemKey,
+    exerciseId: z.string().refine((id) => EXERCISES.some((e) => e.id === id) || CAMERA_EXERCISES.some((e) => e.id === id), "Unknown exercise"),
+    topic: z.string().min(2).max(200),
+  });
   app.post("/api/variation", bodyLimit({ maxSize: 8 * 1024, onError: tooLarge }), async (c) => {
     const req = VariationRequest.parse(await readJson(c));
     const exercise = getExercise(req.exerciseId);
@@ -297,7 +302,9 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(value);
   });
 
-  app.post("/api/transcribe", bodyLimit({ maxSize: 12 * 1024 * 1024, onError: tooLarge }), async (c) => {
+  // Vercel rejects bodies over 4.5 MB before the function runs; keep our own limit under that there.
+  const transcribeLimit = process.env.VERCEL ? 4 * 1024 * 1024 : 12 * 1024 * 1024;
+  app.post("/api/transcribe", bodyLimit({ maxSize: transcribeLimit, onError: tooLarge }), async (c) => {
     if (!transcription) throw notConfigured("Transcription");
     const seconds = Number(c.req.query("seconds") ?? "0");
     if (!Number.isFinite(seconds) || seconds <= 0) throw new AppError("bad_request", "Missing or invalid recording length.", 400);
@@ -328,10 +335,16 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(value);
   });
 
+  // Unknown API paths answer JSON, never the client's index.html.
+  app.all("/api/*", (c) => c.json(new AppError("not_found", "No such API route.", 404).toJSON(), 404));
+
   return app;
 }
 
 async function readJson(c: Context): Promise<unknown> {
+  // Requiring a JSON content type keeps cross-site "simple" requests (text/plain forms) off paid routes.
+  const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+  if (type !== "application/json") throw new AppError("bad_request", "Request body must be JSON.", 400);
   try {
     return await c.req.json();
   } catch {

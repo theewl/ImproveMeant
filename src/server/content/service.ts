@@ -307,6 +307,14 @@ export class ContentService {
   }
 
   /** Current source version for a saved review item, so outdated items aren't taught as current fact. */
+  /** A briefing that already exists (evergreen, or generated earlier). Never fetches or generates. */
+  async cachedBriefing(storyId: string): Promise<Briefing | null> {
+    const eg = evergreenBriefing(storyId);
+    if (eg) return eg;
+    if (!storyId.startsWith("wp-")) return null;
+    return (await this.store.read<Briefing>(this.briefingKey(storyId))) ?? null;
+  }
+
   async storyStatus(storyId: string): Promise<{ sourceVersion: string | null; sourceUpdatedAt?: string; known: boolean }> {
     const eg = evergreenBriefing(storyId);
     if (eg) return { sourceVersion: eg.sourceVersion, known: true };

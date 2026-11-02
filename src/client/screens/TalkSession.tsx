@@ -130,7 +130,8 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
   };
 
   const requestTalkFeedback = async (attempt: Attempt, followUp: { question: string; answer: string } | null): Promise<boolean> => {
-    const prev = attempt.isRetry ? last : undefined;
+    const before = talkAttempts.slice(0, Math.max(0, talkAttempts.findIndex((a) => a.id === attempt.id)));
+    const prev = attempt.isRetry ? [...before].reverse().find((a) => a.text.trim()) : undefined;
     const fb = await s.getFeedback(attempt, {
       exerciseId: exercise.id,
       mode: "talk",
@@ -152,7 +153,11 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
     const q = questions[0];
     if (!q || !pending) return;
     const ans = draft ? await s.makeAttempt(draft, { isRetry: false, assisted: false }) : pendingAnswer;
-    if (!ans) return;
+    if (!ans) {
+      // Retrying after a failed "skip": there is no answer to send.
+      await requestTalkFeedback(pending, null);
+      return;
+    }
     setPendingAnswer(ans);
     const ok = await requestTalkFeedback(pending, { question: q.question, answer: ans.text });
     if (ok) {

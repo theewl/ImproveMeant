@@ -43,7 +43,7 @@ writeFileSync(
     {
       version: 3,
       routes: [
-        { src: "^/api/(.*)$", dest: "/api?__path=$1" },
+        { src: "^/api/(.*)$", dest: "/api?__path=$1", headers: SECURITY_HEADERS },
         { src: "^/assets/(.*)$", headers: { "cache-control": "public, max-age=31536000, immutable" }, continue: true },
         { src: "^/(.*)$", headers: SECURITY_HEADERS, continue: true },
         { handle: "filesystem" },
