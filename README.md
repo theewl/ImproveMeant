@@ -12,7 +12,7 @@ Clearline is a mobile-first practice app for people who know what they mean but 
 
 You can also rehearse a short talk in front of a simulated audience that asks you questions.
 
-A 4-week guided plan, spaced reviews (FSRS), a phrase bank and an optional observer listen-back support the practice. Stories come from Wikipedia's daily feed (in the news, widely read, featured), or you can type any topic or paste your own material. The **Confidence** tab is one short path based on CBT techniques for speaking anxiety (not therapy): why it feels hard → pick a small step → predict → do it → see what happened. Its tools:
+A 4-week guided plan, spaced reviews (FSRS), a phrase bank and an optional observer listen-back support the practice. Stories come from Wikipedia's daily feed (in the news, widely read, featured), chosen each day by the AI for your interests, or you can type any topic or paste your own material. Recording uses your browser's built-in speech recognition for a free transcript; Deepgram is optional. The **Confidence** tab is one short path based on CBT techniques for speaking anxiety (not therapy): why it feels hard → pick a small step → predict → do it → see what happened. Its tools:
 - **Brave-step experiments:** predict what you fear, do it, then compare.
 - **A graded "brave steps" ladder:** speaking situations ranked from easier to harder.
 - **"Untangle a thought":** catch an anxious thought, spot the thinking trap, and write a more balanced one.

@@ -51,7 +51,8 @@ export interface LiveFeedState {
 
 export const api = {
   status: () => request<AppStatus>("/api/status"),
-  stories: (interests: Interest[]) => request<{ cards: StoryCard[]; live: LiveFeedState }>(`/api/stories?interests=${interests.join(",")}`),
+  stories: (interests: Interest[], opts: { refresh?: boolean; seed?: number } = {}) =>
+    request<{ cards: StoryCard[]; live: LiveFeedState }>(`/api/stories?interests=${interests.join(",")}${opts.refresh ? "&refresh=1" : ""}${opts.seed ? `&seed=${opts.seed}` : ""}`),
   briefing: (id: string, refresh = false) => request<Briefing & { sourceChanged: boolean }>(`/api/stories/${encodeURIComponent(id)}/briefing${refresh ? "?refresh=1" : ""}`),
   storyStatus: (id: string) => request<{ sourceVersion: string | null; sourceUpdatedAt?: string; known: boolean }>(`/api/stories/${encodeURIComponent(id)}/status`),
   feedback: (body: FeedbackBody) => request<{ feedback: Feedback; deduplicated: boolean }>("/api/feedback", json(body)),

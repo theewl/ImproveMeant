@@ -144,7 +144,8 @@ export function createApp(deps: AppDeps): Hono {
       .split(",")
       .filter((i): i is Interest => valid.has(i as Interest))
       .slice(0, 3);
-    return c.json(await content.listStories(interests));
+    const seed = Number(c.req.query("seed") ?? "0");
+    return c.json(await content.listStories(interests, { refresh: c.req.query("refresh") === "1", seed: Number.isFinite(seed) ? Math.max(0, Math.min(1000, Math.floor(seed))) : 0 }));
   });
 
   app.get("/api/stories/:id/briefing", async (c) => {

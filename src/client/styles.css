@@ -1478,3 +1478,17 @@ button.small {
   min-height: 44px;
   padding: 0.5rem 1rem;
 }
+
+.live-transcript {
+  font-size: 0.95rem;
+  color: var(--ink-2);
+  text-align: left;
+  max-height: 4.6em;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column-reverse;
+  margin: 0.25rem 0 0;
+}
+.live-transcript .interim {
+  opacity: 0.6;
+}

@@ -8,11 +8,13 @@ import type { AudienceQuestion, Briefing, Exercise, Feedback } from "../../share
 import { estimateTokens, quoteAppearsIn } from "../../shared/text";
 import { stableHash } from "../../shared/evergreen";
 import type { SourceDocument } from "../content/types";
-import type { AudienceInput, CoachProvider, FeedbackInput } from "./types";
-import { AudienceQuestionOutput, BriefingOutput, FeedbackOutput, VariationOutput, clamp } from "./schemas";
+import type { AudienceInput, CoachProvider, CurateInput, CuratedTopics, FeedbackInput } from "./types";
+import { AudienceQuestionOutput, BriefingOutput, CurateOutput, FeedbackOutput, VariationOutput, clamp } from "./schemas";
 import {
   AUDIENCE_SYSTEM,
   BRIEFING_SYSTEM,
+  CURATE_SYSTEM,
+  curateUser,
   FEEDBACK_SYSTEM,
   VARIATION_SYSTEM,
   audienceUser,
@@ -55,7 +57,7 @@ interface CallSpec<T> {
   effort: Effort;
 }
 
-const MAX_TOKENS = { briefing: 6000, feedback: 5000, audience_question: 1500, variation: 1200 } as const;
+const MAX_TOKENS = { briefing: 6000, feedback: 5000, audience_question: 1500, variation: 1200, curation: 1500 } as const;
 
 export class ClaudeCoach implements CoachProvider {
   readonly kind = "claude" as const;
@@ -167,6 +169,21 @@ export class ClaudeCoach implements CoachProvider {
       effort: this.cfg.claude.effortLight,
     });
     return { kind: "live", question: clamp(data.question, 300), intent: clamp(data.intent, 160) };
+  }
+
+  async curateTopics(input: CurateInput): Promise<CuratedTopics> {
+    const { data } = await this.call({
+      kind: "curation",
+      system: CURATE_SYSTEM,
+      user: curateUser(input),
+      schema: CurateOutput,
+      maxTokens: MAX_TOKENS.curation,
+      effort: this.cfg.claude.effortLight,
+    });
+    return {
+      picks: data.picks.slice(0, 6).map((p) => ({ title: clamp(p.title, 200), why: clamp(p.why, 140) })),
+      suggestions: data.suggestions.slice(0, 3).map((p) => ({ title: clamp(p.title, 120), why: clamp(p.why, 140) })),
+    };
   }
 
   async variation(exercise: Exercise, topic: string): Promise<{ prompt: string; kind: "live" }> {

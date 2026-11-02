@@ -5,6 +5,7 @@ import { wordCount } from "../../shared/text";
 import { api, ApiRequestError } from "../lib/api";
 import { uid } from "../lib/storage";
 import { useRecorder, recordingSupported } from "../lib/useRecorder";
+import { useSpeechCapture } from "../lib/useSpeechCapture";
 import { useApp } from "../lib/store";
 
 export interface AttemptDraft {
@@ -12,7 +13,7 @@ export interface AttemptDraft {
   text: string;
   originalTranscript?: string;
   transcriptEdited: boolean;
-  transcriptSource?: "provider" | "typed-by-user";
+  transcriptSource?: "provider" | "browser-speech" | "typed-by-user";
   durationSeconds?: number;
   delivery?: DeliveryMetrics;
   audioBlob?: Blob;
@@ -91,12 +92,14 @@ function TypedAnswer(p: Props & { value: string; onChange: (v: string) => void }
 
 function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   const r = useRecorder();
+  const speech = useSpeechCapture();
   const { data } = useApp();
   const [showTimer, setShowTimer] = useState(!data.prefs.quietMode);
   const [transcript, setTranscript] = useState<string>("");
   const [original, setOriginal] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<DeliveryMetrics | undefined>();
   const [txState, setTxState] = useState<"none" | "working" | "done" | "error" | "manual">("none");
+  const [txSource, setTxSource] = useState<"provider" | "browser-speech">("provider");
   const [txError, setTxError] = useState<string | null>(null);
   const [keepAudio, setKeepAudio] = useState(false);
   // Observer review (talk mode): rate how you came across, listen back as an audience member, rate again.
@@ -110,11 +113,36 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
 
   useEffect(() => () => abort.current?.abort(), []);
 
+  // Run the browser's speech recognition alongside the recorder, so a transcript is ready on stop.
+  useEffect(() => {
+    if (!speech.supported) return;
+    if (r.state === "recording") speech.start();
+    else speech.stop();
+  }, [r.state, speech.supported]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When the recording stops with a usable browser transcript, go straight to "check and get feedback".
+  useEffect(() => {
+    if (r.state !== "stopped" || txState !== "none" || !r.recording) return;
+    const t = speech.text.trim();
+    if (speech.failed || wordCount(t) < 3) return;
+    setTranscript(t);
+    setOriginal(t);
+    setTxSource("browser-speech");
+    setDelivery({
+      basis: "recording-length-only",
+      recordingSeconds: r.recording.seconds,
+      limitations: "Transcribed by your browser's speech recognition, which can mishear words. No pace or pause measurements.",
+    });
+    setTxState("done");
+  }, [r.state, r.recording, speech.text, speech.failed, txState]);
+
   const resetTranscript = () => {
+    speech.reset();
     setTranscript("");
     setOriginal(null);
     setDelivery(undefined);
     setTxState("none");
+    setTxSource("provider");
     setTxError(null);
     txKey.current = uid("tx-");
     setObs(p.focused ? "predict" : "off");
@@ -130,6 +158,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
       setTranscript(res.transcript);
       setOriginal(res.transcript);
       setDelivery(res.delivery);
+      setTxSource("provider");
       setTxState("done");
     } catch (e) {
       const err = e as ApiRequestError;
@@ -184,6 +213,11 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           <span className={paused ? "dot" : "dot pulse"} aria-hidden="true" /> {paused ? "Paused" : "Recording"}
         </p>
         <Waveform analyser={r.analyser} active={!paused} />
+        {speech.supported && !speech.failed && (speech.text || speech.interim) && (
+          <p className="live-transcript" aria-live="off">
+            {speech.text} <span className="interim">{speech.interim}</span>
+          </p>
+        )}
         {showTimer ? (
           <p className="timer" aria-label={`Elapsed ${Math.round(r.elapsed)} seconds`}>
             {formatSeconds(r.elapsed)}
@@ -273,6 +307,14 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
 
       {txState === "none" && (
         <div className="stack">
+          <p className="hint">
+            {speech.supported && !speech.failed
+              ? "Your browser didn't catch enough words to make a transcript. "
+              : speech.failed
+                ? "Your browser's speech recognition didn't work this time. "
+                : ""}
+            Feedback is based on what you said, so it needs the words.
+          </p>
           {p.transcriptionAvailable && (rec.seconds > 600 || rec.blob.size > 4_000_000) && (
             <p className="hint">This recording is too long to transcribe automatically. Listen back and type what you said.</p>
           )}
@@ -287,14 +329,12 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
                   void transcribe();
                 }}
               >
-                {p.transcriptionConsent ? "Transcribe" : "I understand — transcribe"}
+                {p.transcriptionConsent ? "Transcribe and get feedback" : "I understand — transcribe"}
               </button>
             </>
-          ) : (
-            <p className="hint">Listen back, then type what you said.</p>
-          )}
+          ) : null}
           <button className={p.transcriptionAvailable ? "secondary" : "primary"} type="button" onClick={() => setTxState("manual")}>
-            Type what I said
+            Type what I said to get feedback
           </button>
           <button className="link" type="button" onClick={() => { resetTranscript(); r.reset(); }}>
             Record again
@@ -338,7 +378,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
               text: transcript.trim(),
               originalTranscript: !manual && edited ? original! : undefined,
               transcriptEdited: manual || edited,
-              transcriptSource: manual ? "typed-by-user" : "provider",
+              transcriptSource: manual ? "typed-by-user" : txSource,
               durationSeconds: rec.seconds,
               delivery: manual ? { basis: "recording-length-only", recordingSeconds: rec.seconds, limitations: "No automatic transcript, so pace and pauses weren't measured." } : delivery,
               audioBlob: rec.blob,
@@ -348,9 +388,24 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           }}
         >
           <label className="label" htmlFor={tid}>
-            {txState === "manual" ? "Type what you said" : "Check the transcript and fix any mistakes"}
+            {txState === "manual" ? "Type what you said" : "Check the transcript, fix any mistakes, then get feedback"}
           </label>
+          {txState === "done" && txSource === "browser-speech" && (
+            <p className="hint">Transcribed by your browser. {p.transcriptionAvailable ? "" : "Fix anything it misheard."}</p>
+          )}
           <textarea id={tid} rows={7} value={transcript} onChange={(e) => setTranscript(e.target.value)} />
+          {txState === "done" && txSource === "browser-speech" && p.transcriptionAvailable && (
+            <button
+              className="link"
+              type="button"
+              onClick={() => {
+                if (!p.transcriptionConsent) p.onConsent();
+                void transcribe();
+              }}
+            >
+              Re-transcribe with Deepgram (more accurate; sends the audio)
+            </button>
+          )}
           <p className="hint" aria-live="polite">
             {tooLong ? `Too long — limit ${p.maxChars} characters` : `${words} words${edited ? " · edited" : ""}`}
           </p>

@@ -141,6 +141,23 @@ ${data(p.response)}
 </learner_response>`;
 }
 
+export const CURATE_SYSTEM = `You choose topics for an adult who practises explaining ideas clearly at work. From the candidates (today's news, widely read and featured encyclopedia articles), pick the ones most worth explaining.
+
+Prefer: a clear idea or development someone could explain in two minutes; relevance to the stated interests; variety across the picks; things people are actually talking about.
+Avoid: celebrity and entertainment gossip, sports results, obituaries, disasters and attacks, list pages, bare dates, and anything that is mainly a biography.
+Return up to 6 picks using the candidate titles exactly as written, best first, each with one plain sentence saying what's interesting about it (no hype, no exclamation marks).
+Also suggest up to 3 timeless topics that fit the interests and are genuinely fascinating to explain, as English Wikipedia article titles. They must not be in the candidates.
+
+${DATA_RULE}`;
+
+export function curateUser(p: { interests: string[]; candidates: { title: string; description: string; feed: string }[] }): string {
+  return `Interests: ${p.interests.length ? p.interests.map(data).join(", ") : "general"}
+
+<candidates>
+${p.candidates.map((c) => `- ${data(c.title)} · ${data(c.description) || "(no description)"} · ${c.feed}`).join("\n")}
+</candidates>`;
+}
+
 export const VARIATION_SYSTEM = `You adapt a reviewed speaking exercise to a new context chosen by the learner. Keep the same skill and the same definition of success; change only the situation/topic. Output one or two sentences. Do not add new requirements.
 
 ${DATA_RULE}`;

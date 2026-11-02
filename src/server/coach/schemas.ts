@@ -69,6 +69,12 @@ export const VariationOutput = z.object({
 });
 export type VariationOutput = z.infer<typeof VariationOutput>;
 
+export const CurateOutput = z.object({
+  picks: z.array(z.object({ title: z.string().describe("Exact title of a candidate."), why: z.string().describe("One plain sentence on what's interesting or useful to explain. Max ~110 characters.") })).describe("Up to 6, best first."),
+  suggestions: z.array(z.object({ title: z.string().describe("Wikipedia article title of a timeless topic."), why: z.string() })).describe("Up to 3 timeless topics fitting the interests, not in the candidates."),
+});
+export type CurateOutput = z.infer<typeof CurateOutput>;
+
 export function clamp(s: string, max: number): string {
   const t = s.trim();
   return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…";

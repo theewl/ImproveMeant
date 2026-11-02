@@ -617,7 +617,7 @@ function Prepare({
       <p className="task">{task}</p>
       {retryFocus && <p className="focus-tip">Focus: {retryFocus}</p>}
       <p className="hint">
-        About {setup.targetSeconds / 60} min. You won't be cut off.
+        About {setup.targetSeconds / 60} min — you won't be cut off. Record it (or type it), take one audience question, then get feedback.
       </p>
       {setup.notes.trim() && <p className="notes">{setup.notes}</p>}
       {prepLeft != null && (

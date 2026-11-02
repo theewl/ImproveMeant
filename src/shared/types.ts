@@ -34,7 +34,7 @@ export interface Preferences {
 
 export type StoryKind = "current" | "evergreen";
 /** Where a live story came from. */
-export type FeedKind = "news" | "trending" | "featured" | "search" | "own";
+export type FeedKind = "news" | "trending" | "featured" | "timeless" | "search" | "own";
 
 /** Source metadata that must travel with every briefing. */
 export interface SourceMeta {
@@ -148,7 +148,7 @@ export interface Attempt {
   /** Text as originally transcribed, if the user edited it. */
   originalTranscript?: string;
   transcriptEdited: boolean;
-  transcriptSource?: "provider" | "typed-by-user";
+  transcriptSource?: "provider" | "browser-speech" | "typed-by-user";
   /** Learn mode: the user reopened the briefing before/while answering. */
   assisted: boolean;
   isRetry: boolean;

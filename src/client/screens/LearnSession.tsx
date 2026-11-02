@@ -214,7 +214,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
 
       {phase === "understand" && (
         <section>
-          <StepHeader eyebrow="Read" title={briefing.title} />
+          <StepHeader eyebrow="Read, then explain it and get feedback" title={briefing.title} />
           <SourceLine source={briefing.source} kind={briefing.kind} feed={briefing.feed} />
           {briefing.sourceChanged && (
             <p className="notice warn" role="status">

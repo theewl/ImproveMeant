@@ -2,7 +2,7 @@ import type { Config } from "./config";
 import { AppError } from "./errors";
 import type { KeyValueStore } from "./store";
 
-export type UsageKind = "briefing" | "feedback" | "audience_question" | "variation" | "transcription";
+export type UsageKind = "briefing" | "feedback" | "audience_question" | "variation" | "curation" | "transcription";
 
 export interface UsageRecord {
   at: string;

@@ -15,6 +15,18 @@ export interface FeedbackInput {
   target: "main" | "followup";
 }
 
+export interface CurateInput {
+  interests: string[];
+  candidates: { title: string; description: string; feed: string }[];
+}
+
+export interface CuratedTopics {
+  /** Exact candidate titles, best first, each with a one-line reason. */
+  picks: { title: string; why: string }[];
+  /** Timeless topics (article titles) worth looking up, not in the candidates. */
+  suggestions: { title: string; why: string }[];
+}
+
 export interface AudienceInput {
   talk: TalkSetup;
   response: string;
@@ -29,4 +41,5 @@ export interface CoachProvider {
   feedback(input: FeedbackInput): Promise<Feedback>;
   audienceQuestion(input: AudienceInput): Promise<AudienceQuestion>;
   variation(exercise: Exercise, topic: string): Promise<{ prompt: string; kind: "live" | "reviewed" }>;
+  curateTopics(input: CurateInput): Promise<CuratedTopics>;
 }

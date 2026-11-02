@@ -147,18 +147,19 @@ export function Today() {
   const [error, setError] = useState<unknown>(null);
   const interestsKey = data.prefs.interests.join(",");
 
-  const load = () => {
+  const [seed, setSeed] = useState(0);
+  const load = (refresh = false, nextSeed = seed) => {
     setError(null);
     setCards(null);
     api
-      .stories(data.prefs.interests)
+      .stories(data.prefs.interests, { refresh, seed: nextSeed })
       .then((r) => {
         setCards(r.cards);
         setLive(r.live);
       })
       .catch(setError);
   };
-  useEffect(load, [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => load(), [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = localDayKey();
   const { queue } = dueQueue(data.reviews, new Date().toISOString());
@@ -197,7 +198,7 @@ export function Today() {
 
       {live?.status === "stale" && <p className="notice warn">{live.message}</p>}
       {live?.status === "unavailable" && <p className="notice warn">Today's news couldn't load. Showing curated ideas.</p>}
-      {error != null && <ErrorNotice error={error} onRetry={load} />}
+      {error != null && <ErrorNotice error={error} onRetry={() => load()} />}
       {!cards && error == null && <Loading label="Finding today's stories…" />}
 
       {featured && (
@@ -222,12 +223,26 @@ export function Today() {
                 <a className="row-title" href={href({ name: "learn", storyId: c.id })}>
                   {c.title}
                 </a>
-                <p className="row-desc">{c.description}</p>
+                <p className="row-desc">{c.whySelected && c.kind === "current" ? c.whySelected : c.description}</p>
                 <SourceLine source={c.source} kind={c.kind} feed={c.feed} minutes={c.estimatedMinutes} />
               </li>
             ))}
           </ul>
         </section>
+      )}
+
+      {cards && (
+        <button
+          className="link"
+          type="button"
+          onClick={() => {
+            const s = seed + 1;
+            setSeed(s);
+            load(true, s);
+          }}
+        >
+          Show different stories
+        </button>
       )}
 
       <AnyTopic live={status?.mode === "live"} />
