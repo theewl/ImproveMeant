@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Attempt, AudienceQuestion, Briefing, Experiment, ScenarioId, TalkSetup } from "../../shared/types";
-import { OUTWARD_FOCUS_TIP } from "../../shared/confidence";
+import { OUTWARD_FOCUS_TIP, SAFETY_BEHAVIOURS } from "../../shared/confidence";
 import { SCENARIOS, SKILLS, fillPrompt, getExercise, getScenario } from "../../shared/curriculum";
 import { formatSeconds } from "../../shared/observations";
 import { api } from "../lib/api";
@@ -10,7 +10,7 @@ import { uid } from "../lib/storage";
 import { addReviewItem, buildReviewItem } from "../lib/state";
 import { href } from "../lib/router";
 import { ResponseCapture, type AttemptDraft } from "../components/ResponseCapture";
-import { CompareAttempts, FeedbackPanel } from "../components/Feedback";
+import { CompareAttempts, FeedbackPanel, WrapUp } from "../components/Feedback";
 import { ErrorNotice, Loading, SessionTop, StepHeader, formatDate, useFocusMode } from "../components/common";
 
 type Phase = "scenario" | "setup" | "prepare" | "present" | "question" | "feedback" | "finish" | "done";
@@ -46,7 +46,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
   const [isRetry, setIsRetry] = useState(false);
   const [saveSkill, setSaveSkill] = useState(true);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [checkin, setCheckin] = useState<{ anxietyBefore: number; prediction: string } | null>(null);
+  const [checkin, setCheckin] = useState<Checkin | null>(null);
   const [checkinSaved, setCheckinSaved] = useState(false);
   const qKey = useRef(uid("q-"));
 
@@ -311,7 +311,8 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
             To {setup.audience} <span className="sim">simulated</span> · aim for {formatSeconds(setup.targetSeconds)}
           </p>
           <p className="present-task">{task}</p>
-          {setup.notes.trim() && (
+          {checkin?.drop === "Holding notes the whole time" && setup.notes.trim() && <p className="hint">Notes hidden — you chose to try without them.</p>}
+          {setup.notes.trim() && checkin?.drop !== "Holding notes the whole time" && (
             <details className="more">
               <summary>My notes</summary>
               <p className="notes">{setup.notes}</p>
@@ -427,6 +428,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
                   prediction: checkin.prediction || "It would go badly",
                   predictionLikelihood: 50,
                   anxietyBefore: checkin.anxietyBefore,
+                  safetyBehaviourToDrop: checkin.drop,
                   completedAt: new Date().toISOString(),
                   anxietyAfter,
                   outcome,
@@ -437,6 +439,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
             />
           )}
           {checkinSaved && <p className="notice ok">Saved to Confidence.</p>}
+          <WrapUp attempts={s.session.attempts} />
           <p className="hint">In your next real meeting, try opening with your main point.</p>
           <div className="actions">
             <a className="button primary" href={href({ name: "today" })}>
@@ -491,7 +494,13 @@ function SecondQuestion({
   );
 }
 
-function AfterCheckin({ checkin, onSave }: { checkin: { anxietyBefore: number; prediction: string }; onSave: (anxietyAfter: number, outcome: NonNullable<Experiment["outcome"]>) => void }) {
+interface Checkin {
+  anxietyBefore: number;
+  prediction: string;
+  drop?: string;
+}
+
+function AfterCheckin({ checkin, onSave }: { checkin: Checkin; onSave: (anxietyAfter: number, outcome: NonNullable<Experiment["outcome"]>) => void }) {
   const [after, setAfter] = useState(checkin.anxietyBefore);
   const [outcome, setOutcome] = useState<Experiment["outcome"]>();
   return (
@@ -543,12 +552,13 @@ function Prepare({
   task: string;
   retryFocus: string | null;
   showCheckin: boolean;
-  onReady: (checkin: { anxietyBefore: number; prediction: string } | null) => void;
+  onReady: (checkin: Checkin | null) => void;
 }) {
   const [prepLeft, setPrepLeft] = useState<number | null>(null);
   const [useCheckin, setUseCheckin] = useState(false);
   const [anx, setAnx] = useState(5);
   const [prediction, setPrediction] = useState("");
+  const [drop, setDrop] = useState<string | undefined>();
   useEffect(() => {
     if (prepLeft == null || prepLeft <= 0) return;
     const t = window.setTimeout(() => setPrepLeft((x) => (x == null ? x : x - 1)), 1000);
@@ -582,11 +592,20 @@ function Prepare({
             What are you worried will happen? (optional)
           </label>
           <input id="pre-pred" value={prediction} maxLength={300} placeholder="e.g. I'll lose my thread halfway" onChange={(e) => setPrediction(e.target.value)} />
+          <fieldset className="pills">
+            <legend className="label">Optional: drop one habit this time</legend>
+            {SAFETY_BEHAVIOURS.map((b) => (
+              <label key={b} className={drop === b ? "pill on" : "pill"}>
+                <input type="radio" name="pre-drop" checked={drop === b} onChange={() => setDrop(b)} onClick={() => drop === b && setDrop(undefined)} />
+                {b}
+              </label>
+            ))}
+          </fieldset>
           <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
         </details>
       )}
       <div className="actions sticky">
-        <button className="primary" type="button" onClick={() => onReady(useCheckin ? { anxietyBefore: anx, prediction: prediction.trim() } : null)}>
+        <button className="primary" type="button" onClick={() => onReady(useCheckin ? { anxietyBefore: anx, prediction: prediction.trim(), drop } : null)}>
           I'm ready to present
         </button>
         {prepLeft == null && (

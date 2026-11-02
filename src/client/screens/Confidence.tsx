@@ -8,13 +8,17 @@ import {
   activeLadder,
   suggestNextStep,
   summarizeExperiments,
+  compareSafetyBehaviours,
+  IMPACT_QUESTIONS,
+  IMPACT_SCALE,
+  impactGuidance,
 } from "../../shared/confidence";
 import { CRISIS_RESOURCES, mentionsCrisis } from "../../shared/safety";
 import { useApp } from "../lib/store";
 import { uid } from "../lib/storage";
 import { formatDate } from "../components/common";
 
-type View = { name: "home" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "ladder" } | { name: "reframe" };
+type View = { name: "home" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "ladder" } | { name: "reframe" } | { name: "selfcheck" };
 
 export { CrisisList };
 
@@ -53,6 +57,7 @@ export function Confidence() {
       />
     );
   }
+  if (view.name === "selfcheck") return <SelfCheck onBack={() => go({ name: "home" })} />;
   if (view.name === "ladder") return <Ladder onBack={() => go({ name: "home" })} onPlan={(step) => go({ name: "plan", step })} />;
   if (view.name === "reframe")
     return (
@@ -68,6 +73,7 @@ export function Confidence() {
   const next = suggestNextStep(data.ladder, data.experiments);
   const pending = data.experiments.filter((e) => !e.completedAt).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const sum = summarizeExperiments(data.experiments);
+  const cmp = compareSafetyBehaviours(data.experiments);
 
   return (
     <main className="screen" id="main">
@@ -139,6 +145,29 @@ export function Confidence() {
         </p>
       )}
 
+      {cmp && (
+        <div className="compare-card">
+          <p className="eyebrow">Dropping safety habits · self-reported</p>
+          <div className="compare">
+            <div className="compare-col">
+              <p className="eyebrow">Dropped a habit ({cmp.dropped.count})</p>
+              <p>
+                Anxiety during: <strong>{cmp.dropped.avgAnxiety}/10</strong>
+              </p>
+              <p className="hint">Feared outcome happened {cmp.dropped.fearHappened}×</p>
+            </div>
+            <div className="compare-col">
+              <p className="eyebrow">Kept habits ({cmp.kept.count})</p>
+              <p>
+                Anxiety during: <strong>{cmp.kept.avgAnxiety}/10</strong>
+              </p>
+              <p className="hint">Feared outcome happened {cmp.kept.fearHappened}×</p>
+            </div>
+          </div>
+          <p className="hint">Small numbers and different situations — treat this as a hint, not proof. Many people find the habits weren't protecting them as much as they felt.</p>
+        </div>
+      )}
+
       <ul className="rows tools">
         <li className="row-item">
           <button type="button" className="row-button" onClick={() => go({ name: "ladder" })}>
@@ -150,6 +179,12 @@ export function Confidence() {
           <button type="button" className="row-button" onClick={() => go({ name: "reframe" })}>
             <span className="row-title">Untangle a thought</span>
             <span className="row-desc">Catch an anxious thought, spot the thinking trap, find a more balanced view.</span>
+          </button>
+        </li>
+        <li className="row-item">
+          <button type="button" className="row-button" onClick={() => go({ name: "selfcheck" })}>
+            <span className="row-title">How much is it getting in the way?</span>
+            <span className="row-desc">A short, private check-in — not a test or diagnosis — with guidance on when to get support.</span>
           </button>
         </li>
       </ul>
@@ -553,6 +588,85 @@ function ReframeFlow({ onCancel, onSave }: { onCancel: () => void; onSave: (r: R
           </ul>
         </details>
       )}
+    </SubScreen>
+  );
+}
+
+// ---------- Self-check (non-diagnostic) ----------
+
+function SelfCheck({ onBack }: { onBack: () => void }) {
+  const { data, update } = useApp();
+  const [answers, setAnswers] = useState<(number | null)[]>(IMPACT_QUESTIONS.map(() => null));
+  const [result, setResult] = useState<"seek-support" | "self-help" | null>(null);
+  const last = data.impactChecks[data.impactChecks.length - 1];
+  const complete = answers.every((a) => a != null);
+
+  if (result) {
+    return (
+      <SubScreen eyebrow="Self-check" title="Thanks for checking in" onBack={onBack}>
+        {result === "seek-support" ? (
+          <div className="notice warn">
+            <p>
+              <strong>It sounds like anxiety is getting in the way a lot right now.</strong> That's worth talking to a doctor or a licensed therapist about. CBT with a
+              therapist is the recommended treatment for social anxiety, and it helps many people.
+            </p>
+            <p>You can keep using these tools alongside that — they're practice, not a replacement for support.</p>
+          </div>
+        ) : (
+          <div className="notice ok">
+            <p>
+              The brave steps and thought tools here may help. If anxiety starts getting in the way more — at work, with friends, or by making you avoid things — a
+              doctor or licensed therapist can help.
+            </p>
+          </div>
+        )}
+        <p className="hint">This isn't a test or a diagnosis, and it isn't scored. Your answers stay on this device so you can see how things change over time.</p>
+        <details className="more">
+          <summary>Get help now</summary>
+          <CrisisList />
+        </details>
+        <div className="actions">
+          <button className="primary" type="button" onClick={onBack}>
+            Done
+          </button>
+        </div>
+      </SubScreen>
+    );
+  }
+
+  return (
+    <SubScreen eyebrow="Self-check · not a diagnosis" title="How much is it getting in the way?" onBack={onBack}>
+      <p className="hint">Think about the last two weeks. There are no right answers.</p>
+      {last && <p className="hint">Last checked {formatDate(last.at)}.</p>}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!complete) return;
+          const a = answers as number[];
+          update((d) => ({ ...d, impactChecks: [...d.impactChecks, { at: new Date().toISOString(), answers: a }] }));
+          setResult(impactGuidance(a));
+        }}
+      >
+        {IMPACT_QUESTIONS.map((q, qi) => (
+          <fieldset key={q} className="impact-q">
+            <legend className="label">{q}</legend>
+            <div className="pills">
+              {IMPACT_SCALE.map((label, v) => (
+                <label key={label} className={answers[qi] === v ? "pill on" : "pill"}>
+                  <input type="radio" name={`impact-${qi}`} checked={answers[qi] === v} onChange={() => setAnswers((xs) => xs.map((x, i) => (i === qi ? v : x)))} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {last && <p className="hint small-hint">Last time: {IMPACT_SCALE[last.answers[qi] ?? 0]}</p>}
+          </fieldset>
+        ))}
+        <div className="actions sticky">
+          <button className="primary" type="submit" disabled={!complete}>
+            See guidance
+          </button>
+        </div>
+      </form>
     </SubScreen>
   );
 }

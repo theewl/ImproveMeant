@@ -1348,3 +1348,32 @@ button.small {
 .observer > .primary {
   width: 100%;
 }
+
+/* ---------- Wrap-up, comparison, self-check ---------- */
+.wrapup {
+  text-align: left;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin: 1rem 0;
+}
+.wrapup-good {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  border-left: 3px solid var(--ok);
+  padding-left: 0.8rem;
+  margin: 0;
+}
+.compare-card {
+  margin: 1rem 0 0;
+}
+.compare-card .compare-col p {
+  margin-bottom: 0.25rem;
+}
+.impact-q {
+  margin: 0.5rem 0 1rem;
+}
+.small-hint {
+  font-size: 0.8rem;
+  margin: 0.35rem 0 0;
+}

@@ -80,6 +80,7 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
     await user.click(screen.getByLabelText(/The word “proxy”/));
     await user.click(screen.getByRole("button", { name: "Finish session" }));
     await screen.findByText("Session complete");
+    expect(screen.getByText(/no need to replay it/)).toBeInTheDocument();
 
     const d = stored();
     expect(d.sessions).toHaveLength(1);
@@ -355,6 +356,49 @@ describe("Guided plan and phrase bank", () => {
     await user.click(screen.getByRole("button", { name: "Practise in reviews" }));
     expect(await screen.findByText("✓ In your reviews")).toBeInTheDocument();
     expect(stored().reviews.some((r) => r.kind === "phrase" && r.prompt.includes('"proxy"'))).toBe(true);
+  });
+});
+
+describe("Self-check, quiet mode and safety-habit comparison", () => {
+  it("gives non-diagnostic guidance pointing to professional support when it's getting in the way a lot", async () => {
+    const user = userEvent.setup();
+    start("#/confidence", onboarded({ confidenceIntroSeen: true }));
+    await user.click(await screen.findByRole("button", { name: /How much is it getting in the way/ }));
+    expect(screen.getByText(/not a diagnosis/)).toBeInTheDocument();
+    const groups = screen.getAllByRole("group");
+    for (const [i, g] of groups.entries()) await user.click(within(g).getByLabelText(i === 1 ? "A lot" : "A little"));
+    await user.click(screen.getByRole("button", { name: "See guidance" }));
+    expect(await screen.findByText(/worth talking to a doctor or a licensed therapist/)).toBeInTheDocument();
+    expect(stored().impactChecks[0]!.answers).toEqual([1, 3, 1, 1]);
+  });
+
+  it("hides measurement numbers in quiet mode", async () => {
+    const user = userEvent.setup();
+    const d = onboarded();
+    d.prefs.quietMode = true;
+    start("#/learn/eg-goodhart", d);
+    await user.click(await screen.findByRole("button", { name: /hide the briefing/ }));
+    await user.type(screen.getByRole("textbox", { name: "Your explanation" }), "Rewarding a number makes people game it.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    expect(await screen.findByText(/Quiet mode is on/)).toBeInTheDocument();
+    expect(document.querySelector("dl.measured")).toHaveAttribute("hidden");
+  });
+
+  it("compares experiments with and without a dropped safety habit", async () => {
+    const base = { createdAt: "2026-10-01T00:00:00Z", kind: "real-world" as const, situation: "s", prediction: "p", predictionLikelihood: 60, anxietyBefore: 7, completedAt: "2026-10-01T01:00:00Z" };
+    start(
+      "#/confidence",
+      onboarded({
+        confidenceIntroSeen: true,
+        experiments: [
+          { ...base, id: "a", anxietyAfter: 3, outcome: "didnt-happen", safetyBehaviourToDrop: "Scripting every word" },
+          { ...base, id: "b", anxietyAfter: 6, outcome: "partly" },
+        ],
+      }),
+    );
+    expect(await screen.findByText(/Dropping safety habits/)).toBeInTheDocument();
+    expect(screen.getByText("Dropped a habit (1)")).toBeInTheDocument();
+    expect(screen.getByText("Kept habits (1)")).toBeInTheDocument();
   });
 });
 

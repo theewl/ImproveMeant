@@ -9,7 +9,7 @@ import { uid } from "../lib/storage";
 import { addReviewItem, buildReviewItem, type SaveChoice } from "../lib/state";
 import { href } from "../lib/router";
 import { ResponseCapture, type AttemptDraft } from "../components/ResponseCapture";
-import { CompareAttempts, FeedbackPanel } from "../components/Feedback";
+import { CompareAttempts, FeedbackPanel, WrapUp } from "../components/Feedback";
 import { ErrorNotice, Loading, SessionTop, SourceLine, StepHeader, formatDate, useFocusMode } from "../components/common";
 
 type Phase = "understand" | "recall" | "improve" | "retry" | "apply" | "save" | "done";
@@ -340,6 +340,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
             {retries > 0 ? ` and improved it with ${retries === 1 ? "a retry" : "two retries"}` : ""}.
           </p>
           {saveMsg && <p className="hint">{saveMsg}</p>}
+          <WrapUp attempts={s.session.attempts} />
           <div className="actions">
             <a className="button primary" href={href({ name: "today" })}>
               Done

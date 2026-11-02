@@ -1,68 +1,82 @@
-import type { ReviewItem, ReviewResult } from "./types";
+import { createEmptyCard, fsrs, generatorParameters, Rating, type Card, type Grade } from "ts-fsrs";
+import type { FsrsState, ReviewItem, ReviewResult } from "./types";
 
-// Simple deterministic review schedule (a Leitner-style ladder).
-// Ordinary software, no AI. Intervals in days.
-export const INTERVAL_LADDER_DAYS = [1, 3, 7, 16, 35] as const;
+// Review scheduling with FSRS (the open-source scheduler used by Anki), via
+// ts-fsrs. Deterministic: no fuzz, no same-day learning steps (this is a
+// once-a-day app). Self-assessed results map to FSRS ratings:
+//   recalled → Good, partly → Hard, missed → Again; skipped postpones a day.
 
+export const DESIRED_RETENTION = 0.9;
 /** At most this many reviews are offered per day, so a backlog never becomes overwhelming. */
 export const DAILY_REVIEW_CAP = 5;
 /** Active items beyond this are not added; the learner is asked to dismiss something first. */
 export const MAX_ACTIVE_ITEMS = 60;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const scheduler = fsrs(generatorParameters({ request_retention: DESIRED_RETENTION, enable_fuzz: false, enable_short_term: false, maximum_interval: 365 }));
 
 export function addDays(iso: string, days: number): string {
   return new Date(new Date(iso).getTime() + days * DAY_MS).toISOString();
 }
 
-/** Start of the local day is not knowable on the server; we use "due by end of now + 0". */
 export function isDue(item: ReviewItem, nowIso: string): boolean {
   return item.status === "active" && new Date(item.dueAt).getTime() <= new Date(nowIso).getTime();
 }
 
+/** New items are first asked about the next day, so recall is spaced from learning. */
 export function firstDueDate(createdAt: string): string {
-  return addDays(createdAt, INTERVAL_LADDER_DAYS[0]);
+  return addDays(createdAt, 1);
 }
 
-/**
- * Apply a review result and return the updated item.
- * - recalled: move up one step
- * - partly:   stay on the same step (see it again after that step's interval)
- * - missed:   back to step 0 (see it tomorrow)
- * - skipped:  postpone one day without changing the step
- */
+function toCard(item: ReviewItem): Card {
+  if (!item.fsrs) return createEmptyCard(new Date(item.createdAt));
+  const f = item.fsrs;
+  return { ...f, due: new Date(f.due), last_review: f.last_review ? new Date(f.last_review) : undefined, state: f.state as Card["state"] };
+}
+
+function fromCard(c: Card): FsrsState {
+  return {
+    due: c.due.toISOString(),
+    stability: c.stability,
+    difficulty: c.difficulty,
+    elapsed_days: c.elapsed_days,
+    scheduled_days: c.scheduled_days,
+    learning_steps: c.learning_steps,
+    reps: c.reps,
+    lapses: c.lapses,
+    state: c.state,
+    last_review: c.last_review?.toISOString(),
+  };
+}
+
+const RATING: Record<Exclude<ReviewResult, "skipped">, Grade> = {
+  recalled: Rating.Good,
+  partly: Rating.Hard,
+  missed: Rating.Again,
+};
+
+/** Apply a review result and return the updated item. */
 export function applyReview(item: ReviewItem, result: ReviewResult, nowIso: string, response?: string): ReviewItem {
-  const maxStep = INTERVAL_LADDER_DAYS.length - 1;
-  let step = item.step;
-  let days: number;
-  switch (result) {
-    case "recalled":
-      step = Math.min(item.step + 1, maxStep);
-      days = INTERVAL_LADDER_DAYS[step]!;
-      break;
-    case "partly":
-      days = INTERVAL_LADDER_DAYS[step]!;
-      break;
-    case "missed":
-      step = 0;
-      days = INTERVAL_LADDER_DAYS[0];
-      break;
-    case "skipped":
-      days = 1;
-      break;
+  const history = [...item.history, { at: nowIso, result, ...(response ? { response: response.slice(0, 2000) } : {}) }];
+  if (result === "skipped") {
+    return { ...item, dueAt: addDays(nowIso, 1), history };
   }
+  const { card } = scheduler.next(toCard(item), new Date(nowIso), RATING[result]);
+  // Never schedule for later the same day in a once-a-day app.
+  const due = Math.max(card.due.getTime(), new Date(nowIso).getTime() + DAY_MS);
   return {
     ...item,
-    step,
-    dueAt: addDays(nowIso, days),
-    lastReviewedAt: result === "skipped" ? item.lastReviewedAt : nowIso,
-    history: [...item.history, { at: nowIso, result, ...(response ? { response: response.slice(0, 2000) } : {}) }],
+    fsrs: fromCard({ ...card, due: new Date(due) }),
+    step: result === "recalled" ? item.step + 1 : result === "missed" ? 0 : item.step,
+    dueAt: new Date(due).toISOString(),
+    lastReviewedAt: nowIso,
+    history,
   };
 }
 
 /**
  * Today's queue: due, active items, oldest due first, capped.
- * Items reviewed (not skipped) earlier today don't count against the cap twice.
+ * Items reviewed (not skipped) earlier today count against the cap.
  */
 export function dueQueue(items: ReviewItem[], nowIso: string, cap = DAILY_REVIEW_CAP): { queue: ReviewItem[]; waiting: number; doneToday: number } {
   const today = nowIso.slice(0, 10);

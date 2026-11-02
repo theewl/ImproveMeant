@@ -146,7 +146,7 @@ Target length is 3–5 minutes.
 - The audience is always labelled **simulated**.
 
 ### Later review and real-world application (built: basic)
-- **Scheduling:** deterministic Leitner ladder (1, 3, 7, 16 and 35 days), at most 5 reviews a day, and at most 60 active items.
+- **Scheduling:** FSRS via ts-fsrs (as of 2026-11-02, replacing a fixed 1/3/7/16/35-day ladder), at most 5 reviews a day, and at most 60 active items.
 - **Recall before reveal:** the learner recalls first, then sees the saved answer and self-assesses. Self-assessment accepts a paraphrase as a correct answer.
 - **Item controls:** skip, dismiss or delete.
 - **News items:** reviewed "as reported on {date}" and flagged if the source has been edited since.
@@ -530,14 +530,21 @@ It's optional and skippable. The ratings are self-reported and shown on the Prog
 - Every phrase from a Learn session is listed with its meaning and an example.
 - One tap adds it to reviews, which ask you to use it in a new sentence.
 
+### Also built: closing out the research recommendations
+
+| Feature | What it does |
+|---|---|
+| **FSRS review scheduling** | Uses the reference `ts-fsrs` library (MIT licence) with a 0.9 desired-retention target. Self-assessed results map to ratings: recalled → Good, partly → Hard, missed → Again. A skip postpones the item one day. Fuzz is off, same-day relearning steps are off, nothing is scheduled sooner than tomorrow, and the daily cap still applies. Existing items start fresh as new cards. |
+| **Safety-behaviour comparison** | Real-world steps and talk check-ins can both record a habit to drop. If "Holding notes" is the one dropped, the notes are hidden during the talk. Confidence then compares self-reported anxiety and outcomes with the habit dropped against kept, and says plainly that the numbers are small. |
+| **"No need to replay it" wrap-up** | Shown at the end of every Learn and Talk session. It anchors on the coach's "what worked" observation when there is one. |
+| **Quiet mode** | A Settings option that hides the timer and the measurement numbers. Feedback on what you said still appears. |
+| **Data export** | Settings → "Download my data" saves a JSON file of everything stored locally. The access token is left out, and so are recordings. |
+| **Self-check** | Four questions on avoidance, impact on work, impact on social life, and distress, answered on a five-point scale. It is our own wording, not a validated instrument. It produces no score, no "test" and no diagnosis. If any answer is "A lot" or higher, it suggests talking to a doctor or therapist and notes that CBT with a therapist is the recommended treatment. Each answer is shown next to your previous one. **[Q]** Have a clinician review the wording before public release. |
+
 ### Backlog additions
 | When | Item |
 |---|---|
-| **Next** | An optional quiet mode with no delivery numbers shown during or straight after anxious practice. |
-| **Next** | Data export. |
-| **Next** | Replace the review ladder with FSRS. |
 | **Later** | Grow the 4-week plan into a 6–8 week programme with human check-ins, to test the $39 pilot offer. |
-| **Later** | A non-diagnostic self-check that points to professional care. |
 | **Later** | Pairing exposure steps with the human-practice phases. |
 | **Avoid** | Live filler-word counters, streak loss-aversion, and AI-generated therapeutic dialogue. That last one carries safety, regulatory and cost risks. |
 

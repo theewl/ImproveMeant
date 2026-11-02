@@ -60,3 +60,26 @@ describe("crisis language detection", () => {
     }
   });
 });
+
+import { compareSafetyBehaviours, impactGuidance, IMPACT_QUESTIONS, IMPACT_SCALE } from "../../src/shared/confidence";
+
+describe("safety-behaviour comparison", () => {
+  it("needs both groups, then compares self-reported anxiety and outcomes", () => {
+    const a = exp({ completedAt: "x", anxietyAfter: 3, outcome: "didnt-happen", safetyBehaviourToDrop: "Avoiding eye contact" });
+    const b = exp({ completedAt: "x", anxietyAfter: 6, outcome: "happened" });
+    expect(compareSafetyBehaviours([a])).toBeNull();
+    expect(compareSafetyBehaviours([a, b, exp({})])).toEqual({
+      dropped: { count: 1, avgAnxiety: 3, fearHappened: 0 },
+      kept: { count: 1, avgAnxiety: 6, fearHappened: 1 },
+    });
+  });
+});
+
+describe("self-check guidance (non-diagnostic)", () => {
+  it("suggests professional support when anything is rated 'A lot' or more", () => {
+    expect(IMPACT_SCALE[3]).toBe("A lot");
+    expect(impactGuidance(IMPACT_QUESTIONS.map(() => 1))).toBe("self-help");
+    expect(impactGuidance([0, 0, 3, 0])).toBe("seek-support");
+    expect(impactGuidance([4, 4, 4, 4])).toBe("seek-support");
+  });
+});

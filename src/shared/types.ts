@@ -24,6 +24,8 @@ export interface Preferences {
   goal: CommunicationGoal;
   sessionMinutes: SessionLength;
   onboarded: boolean;
+  /** Quiet mode: hide timers and delivery numbers to reduce self-monitoring. */
+  quietMode?: boolean;
   /** Optional access token for a protected deployment. Never a provider key. */
   accessToken?: string;
 }
@@ -240,8 +242,10 @@ export interface ReviewItem {
   storyKind?: StoryKind;
   sourceVersion?: string;
   source?: SourceMeta;
-  /** Index into the interval ladder. */
+  /** Number of successful recalls so far (for display; scheduling uses `fsrs`). */
   step: number;
+  /** FSRS memory state (serialised ts-fsrs Card). Absent for items not yet reviewed. */
+  fsrs?: FsrsState;
   dueAt: string;
   lastReviewedAt?: string;
   history: { at: string; result: ReviewResult; response?: string }[];
@@ -364,4 +368,23 @@ export interface Experiment {
 export interface GuidedPlan {
   startedAt: string;
   reflections: { week: number; at: string; text: string }[];
+}
+
+export interface FsrsState {
+  due: string;
+  stability: number;
+  difficulty: number;
+  elapsed_days: number;
+  scheduled_days: number;
+  learning_steps: number;
+  reps: number;
+  lapses: number;
+  state: number;
+  last_review?: string;
+}
+
+/** Non-diagnostic "how much does it get in the way?" check-in. Answers 0–4 per question. */
+export interface ImpactCheck {
+  at: string;
+  answers: number[];
 }

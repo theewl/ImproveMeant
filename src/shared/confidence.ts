@@ -120,3 +120,34 @@ export function summarizeExperiments(exps: Experiment[]): ExperimentSummary {
     avgAfter: mean(done.filter((e) => e.anxietyAfter != null).map((e) => e.anxietyAfter!)),
   };
 }
+
+export interface SafetyComparison {
+  dropped: { count: number; avgAnxiety: number | null; fearHappened: number };
+  kept: { count: number; avgAnxiety: number | null; fearHappened: number };
+}
+
+/** Compare completed experiments where a safety behaviour was dropped vs not. Self-reported; small numbers. */
+export function compareSafetyBehaviours(exps: Experiment[]): SafetyComparison | null {
+  const done = exps.filter((e) => e.completedAt && e.anxietyAfter != null);
+  const group = (xs: Experiment[]) => ({
+    count: xs.length,
+    avgAnxiety: xs.length ? Math.round((xs.reduce((n, e) => n + e.anxietyAfter!, 0) / xs.length) * 10) / 10 : null,
+    fearHappened: xs.filter((e) => e.outcome === "happened").length,
+  });
+  const dropped = group(done.filter((e) => e.safetyBehaviourToDrop));
+  const kept = group(done.filter((e) => !e.safetyBehaviourToDrop));
+  return dropped.count > 0 && kept.count > 0 ? { dropped, kept } : null;
+}
+
+export const IMPACT_QUESTIONS = [
+  "How much do you avoid speaking up, presenting or social situations because of anxiety?",
+  "How much does this anxiety get in the way of your work or studies?",
+  "How much does it get in the way of friendships or social life?",
+  "How distressing is it for you?",
+];
+export const IMPACT_SCALE = ["Not at all", "A little", "Somewhat", "A lot", "Extremely"];
+
+/** Non-diagnostic guidance: any answer of "A lot" or more suggests talking to a professional. */
+export function impactGuidance(answers: number[]): "seek-support" | "self-help" {
+  return answers.some((a) => a >= 3) ? "seek-support" : "self-help";
+}

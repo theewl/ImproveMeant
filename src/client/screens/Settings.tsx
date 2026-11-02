@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../lib/store";
+import { exportJson } from "../lib/storage";
 import { PreferencesForm } from "./Onboarding";
 import { CrisisList } from "./Confidence";
 
@@ -21,6 +22,15 @@ export function Settings() {
             Saved.
           </p>
         )}
+      </section>
+
+      <section aria-labelledby="quiet-h">
+        <h3 id="quiet-h">Quiet mode</h3>
+        <label className="option">
+          <input type="checkbox" checked={!!data.prefs.quietMode} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, quietMode: e.target.checked } }))} />
+          Hide the timer and measurement numbers while I practise
+        </label>
+        <p className="hint">Helpful if watching numbers makes you more self-conscious. Feedback on what you said still appears.</p>
       </section>
 
       <section aria-labelledby="mode-h">
@@ -77,6 +87,24 @@ export function Settings() {
           <p className="hint">This app isn't a crisis service. If you're struggling, please reach out:</p>
           <CrisisList />
         </details>
+        <button
+          className="secondary"
+          type="button"
+          onClick={() => {
+            const blob = new Blob([exportJson(data)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `clearline-export-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }}
+        >
+          Download my data
+        </button>
+        <p className="hint">A JSON file of everything stored in this browser (recordings aren't included).</p>
         <div className="danger-zone">
           <h4>Delete history</h4>
           <p className="hint">

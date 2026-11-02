@@ -1,5 +1,6 @@
 import type { Attempt, Feedback } from "../../shared/types";
 import { measureAttempt } from "../../shared/observations";
+import { useApp } from "../lib/store";
 
 /** Only the flags that change how to read an attempt. Spoken/typed is implied elsewhere. */
 export function AttemptTags({ a }: { a: Attempt }) {
@@ -20,6 +21,8 @@ export function AttemptTags({ a }: { a: Attempt }) {
 }
 
 export function FeedbackPanel({ feedback: f, attempt }: { feedback: Feedback; attempt: Attempt }) {
+  const { data } = useApp();
+  const quiet = !!data.prefs.quietMode;
   const measured = measureAttempt(attempt);
   const accuracyIssue = f.fidelity.status === "minor_gaps" || f.fidelity.status === "factual_error";
   const live = f.kind === "live";
@@ -94,7 +97,8 @@ export function FeedbackPanel({ feedback: f, attempt }: { feedback: Feedback; at
             {f.fidelity.status === "accurate" && <p className="hint">Accuracy: matches the briefing.</p>}
           </>
         )}
-        <dl className="measured">
+        {quiet && <p className="hint">Quiet mode is on, so measurements are hidden.</p>}
+        <dl className="measured" hidden={quiet}>
           {measured.map((m) => (
             <div key={m.label}>
               <dt>{m.label}</dt>
@@ -105,7 +109,7 @@ export function FeedbackPanel({ feedback: f, attempt }: { feedback: Feedback; at
             </div>
           ))}
         </dl>
-        {attempt.delivery?.limitations && <p className="hint">{attempt.delivery.limitations}</p>}
+        {!quiet && attempt.delivery?.limitations && <p className="hint">{attempt.delivery.limitations}</p>}
         {f.unverifiedQuotesRemoved > 0 && <p className="hint">{f.unverifiedQuotesRemoved} quote(s) the coach attributed to you weren't in your answer and were removed.</p>}
         {live && <p className="hint">AI feedback{f.model ? ` (${f.model})` : ""} on your words only — it can't hear tone or pace, and it can be wrong.</p>}
       </details>
@@ -114,6 +118,7 @@ export function FeedbackPanel({ feedback: f, attempt }: { feedback: Feedback; at
 }
 
 export function CompareAttempts({ first, second }: { first: Attempt; second: Attempt }) {
+  const { data } = useApp();
   const m1 = measureAttempt(first);
   const m2 = measureAttempt(second);
   const labels = Array.from(new Set([...m1, ...m2].map((m) => m.label)));
@@ -129,7 +134,7 @@ export function CompareAttempts({ first, second }: { first: Attempt; second: Att
           </div>
         ))}
       </div>
-      <details className="more">
+      <details className="more" hidden={!!data.prefs.quietMode}>
         <summary>Measured differences</summary>
         <table className="compare-table">
           <thead>
@@ -152,5 +157,18 @@ export function CompareAttempts({ first, second }: { first: Attempt; second: Att
         <p className="hint">Doing better on a retry of the same prompt is a good sign, not mastery. Reviews test it later in a new context.</p>
       </details>
     </section>
+  );
+}
+
+/** End-of-session close: discourage replaying it afterwards and anchor on what went okay. */
+export function WrapUp({ attempts }: { attempts: Attempt[] }) {
+  const strength = [...attempts].reverse().find((a) => a.feedback?.kind === "live" && a.feedback.strength)?.feedback?.strength?.observation;
+  return (
+    <div className="wrapup">
+      <p>
+        <strong>That's done — no need to replay it.</strong> If your mind goes back to the awkward bits, come back to this instead:
+      </p>
+      <p className="wrapup-good">{strength ?? "You showed up and practised out loud. That's the part that counts."}</p>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { GuidedPlan, Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
+import type { GuidedPlan, ImpactCheck, Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
 
 // Local persistence for a private single-user MVP.
 // Limitations (documented in README): data lives only in this browser profile,
@@ -16,6 +16,8 @@ export interface AppData {
   experiments: Experiment[];
   ladder: LadderStep[];
   reframes: Reframe[];
+  /** Self-check history (non-diagnostic). */
+  impactChecks: ImpactCheck[];
   /** Optional 4-week guided plan. */
   plan?: GuidedPlan;
   /** User has seen the "self-help, not therapy" note. */
@@ -36,6 +38,7 @@ export function emptyData(): AppData {
     experiments: [],
     ladder: [],
     reframes: [],
+    impactChecks: [],
     confidenceIntroSeen: false,
     transcriptionConsent: false,
   };
@@ -69,4 +72,10 @@ export function clearData(storage: Storage = localStorage) {
 export function uid(prefix = ""): string {
   const r = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
   return prefix + r;
+}
+
+/** Everything the learner has stored, as a downloadable JSON string (access token excluded). */
+export function exportJson(data: AppData, now = new Date()): string {
+  const { accessToken: _omit, ...prefs } = data.prefs;
+  return JSON.stringify({ exportedAt: now.toISOString(), app: "Clearline", note: "Saved recordings are not included.", data: { ...data, prefs } }, null, 2);
 }

@@ -5,6 +5,7 @@ import { wordCount } from "../../shared/text";
 import { api, ApiRequestError } from "../lib/api";
 import { uid } from "../lib/storage";
 import { useRecorder, recordingSupported } from "../lib/useRecorder";
+import { useApp } from "../lib/store";
 
 export interface AttemptDraft {
   modality: Modality;
@@ -90,7 +91,8 @@ function TypedAnswer(p: Props & { value: string; onChange: (v: string) => void }
 
 function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   const r = useRecorder();
-  const [showTimer, setShowTimer] = useState(true);
+  const { data } = useApp();
+  const [showTimer, setShowTimer] = useState(!data.prefs.quietMode);
   const [transcript, setTranscript] = useState<string>("");
   const [original, setOriginal] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<DeliveryMetrics | undefined>();

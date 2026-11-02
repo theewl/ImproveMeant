@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyReview, dueQueue, DAILY_REVIEW_CAP, INTERVAL_LADDER_DAYS, canAddItem, MAX_ACTIVE_ITEMS } from "../../src/shared/schedule";
+import { applyReview, dueQueue, DAILY_REVIEW_CAP, canAddItem, MAX_ACTIVE_ITEMS } from "../../src/shared/schedule";
 import { quoteAppearsIn, wordCount, sentenceCount, boundText, firstSentence } from "../../src/shared/text";
 import { measureAttempt, deliveryFromWordTimings } from "../../src/shared/observations";
 import { EXERCISES, SCENARIOS, SKILL_ORDER, getExercise, pickLearnExercise } from "../../src/shared/curriculum";
@@ -19,20 +19,40 @@ const item = (over: Partial<ReviewItem> = {}): ReviewItem => ({
   ...over,
 });
 
-describe("review schedule", () => {
+describe("review schedule (FSRS)", () => {
   const now = "2026-11-02T12:00:00.000Z";
-  it("moves up the ladder on recall, holds on partial, resets on miss, postpones on skip", () => {
-    const up = applyReview(item(), "recalled", now);
-    expect(up.step).toBe(1);
-    expect(up.dueAt).toBe("2026-11-05T12:00:00.000Z");
-    expect(applyReview(item({ step: 2 }), "partly", now).step).toBe(2);
-    const miss = applyReview(item({ step: 3 }), "missed", now);
+  const days = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
+
+  it("spaces recalled items further than partly-recalled ones, and resets misses to tomorrow", () => {
+    const good = applyReview(item(), "recalled", now);
+    const hard = applyReview(item(), "partly", now);
+    const miss = applyReview(item(), "missed", now);
+    expect(good.step).toBe(1);
+    expect(good.fsrs?.reps).toBe(1);
+    expect(days(now, good.dueAt)).toBeGreaterThan(days(now, hard.dueAt));
+    expect(days(now, hard.dueAt)).toBeGreaterThanOrEqual(1);
+    expect(days(now, miss.dueAt)).toBe(1);
     expect(miss.step).toBe(0);
-    expect(miss.dueAt).toBe("2026-11-03T12:00:00.000Z");
+  });
+
+  it("grows intervals with consecutive recalls", () => {
+    let it1 = applyReview(item(), "recalled", now);
+    const first = days(now, it1.dueAt);
+    it1 = applyReview(it1, "recalled", it1.dueAt);
+    const second = days(it1.lastReviewedAt!, it1.dueAt);
+    expect(second).toBeGreaterThan(first);
+  });
+
+  it("postpones a skipped item by a day without changing its memory state", () => {
     const skip = applyReview(item({ step: 2 }), "skipped", now);
     expect(skip.step).toBe(2);
+    expect(skip.fsrs).toBeUndefined();
     expect(skip.lastReviewedAt).toBeUndefined();
-    expect(applyReview(item({ step: INTERVAL_LADDER_DAYS.length - 1 }), "recalled", now).step).toBe(INTERVAL_LADDER_DAYS.length - 1);
+    expect(skip.dueAt).toBe("2026-11-03T12:00:00.000Z");
+  });
+
+  it("is deterministic", () => {
+    expect(applyReview(item(), "recalled", now).dueAt).toBe(applyReview(item(), "recalled", now).dueAt);
   });
 
   it("caps the daily queue so a backlog never overwhelms", () => {
