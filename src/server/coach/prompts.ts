@@ -85,7 +85,7 @@ export function feedbackUser(p: {
   if (p.briefing) {
     lines.push("");
     lines.push("Reference briefing the learner studied (for fidelity checks only):");
-    lines.push(`<source_text>\nMain idea: ${p.briefing.mainIdea}\nPoints:\n- ${p.briefing.points.join("\n- ")}${p.briefing.uncertainty ? `\nUncertainty: ${p.briefing.uncertainty}` : ""}\n</source_text>`);
+    lines.push(`<source_text>\nMain idea: ${data(p.briefing.mainIdea)}\nPoints:\n- ${p.briefing.points.map(data).join("\n- ")}${p.briefing.uncertainty ? `\nUncertainty: ${data(p.briefing.uncertainty)}` : ""}\n</source_text>`);
   } else {
     lines.push("No source material: set fidelity status to not_applicable.");
   }

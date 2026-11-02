@@ -66,12 +66,25 @@ export const api = {
     ),
 };
 
+export interface TopicHit {
+  title: string;
+  pageid: number;
+  snippet: string;
+}
+
+export const topics = {
+  search: (q: string) => request<{ hits: TopicHit[] }>(`/api/topics/search?q=${encodeURIComponent(q)}`),
+  add: (pageid: number) => request<{ storyId: string; title: string }>("/api/topics", json({ pageid })),
+  briefOwn: (title: string, text: string) => request<Briefing>("/api/briefings/own", json({ title, text }), 120_000),
+};
+
 export interface FeedbackBody {
   idempotencyKey: string;
   exerciseId: string;
   mode: "learn" | "talk";
   target?: "main" | "followup";
   storyId?: string;
+  ownBriefing?: { title: string; mainIdea: string; points: string[]; uncertainty: string | null };
   talk?: TalkSetup;
   response: { text: string; modality: "spoken" | "typed"; transcriptEdited: boolean; assisted: boolean };
   previous?: { text: string; retryFocus: string | null } | null;

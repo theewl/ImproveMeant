@@ -285,11 +285,13 @@ describe("Confidence tools", () => {
   it("builds a ladder, plans a brave step, checks in afterwards, and shows prediction vs outcome", async () => {
     const user = userEvent.setup();
     start("#/confidence", onboarded());
-    await screen.findByRole("heading", { name: "Confidence" });
+    await screen.findByRole("heading", { name: "Why speaking feels so hard" });
     expect(screen.getByText(/not therapy or a diagnosis/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText("I avoid eye contact"));
     await user.click(screen.getByRole("button", { name: "Got it" }));
+    expect(stored().myHabits).toEqual(["Avoiding eye contact"]);
 
-    await user.click(screen.getByRole("button", { name: /Brave steps ladder/ }));
+    await screen.findByRole("heading", { name: "Pick a brave step" });
     await user.click(await screen.findByRole("button", { name: "+ Ask a question in a meeting" }));
     await user.click(screen.getByRole("button", { name: "+ Say good morning to someone I don't usually talk to" }));
     await user.click(screen.getAllByRole("button", { name: "Plan" })[0]!); // ladder is shown hardest first
@@ -298,17 +300,19 @@ describe("Confidence tools", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.type(screen.getByRole("textbox", { name: "What are you worried will happen?" }), "My voice will shake and people will notice");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByLabelText("Avoiding eye contact"));
+    expect(screen.getByLabelText("Avoiding eye contact")).toBeChecked(); // pre-filled from the intro
     await user.type(screen.getByLabelText("If"), "I lose my thread");
     await user.type(screen.getByLabelText("then I will"), "pause and restate my point");
     await user.click(screen.getByRole("button", { name: "Save my plan" }));
 
-    await user.click(await screen.findByRole("button", { name: /How did it go\?/ }));
+    expect(await screen.findByText("Your current step")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "What happened?" }));
     await user.click(screen.getByLabelText("No, it didn't"));
     await user.type(screen.getByRole("textbox", { name: "One thing that went okay" }), "I asked it clearly");
     await user.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText(/What you feared didn't happen/);
-    expect(screen.getByText(/feared outcome didn't happen/)).toBeInTheDocument();
+    expect(screen.getByText(/Real life:/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Say good morning to someone I don't usually talk to" })).toBeInTheDocument(); // next rung offered
 
     const d = stored();
     expect(d.ladder).toHaveLength(2);
@@ -326,7 +330,7 @@ describe("Confidence tools", () => {
   it("walks through untangling a thought and saves it", async () => {
     const user = userEvent.setup();
     start("#/confidence", onboarded({ confidenceIntroSeen: true }));
-    await user.click(await screen.findByRole("button", { name: /Untangle a thought/ }));
+    await user.click(await screen.findByRole("button", { name: /A thought keeps bugging you/ }));
     await user.type(screen.getByRole("textbox", { name: "What's the anxious thought?" }), "Everyone will think I'm incompetent");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: /Mind reading/ }));
@@ -336,14 +340,14 @@ describe("Confidence tools", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.type(screen.getByRole("textbox", { name: "Write a more balanced thought" }), "Some people may not notice at all");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await screen.findByText(/Nice work untangling/);
+    await screen.findByText(/Now the real test/);
     expect(stored().reframes[0]).toMatchObject({ thought: "Everyone will think I'm incompetent", traps: ["mind-reading"], balanced: "Some people may not notice at all" });
   });
 
   it("shows crisis resources when crisis language is typed", async () => {
     const user = userEvent.setup();
     start("#/confidence", onboarded({ confidenceIntroSeen: true }));
-    await user.click(await screen.findByRole("button", { name: /Untangle a thought/ }));
+    await user.click(await screen.findByRole("button", { name: /A thought keeps bugging you/ }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "What's the anxious thought?" }), "I want to kill myself");
     const alert = await screen.findByRole("alert");
@@ -413,7 +417,7 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
   it("gives non-diagnostic guidance pointing to professional support when it's getting in the way a lot", async () => {
     const user = userEvent.setup();
     start("#/confidence", onboarded({ confidenceIntroSeen: true }));
-    await user.click(await screen.findByRole("button", { name: /How much is it getting in the way/ }));
+    await user.click(await screen.findByRole("button", { name: /Is it getting in the way/ }));
     expect(screen.getByText(/not a diagnosis/)).toBeInTheDocument();
     for (let i = 0; i < 4; i++) {
       const visible = document.querySelector("fieldset.impact-q:not([hidden])") as HTMLElement;
@@ -448,9 +452,7 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
         ],
       }),
     );
-    expect(await screen.findByText(/Dropping safety habits/)).toBeInTheDocument();
-    expect(screen.getByText("Dropped a habit (1)")).toBeInTheDocument();
-    expect(screen.getByText("Kept habits (1)")).toBeInTheDocument();
+    expect(await screen.findByText(/Without a safety habit, your anxiety during was 3\/10 on average \(1\); with your usual habits, 6\/10/)).toBeInTheDocument();
   });
 });
 

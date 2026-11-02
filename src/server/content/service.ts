@@ -5,7 +5,9 @@ import type { CoachProvider } from "../coach/types";
 import type { Deduper } from "../dedupe";
 import { AppError } from "../errors";
 import type { KeyValueStore } from "../store";
-import type { ContentProvider, LiveCandidate } from "./types";
+import type { ContentProvider, LiveCandidate, SourceDocument, TopicHit } from "./types";
+import { stableHash } from "../../shared/evergreen";
+import { boundText } from "../../shared/text";
 
 export interface LiveFeedState {
   status: "ok" | "stale" | "unavailable" | "disabled";
@@ -25,6 +27,14 @@ export interface BriefingWithStatus extends Briefing {
   /** The source has been edited since this briefing was generated. */
   sourceChanged: boolean;
 }
+
+const FEED_LABEL: Record<LiveCandidate["feed"], string> = {
+  news: "In the news today",
+  trending: "Widely read today",
+  featured: "Today's featured article",
+  search: "A topic you chose",
+  own: "Your material",
+};
 
 const interestLabel = (i: Interest) => ALL_INTERESTS.find((x) => x.id === i)?.label ?? i;
 
@@ -76,12 +86,21 @@ export class ContentService {
     if (list) {
       const usable = list.candidates.filter((c) => !list.insufficient.includes(c.storyId));
       const matched = usable.filter((c) => c.interest && interests.includes(c.interest));
-      const chosen = [...matched, ...usable.filter((c) => !matched.includes(c))].slice(0, 2);
+      // Up to 4 live stories: interest matches first, at most 2 per feed, so news, trending and featured all get a look-in.
+      const chosen: LiveCandidate[] = [];
+      const perFeed: Record<string, number> = {};
+      for (const c of [...matched, ...usable.filter((c) => !matched.includes(c))]) {
+        if (chosen.length >= 4) break;
+        if ((perFeed[c.feed] ?? 0) >= 2) continue;
+        perFeed[c.feed] = (perFeed[c.feed] ?? 0) + 1;
+        chosen.push(c);
+      }
       for (const c of chosen) {
         const cachedBriefing = await this.store.read<Briefing>(this.briefingKey(c.storyId));
         picks.push({
           id: c.storyId,
           kind: "current",
+          feed: c.feed,
           title: c.title,
           description: c.blurb,
           interest: c.interest ?? "culture",
@@ -93,10 +112,7 @@ export class ContentService {
             sourceUpdatedAt: c.sourceUpdatedAt,
           },
           estimatedMinutes: 5,
-          whySelected:
-            c.interest && interests.includes(c.interest)
-              ? `In today's news and matches your interest in ${interestLabel(c.interest)}.`
-              : "In today's news (Wikipedia's \"In the news\" selection).",
+          whySelected: `${FEED_LABEL[c.feed]}${c.interest && interests.includes(c.interest) ? ` · matches your interest in ${interestLabel(c.interest)}` : ""}.`,
           briefingReady: !!cachedBriefing,
         });
       }
@@ -117,7 +133,50 @@ export class ContentService {
       if (ordered.length >= 3) break;
       if (!ordered.some((o) => o.id === c.id)) ordered.push({ ...c, whySelected: "Curated idea worth knowing." });
     }
-    return { cards: [...picks, ...ordered].slice(0, 5), live: state };
+    return { cards: [...picks, ...ordered].slice(0, 7), live: state };
+  }
+
+  async searchTopics(query: string): Promise<TopicHit[]> {
+    if (!this.liveEnabled() || !this.provider) throw new AppError("not_configured", "Topic search needs live content and Claude to be configured.", 501);
+    try {
+      return await this.provider.searchTopics(query);
+    } catch (err) {
+      throw new AppError("provider_error", `Couldn't search topics (${(err as Error).message}).`, 502, true);
+    }
+  }
+
+  /** Register a searched article as a story so it can be briefed like any live story. */
+  async addTopic(pageid: number): Promise<{ storyId: string; title: string }> {
+    if (!this.liveEnabled() || !this.provider) throw new AppError("not_configured", "Topics need live content and Claude to be configured.", 501);
+    let c: LiveCandidate | null;
+    try {
+      c = await this.provider.lookup(pageid);
+    } catch (err) {
+      throw new AppError("provider_error", `Couldn't fetch that topic (${(err as Error).message}).`, 502, true);
+    }
+    if (!c) throw new AppError("not_found", "That article wasn't found.", 404);
+    const custom = (await this.store.read<LiveCandidate[]>("custom-topics")) ?? [];
+    await this.store.write("custom-topics", [c, ...custom.filter((x) => x.storyId !== c.storyId)].slice(0, 200));
+    return { storyId: c.storyId, title: c.title };
+  }
+
+  /** A briefing from material the learner pasted. Never cached on the server; bounded; dedupe by content hash. */
+  async briefOwnMaterial(title: string, text: string): Promise<Briefing> {
+    if (this.coach.kind !== "claude") throw new AppError("not_configured", "Briefings from your own material need Claude to be configured.", 501);
+    const bounded = boundText(text.trim(), this.cfg.limits.maxSourceChars);
+    if (bounded.text.length < 400) throw new AppError("insufficient_source", "Paste a bit more — at least a few paragraphs — so the briefing has something to work with.", 422);
+    const hash = stableHash(bounded.text);
+    const doc: SourceDocument = {
+      storyId: `own-${hash}`,
+      title: title.trim() || "Your material",
+      text: bounded.text,
+      partial: bounded.truncated,
+      revision: hash,
+      license: "user-provided",
+      source: { url: "", publisher: "Your material", publishedAt: this.now().toISOString().slice(0, 10), retrievedAt: this.now().toISOString() },
+    };
+    const { value } = await this.dedupe.run(`own:${hash}`, () => this.coach.briefing(doc));
+    return { ...value, feed: "own" };
   }
 
   private briefingKey(id: string) {
@@ -173,6 +232,9 @@ export class ContentService {
   }
 
   private async findInRecentLists(storyId: string): Promise<LiveCandidate | undefined> {
+    const custom = (await this.store.read<LiveCandidate[]>("custom-topics")) ?? [];
+    const own = custom.find((c) => c.storyId === storyId);
+    if (own) return own;
     for (let i = 0; i < 7; i++) {
       const d = new Date(this.now().getTime() - i * 86400_000).toISOString().slice(0, 10);
       const l = await this.store.read<CachedList>(this.listKey(d));

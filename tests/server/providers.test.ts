@@ -50,7 +50,7 @@ describe("WikimediaProvider", () => {
     const long = "Intro paragraph. ".repeat(2000) + "\nReferences\nlots of refs";
     const p = new WikimediaProvider("UA", fakeFetch({ "w/api.php": { query: { pages: [{ title: "Example telescope", extract: long, revisions: [{ revid: 556, timestamp: "2026-11-01T01:00:00Z" }] }] } } }));
     const doc = await p.fetchDocument(
-      { storyId: "wp-42", title: "Example telescope", blurb: "", description: "", interest: null, pageTitle: "Example_telescope", url: "https://en.wikipedia.org/wiki/Example_telescope", revision: "555", featuredOn: "2026-11-01" },
+      { storyId: "wp-42", feed: "news", title: "Example telescope", blurb: "", description: "", interest: null, pageTitle: "Example_telescope", url: "https://en.wikipedia.org/wiki/Example_telescope", revision: "555", featuredOn: "2026-11-01" },
       5000,
     );
     expect(doc.text.length).toBeLessThanOrEqual(5000);
@@ -120,5 +120,41 @@ describe("DeepgramProvider", () => {
       throw new TypeError("fetch failed");
     }) as unknown as typeof fetch);
     await expect(down.transcribe(new Uint8Array(3000), "audio/webm", 3)).rejects.toMatchObject({ code: "provider_error", retryable: true });
+  });
+});
+
+describe("WikimediaProvider: trending, featured, search, lookup", () => {
+  const FEED2 = {
+    news: [],
+    tfa: { title: "Photosynthesis", titles: { normalized: "Photosynthesis" }, pageid: 5, description: "Biological process", extract: "Photosynthesis is how plants make food. It matters.", revision: "9", timestamp: "2026-10-31T00:00:00Z", content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Photosynthesis" } } },
+    mostread: {
+      articles: [
+        { title: "Some_Actor", normalizedtitle: "Some Actor", pageid: 1, description: "American actor", views: 900000 },
+        { title: "Inflation", normalizedtitle: "Inflation", pageid: 2, description: "Rise in prices in an economy", extract: "Inflation is a general increase in prices.", views: 500000, revision: "77" },
+        { title: "List_of_things", normalizedtitle: "List of things", pageid: 3, description: "List", views: 400000 },
+        { title: "Deaths_in_2026", normalizedtitle: "Deaths in 2026", pageid: 4, description: "", views: 300000 },
+        { title: "Obscure_village", normalizedtitle: "Obscure village", pageid: 6, description: "Village in nowhere", views: 1000 },
+      ],
+    },
+  };
+  it("adds the featured article and interest-matching most-read articles, skipping bios, lists and death pages", async () => {
+    const p = new WikimediaProvider("UA", fakeFetch({ "featured/2026/11/02": FEED2 }));
+    const items = await p.listCandidates("2026-11-02");
+    expect(items.map((i) => [i.feed, i.title, i.interest])).toEqual([
+      ["featured", "Photosynthesis", "science"],
+      ["trending", "Inflation", "business"],
+    ]);
+  });
+  it("searches topics and looks up a chosen page", async () => {
+    const p = new WikimediaProvider(
+      "UA",
+      fakeFetch({
+        "list=search": { query: { search: [{ title: "Inflation", pageid: 2, snippet: "<span>Inflation</span> is a rise in prices" }, { title: "List of inflations", pageid: 9 }] } },
+        "pageids=2": { query: { pages: [{ pageid: 2, title: "Inflation", description: "Rise in prices", fullurl: "https://en.wikipedia.org/wiki/Inflation", revisions: [{ revid: 78, timestamp: "2026-11-01T00:00:00Z" }] }] } },
+      }),
+    );
+    expect(await p.searchTopics("inflation")).toEqual([{ title: "Inflation", pageid: 2, snippet: "Inflation is a rise in prices" }]);
+    const c = await p.lookup(2);
+    expect(c).toMatchObject({ storyId: "wp-2", feed: "search", title: "Inflation", revision: "78", interest: "business" });
   });
 });

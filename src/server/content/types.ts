@@ -1,4 +1,4 @@
-import type { Interest, SourceMeta, StoryCard } from "../../shared/types";
+import type { FeedKind, Interest, SourceMeta, StoryCard } from "../../shared/types";
 
 /** Source text we are permitted to process, plus provenance. */
 export interface SourceDocument {
@@ -15,6 +15,7 @@ export interface SourceDocument {
 
 export interface LiveCandidate {
   storyId: string;
+  feed: FeedKind;
   title: string;
   blurb: string;
   description: string;
@@ -26,10 +27,20 @@ export interface LiveCandidate {
   featuredOn: string; // ISO date the provider featured it
 }
 
+export interface TopicHit {
+  title: string;
+  pageid: number;
+  snippet: string;
+}
+
 export interface ContentProvider {
   readonly name: string;
   listCandidates(dateIso: string): Promise<LiveCandidate[]>;
   fetchDocument(c: LiveCandidate, maxChars: number): Promise<SourceDocument>;
+  /** Find articles for a topic the learner typed. */
+  searchTopics(query: string): Promise<TopicHit[]>;
+  /** Build a candidate for one chosen article. */
+  lookup(pageid: number): Promise<LiveCandidate | null>;
 }
 
 export type { StoryCard };

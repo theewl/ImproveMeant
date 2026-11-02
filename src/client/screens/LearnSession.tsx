@@ -101,6 +101,12 @@ export function LearnSession({ storyId }: { storyId: string }) {
 
   const load = (refresh = false) => {
     setLoadError(null);
+    const own = data.ownBriefings[storyId];
+    if (own) {
+      setBriefing({ ...own, sourceChanged: false });
+      s.setSession((x) => ({ ...x, storyTitle: own.title, storySource: own.source, keyTerm: own.keyTerm }));
+      return;
+    }
     api
       .briefing(storyId, refresh)
       .then((b) => {
@@ -155,6 +161,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       exerciseId: exercise.id,
       mode: "learn",
       storyId,
+      ownBriefing: briefing.feed === "own" ? { title: briefing.title, mainIdea: briefing.mainIdea, points: briefing.points, uncertainty: briefing.uncertainty } : undefined,
       previous: prev ? { text: prev.text, retryFocus: prev.feedback?.retryFocus ?? null } : null,
     });
     if (!fb) return;
@@ -173,6 +180,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       mode: "learn",
       target: "followup",
       storyId,
+      ownBriefing: briefing.feed === "own" ? { title: briefing.title, mainIdea: briefing.mainIdea, points: briefing.points, uncertainty: briefing.uncertainty } : undefined,
       followUp: { question: briefing.followUpQuestion, answer: attempt.text },
     });
     if (!fb) return;
@@ -207,7 +215,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       {phase === "understand" && (
         <section>
           <StepHeader eyebrow="Read" title={briefing.title} />
-          <SourceLine source={briefing.source} kind={briefing.kind} />
+          <SourceLine source={briefing.source} kind={briefing.kind} feed={briefing.feed} />
           {briefing.sourceChanged && (
             <p className="notice warn" role="status">
               The source was edited after this summary was written — details may have changed.{" "}

@@ -1467,3 +1467,14 @@ button.small {
 .dots-section {
   margin-bottom: 1.25rem;
 }
+
+.any-topic {
+  margin-top: 1.5rem;
+}
+.any-topic .row input {
+  flex: 1;
+}
+.primary.small {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+}

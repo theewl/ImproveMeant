@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import type { SourceMeta, StoryKind } from "../../shared/types";
+import type { FeedKind, SourceMeta, StoryKind } from "../../shared/types";
+
+const FEED_BADGE: Record<FeedKind, string> = { news: "In the news", trending: "Widely read", featured: "Featured", search: "Your topic", own: "Your material" };
 import { ApiRequestError } from "../lib/api";
 import { href } from "../lib/router";
 
@@ -21,10 +23,10 @@ export function formatDate(s: string): string {
 }
 
 /** One quiet line: label · publisher · date · source link. */
-export function SourceLine({ source, kind, minutes }: { source: SourceMeta; kind: StoryKind; minutes?: number }) {
+export function SourceLine({ source, kind, feed, minutes }: { source: SourceMeta; kind: StoryKind; feed?: FeedKind; minutes?: number }) {
   return (
     <p className="meta-line">
-      <span className={kind === "current" ? "kind current" : "kind"}>{kind === "current" ? "Current" : "Evergreen"}</span>
+      <span className={kind === "current" ? "kind current" : "kind"}>{feed ? FEED_BADGE[feed] : kind === "current" ? "Current" : "Evergreen"}</span>
       <span>{source.publisher}</span>
       <span>{formatDate(source.publishedAt)}</span>
       {minutes ? <span>{minutes} min</span> : null}
