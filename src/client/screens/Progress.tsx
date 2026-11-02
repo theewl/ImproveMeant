@@ -4,6 +4,8 @@ import { MISSIONS, SKILLS, SKILL_ORDER, getScenario } from "../../shared/curricu
 import { audioStore } from "../lib/audioStore";
 import { addRealWorld, summarize, upsertSession } from "../lib/state";
 import { summarizeExperiments } from "../../shared/confidence";
+import { phraseBank } from "./Phrases";
+import { href } from "../lib/router";
 import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
@@ -70,6 +72,13 @@ export function Progress() {
         <p className="hint">Self-assessed after revealing the answer.</p>
       </section>
 
+      <a className="pill-link" href={href({ name: "phrases" })}>
+        <span>
+          <strong>Phrase bank</strong> · {phraseBank(data.sessions).length} phrase{phraseBank(data.sessions).length === 1 ? "" : "s"}
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
+
       <ConfidenceSummary />
 
       <Missions />
@@ -85,7 +94,9 @@ export function Progress() {
 function ConfidenceSummary() {
   const { data } = useApp();
   const c = summarizeExperiments(data.experiments);
-  if (c.completed === 0 && data.reframes.length === 0) return null;
+  const views = data.sessions.flatMap((s) => s.attempts.map((a) => a.selfView).filter((v): v is NonNullable<typeof v> => !!v));
+  const better = views.filter((v) => v.observed > v.predicted).length;
+  if (c.completed === 0 && data.reframes.length === 0 && views.length === 0) return null;
   return (
     <section aria-labelledby="conf-h">
       <h3 id="conf-h">Confidence</h3>
@@ -114,6 +125,11 @@ function ConfidenceSummary() {
           </div>
         )}
       </dl>
+      {views.length > 0 && (
+        <p>
+          Listened back as an observer {views.length} time{views.length === 1 ? "" : "s"} — came across better than expected in {better}.
+        </p>
+      )}
       <p className="hint">Self-reported ratings, kept separate from coaching feedback. Averages across different situations, so treat them as a rough guide.</p>
     </section>
   );

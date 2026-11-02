@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Attempt, Briefing } from "../../shared/types";
 import { fillPrompt, getExercise, pickLearnExercise, SKILLS } from "../../shared/curriculum";
+import { PLAN, currentWeek } from "../../shared/plan";
 import { api } from "../lib/api";
 import { useApp } from "../lib/store";
 import { useSession } from "../lib/useSession";
@@ -64,7 +65,14 @@ export function LearnSession({ storyId }: { storyId: string }) {
   useFocusMode();
   const { data, update, status } = useApp();
   // Fixed for the whole session (finishing increments the completed count).
-  const [exercise] = useState(() => pickLearnExercise(data.sessions.filter((s) => s.mode === "learn" && s.completedAt).length));
+  const [exercise] = useState(() => {
+    // In a guided plan, practise this week's skill; otherwise rotate through skills.
+    if (data.plan) {
+      const wk = PLAN[currentWeek(data.plan, new Date().toISOString()) - 1];
+      if (wk) return getExercise(wk.learnExerciseId);
+    }
+    return pickLearnExercise(data.sessions.filter((s) => s.mode === "learn" && s.completedAt).length);
+  });
   const followUpExercise = getExercise("fu-answer-directly");
   const [briefing, setBriefing] = useState<(Briefing & { sourceChanged: boolean }) | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -93,7 +101,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       .briefing(storyId, refresh)
       .then((b) => {
         setBriefing(b);
-        s.setSession((x) => ({ ...x, storyTitle: b.title, storySource: b.source }));
+        s.setSession((x) => ({ ...x, storyTitle: b.title, storySource: b.source, keyTerm: b.keyTerm }));
       })
       .catch(setLoadError);
   };

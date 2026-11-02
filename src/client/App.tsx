@@ -10,6 +10,7 @@ import { Progress } from "./screens/Progress";
 import { Settings } from "./screens/Settings";
 import { Onboarding } from "./screens/Onboarding";
 import { Confidence } from "./screens/Confidence";
+import { Phrases } from "./screens/Phrases";
 
 const GEAR = "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z";
 
@@ -58,15 +59,16 @@ export function App() {
       {route.name === "onboarding" && <Onboarding />}
       {route.name === "today" && <Today />}
       {route.name === "learn" && <LearnSession key={route.storyId} storyId={route.storyId} />}
-      {route.name === "talk" && <TalkSession key={route.fromStoryId ?? "new"} fromStoryId={route.fromStoryId} />}
+      {route.name === "talk" && <TalkSession key={route.fromStoryId ?? route.scenario ?? "new"} fromStoryId={route.fromStoryId} scenario={route.scenario} />}
       {route.name === "review" && <Review />}
       {route.name === "progress" && <Progress />}
       {route.name === "settings" && <Settings />}
       {route.name === "confidence" && <Confidence />}
+      {route.name === "phrases" && <Phrases />}
 
       <nav className="tabbar" aria-label="Main">
         {NAV.map((n) => {
-          const active = n.route.name === route.name || (n.route.name === "today" && route.name === "review");
+          const active = n.route.name === route.name || (n.route.name === "today" && route.name === "review") || (n.route.name === "progress" && route.name === "phrases");
           return (
             <a key={n.label} href={href(n.route)} aria-current={active ? "page" : undefined} className={active ? "on" : ""}>
               <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">

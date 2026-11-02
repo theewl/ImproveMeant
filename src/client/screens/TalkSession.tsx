@@ -32,10 +32,10 @@ function defaultSetup(id: ScenarioId, fromStoryId?: string): TalkSetup {
   };
 }
 
-export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
+export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromStoryId?: string; scenario?: ScenarioId }) {
   const { data, update, status } = useApp();
-  const [setup, setSetup] = useState<TalkSetup>(() => defaultSetup(fromStoryId ? "explain-group" : "propose-change", fromStoryId));
-  const [phase, setPhase] = useState<Phase>(fromStoryId ? "setup" : "scenario");
+  const [setup, setSetup] = useState<TalkSetup>(() => defaultSetup(initialScenario ?? (fromStoryId ? "explain-group" : "propose-change"), fromStoryId));
+  const [phase, setPhase] = useState<Phase>(fromStoryId || initialScenario ? "setup" : "scenario");
   useFocusMode(phase !== "scenario");
   const [story, setStory] = useState<Briefing | null>(null);
   const [pending, setPending] = useState<Attempt | null>(null);

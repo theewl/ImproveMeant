@@ -150,6 +150,8 @@ export interface Attempt {
   delivery?: DeliveryMetrics;
   /** Key of a recording saved on this device (IndexedDB), only if user opted in. */
   savedAudioKey?: string;
+  /** Observer review (self-reported): how they thought they came across before vs after listening back. 0–10. */
+  selfView?: { predicted: number; observed: number };
   feedback?: Feedback;
 }
 
@@ -207,6 +209,8 @@ export interface PracticeSession {
   storyId?: string;
   storyTitle?: string;
   storySource?: SourceMeta;
+  /** Learn mode: the phrase taught in the briefing, for the phrase bank. */
+  keyTerm?: KeyTerm;
   exerciseId: string;
   skill: SkillId;
   talk?: TalkSetup;
@@ -353,4 +357,11 @@ export interface Experiment {
   whatHappened?: string;
   wentOkay?: string;
   learned?: string;
+}
+
+// ---------- Guided plan ----------
+
+export interface GuidedPlan {
+  startedAt: string;
+  reflections: { week: number; at: string; text: string }[];
 }

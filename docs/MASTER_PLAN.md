@@ -501,15 +501,42 @@ Why this matters: wording that implies treatment can bring an app under medical-
 - **[Q] A validated questionnaire** (for example the Mini-SPIN) for a pilot study only. Check the licence first. It would never be used to diagnose, and it would point people to professional care.
 - **[Q] Clinical review.** Have a clinician review the content and safety copy before any public release.
 
+### Built in this round (borrowed from the most successful apps)
+
+| Feature | Borrowed from | Why |
+|---|---|---|
+| **Guided 4-week plan** | Toastmasters Pathways levels; Duolingo's visible path | People finish and come back when the next step is obvious and progress shows. |
+| **Observer review of recordings** | Video feedback in Clark & Wells | People with social anxiety usually rate themselves worse than they come across. Hearing yourself as the audience would corrects that. |
+| **Phrase bank** | Lexer and Anki | Vocabulary sticks when it's collected, reviewed and used in your own sentences. |
+
+**Guided plan**
+- Each week covers one skill: lead with your point, organise, make it concrete, land the ending.
+- Four tasks a week, ticked off automatically from what you actually do:
+  - explain a story
+  - rehearse a set scenario
+  - one real-world brave step
+  - one supporting task: build the ladder, untangle a thought, do reviews on two days, or the final look-back
+- A look-back after each week.
+- No streaks and no penalties for missing a week.
+
+**Observer review**
+1. After a talk recording, rate how you think you came across (0–10).
+2. Listen back "as an audience member" and rate again.
+3. The app shows the gap.
+
+It's optional and skippable. The ratings are self-reported and shown on the Progress page.
+
+**Phrase bank**
+- Every phrase from a Learn session is listed with its meaning and an example.
+- One tap adds it to reviews, which ask you to use it in a new sentence.
+
 ### Backlog additions
 | When | Item |
 |---|---|
-| **Next** | Recording "observer review": predict how you'll come across, then listen back as if you were an observer. |
 | **Next** | An optional quiet mode with no delivery numbers shown during or straight after anxious practice. |
 | **Next** | Data export. |
 | **Next** | Replace the review ladder with FSRS. |
-| **Next** | A phrase bank, so key terms can be reviewed and reused. |
-| **Later** | A structured 6–8 week guided programme with weekly reviews. This fits the $39 pilot test. |
+| **Later** | Grow the 4-week plan into a 6–8 week programme with human check-ins, to test the $39 pilot offer. |
 | **Later** | A non-diagnostic self-check that points to professional care. |
 | **Later** | Pairing exposure steps with the human-practice phases. |
 | **Avoid** | Live filler-word counters, streak loss-aversion, and AI-generated therapeutic dialogue. That last one carries safety, regulatory and cost risks. |

@@ -16,6 +16,7 @@ export interface AttemptDraft {
   delivery?: DeliveryMetrics;
   audioBlob?: Blob;
   keepAudio: boolean;
+  selfView?: { predicted: number; observed: number };
 }
 
 interface Props {
@@ -96,6 +97,10 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
   const [txState, setTxState] = useState<"none" | "working" | "done" | "error" | "manual">("none");
   const [txError, setTxError] = useState<string | null>(null);
   const [keepAudio, setKeepAudio] = useState(false);
+  // Observer review (talk mode): rate how you came across, listen back as an audience member, rate again.
+  const [obs, setObs] = useState<"predict" | "listen" | "rate" | "done" | "off">(p.focused ? "predict" : "off");
+  const [predicted, setPredicted] = useState(4);
+  const [observed, setObserved] = useState(5);
   const abort = useRef<AbortController | null>(null);
   const txKey = useRef(uid("tx-"));
   const tid = useId();
@@ -199,11 +204,59 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
 
   // stopped (or error with recording)
   const rec = r.recording!;
+
+  if (obs === "predict" || obs === "listen" || obs === "rate") {
+    return (
+      <div className="rec-box done-rec observer">
+        <p className="eyebrow">Listen back as an observer · optional</p>
+        {obs === "predict" && (
+          <>
+            <ObserverSlider id="obs-pred" label="Before listening: how do you think you came across?" value={predicted} onChange={setPredicted} />
+            <div className="stack">
+              <button className="primary" type="button" onClick={() => setObs("listen")}>
+                Listen back
+              </button>
+              <button className="link" type="button" onClick={() => setObs("off")}>
+                Skip
+              </button>
+            </div>
+          </>
+        )}
+        {obs === "listen" && (
+          <>
+            <p className="hint">Listen as if you were in the audience, hearing someone else.</p>
+            <audio controls autoPlay src={rec.url} aria-label={`Play back your recording (${formatSeconds(rec.seconds)})`} onEnded={() => setObs("rate")} />
+            <button className="primary" type="button" onClick={() => setObs("rate")}>
+              Done listening
+            </button>
+          </>
+        )}
+        {obs === "rate" && (
+          <>
+            <ObserverSlider id="obs-seen" label="As an audience member: how did they come across?" value={observed} onChange={setObserved} />
+            <button className="primary" type="button" onClick={() => setObs("done")}>
+              Save
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+  const selfView = obs === "done" ? { predicted, observed } : undefined;
   const edited = original != null && transcript.trim() !== original.trim();
   const words = wordCount(transcript);
   const tooLong = transcript.length > p.maxChars;
   return (
     <div className="rec-box done-rec">
+      {selfView && (
+        <p className="notice ok" role="status">
+          {selfView.observed > selfView.predicted
+            ? `You expected ${selfView.predicted}/10 and heard ${selfView.observed}/10 — you came across better than it felt.`
+            : selfView.observed === selfView.predicted
+              ? `You expected ${selfView.predicted}/10 and heard the same. Your sense of yourself was accurate.`
+              : `You expected ${selfView.predicted}/10 and heard ${selfView.observed}/10. Worth noting what you'd change — then let it go.`}
+        </p>
+      )}
       <audio controls src={rec.url} aria-label={`Play back your recording (${formatSeconds(rec.seconds)})`} />
 
       {txState === "none" && (
@@ -274,6 +327,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
               delivery: manual ? { basis: "recording-length-only", recordingSeconds: rec.seconds, limitations: "No automatic transcript, so pace and pauses weren't measured." } : delivery,
               audioBlob: rec.blob,
               keepAudio,
+              selfView,
             });
           }}
         >
@@ -289,6 +343,24 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
           </button>
         </form>
       )}
+    </div>
+  );
+}
+
+function ObserverSlider({ id, label, value, onChange }: { id: string; label: string; value: number; onChange: (n: number) => void }) {
+  return (
+    <div className="slider">
+      <div className="slider-head">
+        <label className="label" htmlFor={id}>
+          {label}
+        </label>
+        <output htmlFor={id}>{value}/10</output>
+      </div>
+      <input id={id} type="range" min={0} max={10} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <div className="slider-ends" aria-hidden="true">
+        <span>Nervous, unclear</span>
+        <span>Calm, clear</span>
+      </div>
     </div>
   );
 }

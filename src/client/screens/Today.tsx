@@ -6,6 +6,7 @@ import { api, type LiveFeedState } from "../lib/api";
 import { useApp } from "../lib/store";
 import { href } from "../lib/router";
 import { ErrorNotice, Loading, SourceLine } from "../components/common";
+import { PlanCard } from "../components/PlanCard";
 
 export function Today() {
   const { data } = useApp();
@@ -44,6 +45,8 @@ export function Today() {
             ? `Picked for you: ${interestNames.join(", ")}`
             : "A mix of ideas worth knowing"}
       </p>
+
+      <PlanCard learnStoryId={featured?.id} />
 
       {queue.length > 0 && (
         <a className="pill-link" href={href({ name: "review" })}>

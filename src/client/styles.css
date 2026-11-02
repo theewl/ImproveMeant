@@ -1265,3 +1265,86 @@ button.small {
 .small-dd {
   font-size: 1.2rem !important;
 }
+
+/* ---------- Plan, phrases, observer ---------- */
+.plan {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 1.1rem 1.2rem;
+  margin: 1rem 0;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
+}
+.plan h3 {
+  font: 600 1.3rem/1.25 var(--serif);
+  margin: 0.15rem 0 0.75rem;
+}
+.tasks {
+  list-style: none;
+  padding: 0;
+  margin: 0.9rem 0 0.25rem;
+}
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0;
+  min-height: 44px;
+}
+.task-item a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 4px;
+}
+.task-item.done {
+  color: var(--ink-2);
+}
+.tick {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.task-item.done .tick {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--surface);
+}
+.lookback {
+  margin: 0.75rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.lookback .primary {
+  margin-top: 0.5rem;
+}
+.phrases {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.phrase {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+.phrase p {
+  margin-bottom: 0.4rem;
+}
+.observer .stack {
+  align-items: stretch;
+}
+.observer audio {
+  margin: 0.5rem 0 0.75rem;
+}
+.observer > .primary {
+  width: 100%;
+}

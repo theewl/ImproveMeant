@@ -325,6 +325,39 @@ describe("Confidence tools", () => {
   });
 });
 
+describe("Guided plan and phrase bank", () => {
+  it("starts a 4-week plan on Today with this week's tasks linked", async () => {
+    const user = userEvent.setup();
+    start("#/today", onboarded());
+    await user.click(await screen.findByRole("button", { name: /Start a 4-week plan/ }));
+    expect(await screen.findByText(/Week 1 of 4/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Lead with your point" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Rehearse: introduce yourself" })).toHaveAttribute("href", "#/talk/s:introduce");
+    expect(stored().plan?.startedAt).toBeTruthy();
+  });
+
+  it("opens the plan's talk scenario directly", async () => {
+    start("#/talk/s:introduce", onboarded());
+    await screen.findByRole("heading", { name: "Set up your talk" });
+    expect(screen.getByText("Introduce yourself")).toBeInTheDocument();
+  });
+
+  it("collects the session phrase into the phrase bank and adds it to reviews", async () => {
+    const user = userEvent.setup();
+    start("#/learn/eg-goodhart", onboarded());
+    await user.click(await screen.findByRole("button", { name: /hide the briefing/ }));
+    await user.type(screen.getByRole("textbox", { name: "Your explanation" }), "Rewarding a number makes people game it.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByRole("heading", { name: "Your feedback" });
+    cleanup();
+    start("#/phrases", stored());
+    expect(await screen.findByText("proxy")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Practise in reviews" }));
+    expect(await screen.findByText("✓ In your reviews")).toBeInTheDocument();
+    expect(stored().reviews.some((r) => r.kind === "phrase" && r.prompt.includes('"proxy"'))).toBe(true);
+  });
+});
+
 describe("onboarding", () => {
   it("is short, limits interests to three, and is skippable", async () => {
     const user = userEvent.setup();

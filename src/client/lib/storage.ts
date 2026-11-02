@@ -1,4 +1,4 @@
-import type { Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
+import type { GuidedPlan, Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
 
 // Local persistence for a private single-user MVP.
 // Limitations (documented in README): data lives only in this browser profile,
@@ -16,6 +16,8 @@ export interface AppData {
   experiments: Experiment[];
   ladder: LadderStep[];
   reframes: Reframe[];
+  /** Optional 4-week guided plan. */
+  plan?: GuidedPlan;
   /** User has seen the "self-help, not therapy" note. */
   confidenceIntroSeen: boolean;
   /** User has acknowledged that audio is sent to the transcription provider. */

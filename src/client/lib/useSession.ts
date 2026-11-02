@@ -49,6 +49,7 @@ export function useSession(init: () => PracticeSession) {
       durationSeconds: draft.durationSeconds,
       delivery: draft.delivery,
       savedAudioKey,
+      selfView: draft.selfView,
     };
   }, []);
 
