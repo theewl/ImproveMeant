@@ -327,7 +327,7 @@ export interface LadderStep {
   id: string;
   createdAt: string;
   title: string;
-  /** Expected discomfort, 0–100 (self-reported). */
+  /** Expected discomfort, 0–10 (self-reported; same scale as anxiety check-ins). */
   expectedDiscomfort: number;
   archived?: boolean;
 }

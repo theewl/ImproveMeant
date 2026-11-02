@@ -1,6 +1,8 @@
 # Master Plan: Clearline (working name)
 
 > **Stay informed. Remember what matters. Have something to say.**
+>
+> Update 2026-11-02: the scope now also includes CBT-informed self-help for speaking anxiety. See §9.
 
 **Status:** living document. First written 2026-11-02, alongside the private MVP on branch `claude/mvp-learn-explain`.
 
@@ -442,6 +444,75 @@ These are estimates. **Measured usage: none yet.** No live calls were made durin
 - **Unsupported scoring:** any "confidence", "charisma" or mastery percentage.
 
 ---
+
+## 9. Confidence: CBT-informed self-help for speaking and social anxiety (added 2026-11-02)
+
+**Scope change [D].** The product goal now covers four areas, all aimed at one outcome: *getting your thoughts into a clear spoken explanation*.
+- Public speaking
+- Social and speaking anxiety
+- Memory
+- Vocabulary and verbalisation
+
+Anxiety support is **self-help based on CBT techniques**. It is not therapy, and it makes no diagnosis.
+
+Sources: `docs/research/2026-11-cbt-and-best-apps.md`, accessed 2026-11-02. Most items there are search-indexed rather than fetched, and some are marked as prior knowledge only. Verify them before using them in public copy.
+
+### Evidence we rely on
+- **[E] Guidelines.** NICE CG159 recommends individual CBT built specifically for social anxiety disorder (the Clark & Wells or Heimberg model) as the first choice for adults. Adults who decline it should be offered CBT-based supported self-help. That second role is the honest frame for Clearline.
+- **[E] Model components we can build features from** (Clark & Wells):
+  - self-focused attention
+  - safety behaviours
+  - behavioural experiments (predict, test, compare)
+  - video or recording feedback
+  - worry before and replay after a speaking event
+- **[E] Internet-delivered CBT** for social anxiety shows moderate-to-large effects against passive controls. Guided programmes beat unguided ones by only a small margin. Weaknesses in that evidence:
+  - many trials compare against waitlists
+  - participants are self-selected
+  - real-world dropout is higher than in trials
+  - we found no meta-analysis of apps alone
+- **[E] Exposure.** Current thinking favours designing exposure to break expectations, rather than waiting for anxiety to fade. That supports comparing predictions with outcomes.
+- **[E] Simulated or VR audiences** reduce public speaking anxiety compared with no treatment, but there are few randomised trials, and real-world exposure does slightly better.
+- **[E] Spaced practice** helps adults learn vocabulary.
+
+### What's built (deterministic, on-device, no AI)
+- **Behavioural experiments ("brave steps").** Before: what you'll do, what you fear, how likely it feels, and your anxiety (0–10). Optionally, one safety behaviour to drop and a tip to focus outward. Afterwards: did the feared outcome happen, anxiety during, one thing that went okay, what you learned. A "no need to replay it" close discourages going over it again afterwards. Over time the app shows "X of Y feared outcomes didn't happen".
+- **Brave steps ladder (graded exposure).** You rank situations by expected discomfort (0–10), starting from suggestions or your own. The app suggests the easiest step you haven't yet done at about 4/10 or lower, and explains that repeating a step is how it gets easier.
+- **Untangle a thought (cognitive restructuring).** Four steps:
+  1. Write the thought and how much you believe it.
+  2. Pick any thinking traps that fit, from eight described in our own words.
+  3. Answer questions matched to the traps you picked: what doesn't fit the thought, and what you'd tell a friend.
+  4. Write a balanced thought and re-rate how much you believe the original.
+- **Talk rehearsal check-in.** Optional, before and after a talk. It saves a rehearsal experiment.
+- **Safety.** A first-visit note: self-help, not therapy, see a professional if anxiety is affecting daily life. If crisis wording is typed, the app shows 988, findahelpline.com and a reminder to call emergency services. "Get help now" also appears in Confidence and Settings.
+- **Privacy.** Confidence data stays in the browser and is never sent to the AI. It's deleted with the rest of your history.
+
+### Claims we must not make [D]
+- That Clearline treats or diagnoses anything, or is therapy.
+- That it is clinically proven, FDA-cleared or endorsed by NICE.
+- Outcome numbers borrowed from other programmes' trials, or uncontrolled figures like "90% feel better".
+- That the simulated audience is VR exposure therapy.
+- That the AI is a counsellor, or that it watches for crises.
+- Any affiliation with Anxiety Canada, CCI or the NHS, or text copied from them.
+
+Why this matters: wording that implies treatment can bring an app under medical-device rules (FDA and MHRA guidance on intended purpose).
+
+### Measurement
+- Self-reported anxiety and predictions stay separate from coaching observations, and are labelled "self-reported".
+- **[Q] A validated questionnaire** (for example the Mini-SPIN) for a pilot study only. Check the licence first. It would never be used to diagnose, and it would point people to professional care.
+- **[Q] Clinical review.** Have a clinician review the content and safety copy before any public release.
+
+### Backlog additions
+| When | Item |
+|---|---|
+| **Next** | Recording "observer review": predict how you'll come across, then listen back as if you were an observer. |
+| **Next** | An optional quiet mode with no delivery numbers shown during or straight after anxious practice. |
+| **Next** | Data export. |
+| **Next** | Replace the review ladder with FSRS. |
+| **Next** | A phrase bank, so key terms can be reviewed and reused. |
+| **Later** | A structured 6–8 week guided programme with weekly reviews. This fits the $39 pilot test. |
+| **Later** | A non-diagnostic self-check that points to professional care. |
+| **Later** | Pairing exposure steps with the human-practice phases. |
+| **Avoid** | Live filler-word counters, streak loss-aversion, and AI-generated therapeutic dialogue. That last one carries safety, regulatory and cost risks. |
 
 ## Appendix A: Implementation plan used for the MVP
 1. **Shared domain:** types, curriculum, the evergreen library, scheduling, and text and measurement utilities.

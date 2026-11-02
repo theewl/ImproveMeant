@@ -44,7 +44,7 @@ describe("content", () => {
   it("has complete thinking-trap and starter-step content", () => {
     expect(THINKING_TRAPS.length).toBeGreaterThanOrEqual(6);
     for (const t of THINKING_TRAPS) expect(t.name && t.plain && t.question).toBeTruthy();
-    expect(STARTER_STEPS.every((s) => s.expectedDiscomfort > 0 && s.expectedDiscomfort <= 100)).toBe(true);
+    expect(STARTER_STEPS.every((s) => s.expectedDiscomfort > 0 && s.expectedDiscomfort <= 10)).toBe(true);
   });
 });
 

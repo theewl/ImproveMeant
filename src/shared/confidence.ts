@@ -69,12 +69,12 @@ export const SAFETY_BEHAVIOURS = [
 
 /** One-tap starter steps for the brave-steps ladder, roughly easiest first. */
 export const STARTER_STEPS: { title: string; expectedDiscomfort: number }[] = [
-  { title: "Say one comment in a small meeting", expectedDiscomfort: 30 },
-  { title: "Ask a question in a meeting", expectedDiscomfort: 40 },
-  { title: "Explain an idea to a colleague, one-on-one", expectedDiscomfort: 35 },
-  { title: "Give a 1-minute update to my team", expectedDiscomfort: 55 },
-  { title: "Disagree politely in a meeting", expectedDiscomfort: 65 },
-  { title: "Present for 5 minutes to a group", expectedDiscomfort: 80 },
+  { title: "Say one comment in a small meeting", expectedDiscomfort: 3 },
+  { title: "Ask a question in a meeting", expectedDiscomfort: 4 },
+  { title: "Explain an idea to a colleague, one-on-one", expectedDiscomfort: 3 },
+  { title: "Give a 1-minute update to my team", expectedDiscomfort: 5 },
+  { title: "Disagree politely in a meeting", expectedDiscomfort: 6 },
+  { title: "Present for 5 minutes to a group", expectedDiscomfort: 8 },
 ];
 
 export const OUTWARD_FOCUS_TIP =

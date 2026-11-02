@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../lib/store";
 import { PreferencesForm } from "./Onboarding";
+import { CrisisList } from "./Confidence";
 
 export function Settings() {
   const { data, update, deleteAll, status, refreshStatus } = useApp();
@@ -71,6 +72,11 @@ export function Settings() {
           <input type="checkbox" checked={data.transcriptionConsent} onChange={(e) => update((d) => ({ ...d, transcriptionConsent: e.target.checked }))} />
           I've read how transcription works (unticking shows the explanation again)
         </label>
+        <details className="more">
+          <summary>Get help now</summary>
+          <p className="hint">This app isn't a crisis service. If you're struggling, please reach out:</p>
+          <CrisisList />
+        </details>
         <div className="danger-zone">
           <h4>Delete history</h4>
           <p className="hint">

@@ -16,6 +16,8 @@ import { formatDate } from "../components/common";
 
 type View = { name: "home" } | { name: "plan"; step?: LadderStep } | { name: "checkin"; id: string } | { name: "ladder" } | { name: "reframe" };
 
+export { CrisisList };
+
 export function Confidence() {
   const { data, update } = useApp();
   const [view, setView] = useState<View>({ name: "home" });
@@ -109,7 +111,7 @@ export function Confidence() {
                 const last = tries[tries.length - 1];
                 return last
                   ? `Tried ${tries.length}× · last time ${last.anxietyAfter}/10. Repeating a step until it feels about 4/10 is how it gets easier.`
-                  : `Expected discomfort: ${next.expectedDiscomfort}/100`;
+                  : `Expected discomfort: ${next.expectedDiscomfort}/10`;
               })()}
             </p>
             <button className="primary" type="button" onClick={() => go({ name: "plan", step: next })}>
@@ -161,9 +163,10 @@ export function Confidence() {
 }
 
 function resultMessage(e: Experiment): string {
-  if (e.outcome === "didnt-happen") return `What you feared didn't happen. You rated it ${e.predictionLikelihood}% likely beforehand.`;
-  if (e.outcome === "partly") return "Part of it happened — and you got through it. That's useful evidence too.";
-  return "It happened, and you got through it. Note what helped for next time.";
+  const close = " That's logged — no need to replay it.";
+  if (e.outcome === "didnt-happen") return `What you feared didn't happen. You rated it ${e.predictionLikelihood}% likely beforehand.${close}`;
+  if (e.outcome === "partly") return `Part of it happened — and you got through it. That's useful evidence too.${close}`;
+  return `It happened, and you got through it. Note what helped for next time.${close}`;
 }
 
 // ---------- Shared bits ----------
@@ -348,7 +351,7 @@ function CheckIn({ exp, onCancel, onSave }: { exp: Experiment; onCancel: () => v
 function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep) => void }) {
   const { data, update } = useApp();
   const [title, setTitle] = useState("");
-  const [disc, setDisc] = useState(50);
+  const [disc, setDisc] = useState(5);
   const steps = activeLadder(data.ladder);
   const suggestions = STARTER_STEPS.filter((s) => !steps.some((x) => x.title === s.title)).slice(0, steps.length === 0 ? 6 : 3);
   const add = (t: string, d: number) =>
@@ -376,7 +379,7 @@ function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep
             const last = tries[tries.length - 1];
             return (
               <li key={s.id} className="rung">
-                <span className="rung-score" aria-label={`Expected discomfort ${s.expectedDiscomfort} out of 100`}>
+                <span className="rung-score" aria-label={`Expected discomfort ${s.expectedDiscomfort} out of 10`}>
                   {s.expectedDiscomfort}
                 </span>
                 <span className="rung-body">
@@ -418,7 +421,7 @@ function Ladder({ onBack, onPlan }: { onBack: () => void; onPlan: (s: LadderStep
           Add your own step
         </label>
         <input id="new-step" value={title} maxLength={140} placeholder="e.g. Introduce myself at the all-hands" onChange={(e) => setTitle(e.target.value)} />
-        <Slider label="Expected discomfort" value={disc} onChange={setDisc} min={0} max={100} />
+        <Slider label="Expected discomfort" value={disc} onChange={setDisc} min={0} max={10} suffix="/10" />
         <button className="secondary" type="submit" disabled={title.trim().length < 3}>
           Add step
         </button>
