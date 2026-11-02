@@ -7,6 +7,7 @@ export type Route =
   | { name: "review" }
   | { name: "progress" }
   | { name: "settings" }
+  | { name: "confidence" }
   | { name: "onboarding" };
 
 export function parseHash(hash: string): Route {
@@ -19,6 +20,7 @@ export function parseHash(hash: string): Route {
     case "review":
     case "progress":
     case "settings":
+    case "confidence":
     case "onboarding":
       return { name: parts[0] };
     default:

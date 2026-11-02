@@ -3,6 +3,7 @@ import type { Attempt, PracticeSession } from "../../shared/types";
 import { MISSIONS, SKILLS, SKILL_ORDER, getScenario } from "../../shared/curriculum";
 import { audioStore } from "../lib/audioStore";
 import { addRealWorld, summarize, upsertSession } from "../lib/state";
+import { summarizeExperiments } from "../../shared/confidence";
 import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
@@ -69,6 +70,8 @@ export function Progress() {
         <p className="hint">Self-assessed after revealing the answer.</p>
       </section>
 
+      <ConfidenceSummary />
+
       <Missions />
 
       <section aria-labelledby="hist-h">
@@ -76,6 +79,43 @@ export function Progress() {
         {sessions.length === 0 ? <p className="hint">Your sessions will appear here.</p> : sessions.map((s) => <SessionEntry key={s.id} s={s} />)}
       </section>
     </main>
+  );
+}
+
+function ConfidenceSummary() {
+  const { data } = useApp();
+  const c = summarizeExperiments(data.experiments);
+  if (c.completed === 0 && data.reframes.length === 0) return null;
+  return (
+    <section aria-labelledby="conf-h">
+      <h3 id="conf-h">Confidence</h3>
+      <dl className="stats">
+        <div>
+          <dt>Brave steps done</dt>
+          <dd>{c.completed}</dd>
+        </div>
+        <div>
+          <dt>Fears that didn't happen</dt>
+          <dd>
+            {c.fearNotHappened}
+            {c.completed ? <span className="of"> of {c.completed}</span> : null}
+          </dd>
+        </div>
+        <div>
+          <dt>Thoughts untangled</dt>
+          <dd>{data.reframes.length}</dd>
+        </div>
+        {c.avgBefore != null && c.avgAfter != null && (
+          <div>
+            <dt>Anxiety before → during</dt>
+            <dd className="small-dd">
+              {c.avgBefore} → {c.avgAfter}
+            </dd>
+          </div>
+        )}
+      </dl>
+      <p className="hint">Self-reported ratings, kept separate from coaching feedback. Averages across different situations, so treat them as a rough guide.</p>
+    </section>
   );
 }
 

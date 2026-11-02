@@ -1,4 +1,4 @@
-import type { Preferences, PracticeSession, RealWorldAttempt, ReviewItem } from "../../shared/types";
+import type { Experiment, LadderStep, Preferences, PracticeSession, RealWorldAttempt, Reframe, ReviewItem } from "../../shared/types";
 
 // Local persistence for a private single-user MVP.
 // Limitations (documented in README): data lives only in this browser profile,
@@ -12,6 +12,12 @@ export interface AppData {
   sessions: PracticeSession[];
   reviews: ReviewItem[];
   realWorld: RealWorldAttempt[];
+  /** Confidence tools (CBT-informed self-help). */
+  experiments: Experiment[];
+  ladder: LadderStep[];
+  reframes: Reframe[];
+  /** User has seen the "self-help, not therapy" note. */
+  confidenceIntroSeen: boolean;
   /** User has acknowledged that audio is sent to the transcription provider. */
   transcriptionConsent: boolean;
 }
@@ -19,7 +25,18 @@ export interface AppData {
 export const DEFAULT_PREFS: Preferences = { interests: [], goal: "meetings", sessionMinutes: 5, onboarded: false };
 
 export function emptyData(): AppData {
-  return { version: 1, prefs: { ...DEFAULT_PREFS }, sessions: [], reviews: [], realWorld: [], transcriptionConsent: false };
+  return {
+    version: 1,
+    prefs: { ...DEFAULT_PREFS },
+    sessions: [],
+    reviews: [],
+    realWorld: [],
+    experiments: [],
+    ladder: [],
+    reframes: [],
+    confidenceIntroSeen: false,
+    transcriptionConsent: false,
+  };
 }
 
 export function loadData(storage: Storage = localStorage): AppData {

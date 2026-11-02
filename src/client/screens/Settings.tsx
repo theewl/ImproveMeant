@@ -61,6 +61,7 @@ export function Settings() {
         <h3 id="privacy-h">Your data</h3>
         <ul className="plain">
           <li>Preferences, answers, transcripts, feedback and review dates are stored only in this browser (local storage). They aren't synced or backed up.</li>
+          <li>Confidence notes (brave steps, check-ins, thoughts) stay in this browser and are never sent to the AI service.</li>
           <li>Recordings are not saved unless you tick “Keep this recording”. Saved recordings stay in this browser.</li>
           <li>When AI coaching is on, your answer text (not audio) is sent to Anthropic's API to generate feedback.</li>
           <li>When transcription is on and you choose to transcribe, the audio is sent to Deepgram. The server asks Deepgram not to retain it.</li>
@@ -73,7 +74,7 @@ export function Settings() {
         <div className="danger-zone">
           <h4>Delete history</h4>
           <p className="hint">
-            Deletes all sessions, transcripts, feedback, reviews, real-world logs and saved recordings from this browser. It can't delete copies already processed by
+            Deletes all sessions, transcripts, feedback, reviews, confidence notes, real-world logs and saved recordings from this browser. It can't delete copies already processed by
             Anthropic or Deepgram under their own retention policies.
           </p>
           <button

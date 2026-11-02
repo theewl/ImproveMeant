@@ -210,13 +210,14 @@ describe("Review and history", () => {
   it("deletes all history from Settings", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    start("#/settings", onboarded({ reviews: [due], realWorld: [{ id: "w", at: "2026-10-01T00:00:00Z", missionId: "ask-meeting", note: "x" }] }));
+    start("#/settings", onboarded({ reviews: [due], realWorld: [{ id: "w", at: "2026-10-01T00:00:00Z", missionId: "ask-meeting", note: "x" }], ladder: [{ id: "l", createdAt: "2026-10-01T00:00:00Z", title: "x", expectedDiscomfort: 40 }] }));
     await user.click(await screen.findByRole("button", { name: "Delete all history" }));
     await screen.findByText("History deleted.");
     const d = stored();
     expect(d.reviews).toHaveLength(0);
     expect(d.sessions).toHaveLength(0);
     expect(d.realWorld).toHaveLength(0);
+    expect(d.ladder).toHaveLength(0);
   });
 
   it("shows progress after a reload with spoken and written sessions counted separately", async () => {
@@ -236,6 +237,91 @@ describe("Review and history", () => {
     const dl = stats.closest("dl")!;
     expect(within(dl).getByText("Spoken sessions").nextSibling).toHaveTextContent("1");
     expect(within(dl).getByText("Written sessions").nextSibling).toHaveTextContent("2");
+  });
+});
+
+describe("Confidence tools", () => {
+  it("builds a ladder, plans a brave step, checks in afterwards, and shows prediction vs outcome", async () => {
+    const user = userEvent.setup();
+    start("#/confidence", onboarded());
+    await screen.findByRole("heading", { name: "Confidence" });
+    expect(screen.getByText(/not therapy or a diagnosis/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Got it" }));
+
+    await user.click(screen.getByRole("button", { name: /Brave steps ladder/ }));
+    await user.click(await screen.findByRole("button", { name: "+ Ask a question in a meeting" }));
+    await user.click(screen.getByRole("button", { name: "+ Give a 1-minute update to my team" }));
+    await user.click(screen.getAllByRole("button", { name: "Plan" }).at(-1)!); // easiest rung is last (ladder shown hardest first)
+    await screen.findByRole("heading", { name: "Plan it" });
+    expect(screen.getByRole("textbox", { name: "What will you do?" })).toHaveValue("Ask a question in a meeting");
+    await user.type(screen.getByRole("textbox", { name: "What are you worried will happen?" }), "My voice will shake and people will notice");
+    await user.click(screen.getByLabelText("Avoiding eye contact"));
+    await user.click(screen.getByRole("button", { name: "Save my plan" }));
+
+    await user.click(await screen.findByRole("button", { name: /How did it go\?/ }));
+    await user.click(screen.getByLabelText("No, it didn't"));
+    await user.type(screen.getByRole("textbox", { name: "One thing that went okay" }), "I asked it clearly");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText(/What you feared didn't happen/);
+    expect(screen.getByText(/feared outcome didn't happen/)).toBeInTheDocument();
+
+    const d = stored();
+    expect(d.ladder).toHaveLength(2);
+    expect(d.experiments).toHaveLength(1);
+    expect(d.experiments[0]).toMatchObject({ situation: "Ask a question in a meeting", outcome: "didnt-happen", safetyBehaviourToDrop: "Avoiding eye contact", wentOkay: "I asked it clearly" });
+    expect(d.experiments[0]!.ladderStepId).toBe(d.ladder.find((l) => l.title.startsWith("Ask"))!.id);
+  });
+
+  it("walks through untangling a thought and saves it", async () => {
+    const user = userEvent.setup();
+    start("#/confidence", onboarded({ confidenceIntroSeen: true }));
+    await user.click(await screen.findByRole("button", { name: /Untangle a thought/ }));
+    await user.type(screen.getByRole("textbox", { name: "What's the anxious thought?" }), "Everyone will think I'm incompetent");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: /Mind reading/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText(/What did people actually say or do/)).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "What doesn't fit the thought?" }), "My last update went fine");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByRole("textbox", { name: "Write a more balanced thought" }), "Some people may not notice at all");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText(/Nice work untangling/);
+    expect(stored().reframes[0]).toMatchObject({ thought: "Everyone will think I'm incompetent", traps: ["mind-reading"], balanced: "Some people may not notice at all" });
+  });
+
+  it("shows crisis resources when crisis language is typed", async () => {
+    const user = userEvent.setup();
+    start("#/confidence", onboarded({ confidenceIntroSeen: true }));
+    await user.click(await screen.findByRole("button", { name: /Untangle a thought/ }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "What's the anxious thought?" }), "I want to kill myself");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/988/);
+  });
+
+  it("records an optional anxiety check-in around a talk rehearsal", async () => {
+    const user = userEvent.setup();
+    start("#/talk/eg-goodhart", onboarded());
+    await screen.findByRole("heading", { name: "Set up your talk" });
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Topic" })).not.toHaveValue(""));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(await screen.findByText("Feeling nervous? Quick check-in"));
+    const details = screen.getByText("Feeling nervous? Quick check-in").closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    fireEvent.change(screen.getByLabelText(/How anxious do you feel/), { target: { value: "8" } });
+    await user.type(screen.getByRole("textbox", { name: /What are you worried will happen/ }), "I'll lose my thread");
+    await user.click(screen.getByRole("button", { name: "I'm ready to present" }));
+    await user.type(await screen.findByRole("textbox", { name: "Your talk" }), "When a measure becomes a target, people game it.");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(await screen.findByRole("button", { name: "Skip the question" }));
+    await user.click(await screen.findByRole("button", { name: "Finish" }));
+    await user.click(screen.getByRole("button", { name: "Finish session" }));
+    await screen.findByText(/Before, you felt 8\/10/);
+    await user.click(screen.getByLabelText("No"));
+    await user.click(screen.getByRole("button", { name: "Save check-in" }));
+    await screen.findByText("Saved to Confidence.");
+    expect(stored().experiments[0]).toMatchObject({ kind: "rehearsal", anxietyBefore: 8, prediction: "I'll lose my thread", outcome: "didnt-happen" });
   });
 });
 

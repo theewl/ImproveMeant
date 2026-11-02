@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Attempt, AudienceQuestion, Briefing, ScenarioId, TalkSetup } from "../../shared/types";
+import type { Attempt, AudienceQuestion, Briefing, Experiment, ScenarioId, TalkSetup } from "../../shared/types";
+import { OUTWARD_FOCUS_TIP } from "../../shared/confidence";
 import { SCENARIOS, SKILLS, fillPrompt, getExercise, getScenario } from "../../shared/curriculum";
 import { formatSeconds } from "../../shared/observations";
 import { api } from "../lib/api";
@@ -45,6 +46,8 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
   const [isRetry, setIsRetry] = useState(false);
   const [saveSkill, setSaveSkill] = useState(true);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [checkin, setCheckin] = useState<{ anxietyBefore: number; prediction: string } | null>(null);
+  const [checkinSaved, setCheckinSaved] = useState(false);
   const qKey = useRef(uid("q-"));
 
   const scenario = getScenario(setup.scenarioId);
@@ -290,7 +293,16 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
       )}
 
       {phase === "prepare" && (
-        <Prepare setup={setup} task={task} retryFocus={isRetry ? last?.feedback?.retryFocus ?? null : null} onReady={() => setPhase("present")} />
+        <Prepare
+          setup={setup}
+          task={task}
+          retryFocus={isRetry ? last?.feedback?.retryFocus ?? null : null}
+          showCheckin={!isRetry}
+          onReady={(c) => {
+            if (c) setCheckin(c);
+            setPhase("present");
+          }}
+        />
       )}
 
       {phase === "present" && (
@@ -402,6 +414,29 @@ export function TalkSession({ fromStoryId }: { fromStoryId?: string }) {
             {retries ? ` · ${retries} retr${retries === 1 ? "y" : "ies"}` : ""}
           </p>
           {saveMsg && <p className="hint">{saveMsg}</p>}
+          {checkin && !checkinSaved && (
+            <AfterCheckin
+              checkin={checkin}
+              onSave={(anxietyAfter, outcome) => {
+                const e: Experiment = {
+                  id: uid("x-"),
+                  createdAt: s.session.startedAt,
+                  kind: "rehearsal",
+                  sessionId: s.session.id,
+                  situation: `Rehearsal: ${scenario.title}${setup.topic ? ` — ${setup.topic}` : ""}`,
+                  prediction: checkin.prediction || "It would go badly",
+                  predictionLikelihood: 50,
+                  anxietyBefore: checkin.anxietyBefore,
+                  completedAt: new Date().toISOString(),
+                  anxietyAfter,
+                  outcome,
+                };
+                update((d) => ({ ...d, experiments: [...d.experiments, e] }));
+                setCheckinSaved(true);
+              }}
+            />
+          )}
+          {checkinSaved && <p className="notice ok">Saved to Confidence.</p>}
           <p className="hint">In your next real meeting, try opening with your main point.</p>
           <div className="actions">
             <a className="button primary" href={href({ name: "today" })}>
@@ -456,8 +491,64 @@ function SecondQuestion({
   );
 }
 
-function Prepare({ setup, task, retryFocus, onReady }: { setup: TalkSetup; task: string; retryFocus: string | null; onReady: () => void }) {
+function AfterCheckin({ checkin, onSave }: { checkin: { anxietyBefore: number; prediction: string }; onSave: (anxietyAfter: number, outcome: NonNullable<Experiment["outcome"]>) => void }) {
+  const [after, setAfter] = useState(checkin.anxietyBefore);
+  const [outcome, setOutcome] = useState<Experiment["outcome"]>();
+  return (
+    <form
+      className="checkin-after"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (outcome) onSave(after, outcome);
+      }}
+    >
+      <p className="eyebrow">Before, you felt {checkin.anxietyBefore}/10{checkin.prediction ? ` and worried: “${checkin.prediction}”` : ""}</p>
+      <div className="slider-head">
+        <label className="label" htmlFor="after-anx">
+          How anxious did you feel while speaking?
+        </label>
+        <output htmlFor="after-anx">{after}/10</output>
+      </div>
+      <input id="after-anx" type="range" min={0} max={10} value={after} onChange={(e) => setAfter(Number(e.target.value))} />
+      <fieldset className="pills">
+        <legend className="label">Did what you worried about happen?</legend>
+        {(
+          [
+            ["didnt-happen", "No"],
+            ["partly", "Partly"],
+            ["happened", "Yes"],
+          ] as const
+        ).map(([v, l]) => (
+          <label key={v} className={outcome === v ? "pill on" : "pill"}>
+            <input type="radio" name="after-outcome" checked={outcome === v} onChange={() => setOutcome(v)} />
+            {l}
+          </label>
+        ))}
+      </fieldset>
+      <button className="secondary" type="submit" disabled={!outcome}>
+        Save check-in
+      </button>
+    </form>
+  );
+}
+
+function Prepare({
+  setup,
+  task,
+  retryFocus,
+  showCheckin,
+  onReady,
+}: {
+  setup: TalkSetup;
+  task: string;
+  retryFocus: string | null;
+  showCheckin: boolean;
+  onReady: (checkin: { anxietyBefore: number; prediction: string } | null) => void;
+}) {
   const [prepLeft, setPrepLeft] = useState<number | null>(null);
+  const [useCheckin, setUseCheckin] = useState(false);
+  const [anx, setAnx] = useState(5);
+  const [prediction, setPrediction] = useState("");
   useEffect(() => {
     if (prepLeft == null || prepLeft <= 0) return;
     const t = window.setTimeout(() => setPrepLeft((x) => (x == null ? x : x - 1)), 1000);
@@ -477,8 +568,25 @@ function Prepare({ setup, task, retryFocus, onReady }: { setup: TalkSetup; task:
           {prepLeft > 0 ? formatSeconds(prepLeft) : "Time's up"}
         </p>
       )}
+      {showCheckin && (
+        <details className="more" onToggle={(e) => setUseCheckin((e.target as HTMLDetailsElement).open)}>
+          <summary>Feeling nervous? Quick check-in</summary>
+          <div className="slider-head">
+            <label className="label" htmlFor="pre-anx">
+              How anxious do you feel?
+            </label>
+            <output htmlFor="pre-anx">{anx}/10</output>
+          </div>
+          <input id="pre-anx" type="range" min={0} max={10} value={anx} onChange={(e) => setAnx(Number(e.target.value))} />
+          <label className="label" htmlFor="pre-pred">
+            What are you worried will happen? (optional)
+          </label>
+          <input id="pre-pred" value={prediction} maxLength={300} placeholder="e.g. I'll lose my thread halfway" onChange={(e) => setPrediction(e.target.value)} />
+          <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
+        </details>
+      )}
       <div className="actions sticky">
-        <button className="primary" type="button" onClick={onReady}>
+        <button className="primary" type="button" onClick={() => onReady(useCheckin ? { anxietyBefore: anx, prediction: prediction.trim() } : null)}>
           I'm ready to present
         </button>
         {prepLeft == null && (

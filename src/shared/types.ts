@@ -294,3 +294,63 @@ export interface ApiError {
     | "empty_response";
   retryable: boolean;
 }
+
+// ---------- Confidence (CBT-informed self-help; not therapy) ----------
+
+export type ThinkingTrap =
+  | "mind-reading"
+  | "fortune-telling"
+  | "catastrophising"
+  | "spotlight"
+  | "all-or-nothing"
+  | "discounting-positives"
+  | "shoulds"
+  | "labelling";
+
+/** "Untangle a thought": a cognitive-restructuring worksheet entry. */
+export interface Reframe {
+  id: string;
+  at: string;
+  situation: string;
+  thought: string;
+  /** How much the learner believed the thought, 0–100 (self-reported). */
+  beliefBefore: number;
+  traps: ThinkingTrap[];
+  evidenceAgainst: string;
+  friendAdvice: string;
+  balanced: string;
+  beliefAfter?: number;
+}
+
+/** A rung on the brave-steps ladder (graded exposure). */
+export interface LadderStep {
+  id: string;
+  createdAt: string;
+  title: string;
+  /** Expected discomfort, 0–100 (self-reported). */
+  expectedDiscomfort: number;
+  archived?: boolean;
+}
+
+/** A behavioural experiment: predict, do it, compare. */
+export interface Experiment {
+  id: string;
+  createdAt: string;
+  kind: "real-world" | "rehearsal";
+  situation: string;
+  ladderStepId?: string;
+  sessionId?: string;
+  /** What the learner fears will happen. */
+  prediction: string;
+  /** How likely they think it is, 0–100. */
+  predictionLikelihood: number;
+  /** Anxiety before, 0–10 (self-reported). */
+  anxietyBefore: number;
+  safetyBehaviourToDrop?: string;
+  completedAt?: string;
+  anxietyAfter?: number;
+  outcome?: "happened" | "partly" | "didnt-happen";
+  whatHappened?: string;
+  wentOkay?: string;
+  learned?: string;
+}
