@@ -32,6 +32,8 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
   const [comfortAfter, setComfortAfter] = useState(5);
   const [sendFrames, setSendFrames] = useState(data.cameraFramesConsent);
   const [isRetry, setIsRetry] = useState(false);
+  // Remount the take only when the learner asks for another take, never while feedback is in flight.
+  const [takeKey, setTakeKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [pending, setPending] = useState<Attempt | null>(null);
@@ -222,7 +224,7 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
 
       {phase === "record" && (
         <CameraTake
-          key={attempts.length}
+          key={takeKey}
           task={task}
           notes={drill.noReview ? "" : notes}
           targetSeconds={drill.seconds}
@@ -271,6 +273,7 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
                 onClick={() => {
                   setIsRetry(true);
                   setError(null);
+                  setTakeKey((k) => k + 1);
                   setPhase("record");
                 }}
               >
