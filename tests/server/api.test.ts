@@ -134,6 +134,24 @@ describe("access control", () => {
   });
 });
 
+describe("remote access without a token", () => {
+  it("blocks tunnelled or remote requests to paid endpoints when no token is set", async () => {
+    const { call, post } = buildTestApp({ transport: fakeTransport([textMessage(goodFeedback)]) });
+    expect((await call("/api/stories")).status).toBe(200);
+    const viaTunnel = await call("http://abc.trycloudflare.com/api/stories");
+    expect(viaTunnel.status).toBe(403);
+    expect((await viaTunnel.json()).error).toMatch(/APP_ACCESS_TOKEN/);
+    expect((await post("/api/feedback", feedbackBody(), { "X-Forwarded-For": "203.0.113.5" })).status).toBe(403);
+    expect((await call("http://abc.trycloudflare.com/api/status")).status).toBe(200);
+  });
+
+  it("allows remote use in demo mode (nothing paid) and with a valid token", async () => {
+    expect((await buildTestApp().call("http://192.168.1.20:8787/api/stories")).status).toBe(200);
+    const { call } = buildTestApp({ transport: fakeTransport([textMessage(goodFeedback)]), env: { APP_ACCESS_TOKEN: "s3cret-token" } });
+    expect((await call("http://abc.trycloudflare.com/api/stories", { headers: { Authorization: "Bearer s3cret-token" } })).status).toBe(200);
+  });
+});
+
 describe("logging", () => {
   it("logs method, path and status only — never response text", async () => {
     const { post, logs } = buildTestApp();

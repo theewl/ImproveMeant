@@ -12,7 +12,7 @@ import type { ReviewItem } from "../../src/shared/types";
 function routeFetchTo(app: { request: (input: Request) => Response | Promise<Response> }) {
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
     const { signal: _signal, ...rest } = init;
-    return app.request(new Request(`http://local${url}`, rest as RequestInit));
+    return app.request(new Request(`http://localhost${url}`, rest as RequestInit));
   });
 }
 

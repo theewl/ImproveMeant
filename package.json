@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently -k -n server,client \"tsx watch src/server/index.ts\" \"vite\"",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
-    "start": "NODE_ENV=production tsx src/server/index.ts",
+    "start": "tsx src/server/index.ts --serve-client",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

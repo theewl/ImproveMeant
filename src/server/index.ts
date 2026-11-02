@@ -19,7 +19,7 @@ const deps = createServices(cfg);
 const app = createApp(deps);
 
 const clientDir = resolve("dist/client");
-if (process.env.NODE_ENV === "production" && existsSync(clientDir)) {
+if ((process.env.NODE_ENV === "production" || process.argv.includes("--serve-client")) && existsSync(clientDir)) {
   app.use("/*", serveStatic({ root: "./dist/client" }));
   app.get("*", (c) => c.html(readFileSync(resolve(clientDir, "index.html"), "utf8")));
 }

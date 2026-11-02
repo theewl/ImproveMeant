@@ -44,6 +44,7 @@ export function createApp(deps: AppDeps): Hono {
   const log = deps.log ?? ((l: string) => console.log(l));
   const app = new Hono();
   const maxChars = cfg.limits.maxResponseChars;
+  const paidConfigured = coach.kind === "claude" || transcription !== null;
 
   const FeedbackRequest = z.object({
     idempotencyKey: idemKey,
@@ -69,14 +70,25 @@ export function createApp(deps: AppDeps): Hono {
     log(`${c.req.method} ${new URL(c.req.url).pathname} ${c.res.status} ${Date.now() - t0}ms`);
   });
 
-  // Optional access control for every API route except status/health.
+  // Access control for every API route except status/health.
   app.use("/api/*", async (c, next) => {
     const p = new URL(c.req.url).pathname;
-    if (!cfg.accessToken || p === "/api/status" || p === "/api/health") return next();
+    if (p === "/api/status" || p === "/api/health") return next();
+    if (!cfg.accessToken) {
+      // Without a token, paid endpoints only answer local requests. This catches
+      // tunnels and port-forwarding, where the server still listens on loopback.
+      if (paidConfigured && isRemoteRequest(c)) {
+        return c.json(
+          new AppError("unauthorized", "This server can only be used from this computer until APP_ACCESS_TOKEN is set in .env.", 403).toJSON(),
+          403,
+        );
+      }
+      return next();
+    }
     const header = c.req.header("authorization") ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : "";
     if (!safeEqual(token, cfg.accessToken)) {
-      return c.json(new AppError("unauthorized", "An access token is required for this server.", 401).toJSON(), 401);
+      return c.json(new AppError("unauthorized", "This server needs an access token. Enter it under Settings.", 401).toJSON(), 401);
     }
     return next();
   });
@@ -235,6 +247,14 @@ async function readJson(c: Context): Promise<unknown> {
 
 function tooLarge(c: Context) {
   return c.json(new AppError("too_large", "Request is too large.", 413).toJSON(), 413);
+}
+
+/** True when the request did not come directly from this machine (other host, or via a proxy/tunnel). */
+function isRemoteRequest(c: Context): boolean {
+  const host = (c.req.header("host") ?? new URL(c.req.url).host).replace(/:\d+$/, "").toLowerCase();
+  const loopbackHost = host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  const proxied = ["x-forwarded-for", "x-forwarded-host", "cf-connecting-ip", "x-real-ip", "forwarded"].some((h) => c.req.header(h));
+  return !loopbackHost || proxied;
 }
 
 function safeEqual(a: string, b: string): boolean {

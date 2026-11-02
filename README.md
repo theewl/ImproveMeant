@@ -37,6 +37,24 @@ For a production build:
 npm run build && npm start   # serves dist/client + API on http://127.0.0.1:8787
 ```
 
+## Using it on your phone
+
+Phone browsers only allow the microphone on HTTPS pages, so open the app through an HTTPS tunnel to your computer.
+
+1. In `.env`, set `APP_ACCESS_TOKEN` to a long random password. Without it, the server refuses tunnelled requests whenever an API key is configured, so nobody else can spend your credits.
+2. Build and start the app on one port:
+   ```bash
+   npm run build && npm start        # http://127.0.0.1:8787
+   ```
+3. Start a tunnel in a second terminal. For example, with [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) (free, no account needed):
+   ```bash
+   cloudflared tunnel --url http://localhost:8787
+   ```
+   It prints an `https://….trycloudflare.com` address.
+4. Open that address on your phone. Go to **Settings → Access token**, enter your password, and allow the microphone when asked.
+
+While the tunnel is running, the address is public, and the token is what protects it. Stop the tunnel (Ctrl+C) when you're done. Your phone keeps its own practice history, separate from your computer's.
+
 ## Live providers (optional)
 
 Copy `.env.example` to `.env` and fill in only what you have. Keys stay on the server.
@@ -57,7 +75,7 @@ Setup steps for each provider are in [`docs/PROVIDERS.md`](docs/PROVIDERS.md).
 |---|---|
 | `npm run dev` | Server (tsx watch) and Vite dev server |
 | `npm run build` | Type-check and build the client |
-| `npm start` | Production server |
+| `npm start` | Production server (serves the built client and API on one port) |
 | `npm test` | Vitest: unit, API, jsdom journey and security tests |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run eval:coaching` | Coaching evaluation. Runs dry by default; `-- --live --yes` calls the API (about $0.30–0.90). See [`eval/RUBRIC.md`](eval/RUBRIC.md) |
