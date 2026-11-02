@@ -507,3 +507,27 @@ describe("Camera drills (demo mode, no camera in jsdom)", () => {
     expect(screen.getByRole("link", { name: "Camera" })).toBeInTheDocument();
   });
 });
+
+describe("Camera drills: feedback request failure", () => {
+  it("keeps the take and shows the error instead of reopening the camera", async () => {
+    const user = userEvent.setup();
+    const { app } = buildTestApp();
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      if (url.startsWith("/api/camera-feedback")) return new Response(JSON.stringify({ error: "The AI service is unavailable right now.", code: "provider_error", retryable: true }), { status: 503, headers: { "Content-Type": "application/json" } });
+      const { signal: _signal, ...rest } = init;
+      return app.request(new Request(`http://localhost${url}`, rest as RequestInit));
+    });
+    start("#/camera/cam-one-person", onboarded());
+    await screen.findByRole("heading", { name: "Hello, one person" });
+    await user.click(screen.getByRole("button", { name: "Open the camera" }));
+    await screen.findByRole("heading", { name: "Camera not available" });
+    const box = screen.getByRole("textbox", { name: /No camera here/ });
+    await user.type(box, "Hi, it's me. If you've ever fixed a bike at midnight, you know.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByText(/AI service is unavailable/);
+    // Same form, same words, a retry button: not a fresh camera screen.
+    expect(screen.getByRole("textbox", { name: /No camera here/ })).toHaveValue("Hi, it's me. If you've ever fixed a bike at midnight, you know.");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open the camera" })).not.toBeInTheDocument();
+  });
+});
