@@ -86,7 +86,7 @@ export const STARTER_STEPS: { title: string; expectedDiscomfort: number }[] = [
 ];
 
 export const OUTWARD_FOCUS_TIP =
-  "While you speak, put your attention on the listener and your message — not on how you look or sound.";
+  "Attention on the listener, not on yourself.";
 
 export function activeLadder(steps: LadderStep[]): LadderStep[] {
   return steps.filter((s) => !s.archived).sort((a, b) => a.expectedDiscomfort - b.expectedDiscomfort || a.createdAt.localeCompare(b.createdAt));

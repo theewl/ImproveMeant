@@ -6,8 +6,6 @@ import {
   STARTER_STEPS,
   THINKING_TRAPS,
   activeLadder,
-  summarizeExperiments,
-  compareSafetyBehaviours,
   IMPACT_QUESTIONS,
   IMPACT_SCALE,
   impactGuidance,
@@ -15,7 +13,7 @@ import {
 import { CrisisList, CrisisNotice } from "../components/Crisis";
 import { CAMERA_PRINCIPLES, CAMERA_SETUP } from "../../shared/camera";
 import { PLAYBOOK } from "../../shared/vlog";
-import { allSteps, nextStep, realStepIdeas, stepKindLabel, stepRecord, type Step } from "../../shared/steps";
+import { allSteps, nextStep, stepKindLabel, stepRecord, type Step } from "../../shared/steps";
 import { href } from "../lib/router";
 import { useApp } from "../lib/store";
 import { uid } from "../lib/storage";
@@ -32,6 +30,7 @@ export function Confidence() {
   const { data, update } = useApp();
   const [view, setView] = useState<View>(data.confidenceIntroSeen ? { name: "home" } : { name: "start" });
   const [flash, setFlash] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const go = (v: View, msg: string | null = null) => {
     setFlash(msg);
     setView(v);
@@ -87,12 +86,8 @@ export function Confidence() {
     );
 
   const pending = data.experiments.filter((e) => !e.completedAt && e.kind === "real-world").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const real = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
-  const reh = summarizeExperiments(data.experiments.filter((e) => e.kind !== "real-world"));
-  const cmp = compareSafetyBehaviours(data.experiments);
   const next = nextStep(data, data.prefs.goal);
   const steps = allSteps(data);
-  const ideas = realStepIdeas(data.ladder);
   const ladderStep = (st: Step) => {
     const t = st.target;
     return t.kind === "real" ? data.ladder.find((l) => l.id === t.ladderStepId) : undefined;
@@ -113,7 +108,7 @@ export function Confidence() {
   return (
     <main className="screen" id="main">
       <h2 className="page-title">Steps</h2>
-      <p className="hint">One method for all of it: pick a step that's slightly uncomfortable, say what you fear, do it out loud, get one note, do it again, then check what really happened.</p>
+      <p className="hint">Easiest first. Pick one, say what you fear, do it, see what happens.</p>
       {flash && (
         <p className="notice ok" role="status">
           {flash}
@@ -158,7 +153,7 @@ export function Confidence() {
           The ladder, easiest first
         </h3>
         <ol className="ladder">
-          {steps.map((st) => {
+          {(showAll ? steps : steps.slice(0, 6)).map((st) => {
             const r = stepRecord(st, data);
             const h = stepHref(st);
             const body = (
@@ -190,61 +185,40 @@ export function Confidence() {
           })}
         </ol>
         <div className="row wrap">
+          {steps.length > 6 && (
+            <button className="link" type="button" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Show fewer" : `Show all ${steps.length}`}
+            </button>
+          )}
           <button className="secondary small" type="button" onClick={() => go({ name: "pick" })}>
             Add a real-life step
           </button>
-          {ideas.length > 0 && <span className="hint">e.g. {ideas[0]!.title.toLowerCase()}</span>}
         </div>
       </section>
-
-      {(real.tested > 0 || reh.tested > 0 || cmp) && (
-        <section className="record" aria-labelledby="record-h">
-          <h3 id="record-h" className="section-title">
-            Your record
-          </h3>
-          {real.tested > 0 && (
-            <p>
-              Real life: <strong>{real.fearNotHappened} of {real.tested}</strong> feared outcome{real.tested === 1 ? "" : "s"} didn't happen
-              {real.fearPartly ? ` (${real.fearPartly} partly)` : ""}.
-            </p>
-          )}
-          {reh.tested > 0 && (
-            <p>
-              Practice sessions: <strong>{reh.fearNotHappened} of {reh.tested}</strong> didn't happen{reh.fearPartly ? ` (${reh.fearPartly} partly)` : ""}.
-            </p>
-          )}
-          {cmp && (
-            <p className="hint">
-              Without a safety habit, your anxiety during was {cmp.dropped.avgAnxiety}/10 on average ({cmp.dropped.count}); with your usual habits, {cmp.kept.avgAnxiety}/10 (
-              {cmp.kept.count}). Small numbers — a hint, not proof.
-            </p>
-          )}
-        </section>
-      )}
 
       <ul className="rows tools">
         <li className="row-item">
           <button type="button" className="row-button" onClick={() => go({ name: "reframe" })}>
             <span className="row-title">A thought keeps bugging you?</span>
-            <span className="row-desc">Untangle it in four short steps, then take the step anyway.</span>
+            <span className="row-desc">Untangle it in four steps.</span>
           </button>
         </li>
         <li className="row-item">
           <button type="button" className="row-button" onClick={() => go({ name: "start" })}>
             <span className="row-title">Why speaking feels so hard</span>
-            <span className="row-desc">The loop that keeps anxiety going, and your own habits.</span>
+            <span className="row-desc">Two minutes on the loop behind it.</span>
           </button>
         </li>
         <li className="row-item">
           <button type="button" className="row-button" onClick={() => go({ name: "selfcheck" })}>
             <span className="row-title">Is it getting in the way?</span>
-            <span className="row-desc">A short private check-in, with guidance on when to get support. Not a test.</span>
+            <span className="row-desc">A private check-in. Not a test.</span>
           </button>
         </li>
       </ul>
 
       <details className="more">
-        <summary>Before you record: five camera checks</summary>
+        <summary>Camera checks</summary>
         <ul className="plain checks">
           {CAMERA_SETUP.map((c) => (
             <li key={c.id}>
@@ -254,7 +228,7 @@ export function Confidence() {
         </ul>
       </details>
       <details className="more">
-        <summary>What the best creators do, and what this app does about it</summary>
+        <summary>What the best creators do</summary>
         <ul className="plain checks">
           {PLAYBOOK.map((p) => (
             <li key={p.who}>
@@ -264,7 +238,7 @@ export function Confidence() {
         </ul>
       </details>
       <details className="more">
-        <summary>What makes talking to a camera work</summary>
+        <summary>What makes it work on camera</summary>
         <ul className="plain checks">
           {CAMERA_PRINCIPLES.map((pr) => (
             <li key={pr.title}>
@@ -274,12 +248,10 @@ export function Confidence() {
         </ul>
       </details>
 
-      <section className="support-row" aria-labelledby="support-h">
-        <h3 id="support-h" className="section-title">
-          Need support now?
-        </h3>
+      <details className="more">
+        <summary>Need support now?</summary>
         <CrisisList />
-      </section>
+      </details>
     </main>
   );
 }

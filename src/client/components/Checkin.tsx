@@ -93,9 +93,6 @@ export function BeforeCheckin({ defaultDrop, open = false, onChange }: { default
         ))}
       </fieldset>
       <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
-      <p className="focus-tip">
-        Nerves and excitement feel similar in the body. Some people find it helps to say <strong>“I'm excited”</strong> out loud instead of trying to calm down. Try it if it fits you.
-      </p>
     </details>
   );
 }

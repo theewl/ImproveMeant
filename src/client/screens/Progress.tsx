@@ -1,126 +1,152 @@
 import { useEffect, useState } from "react";
 import type { Attempt, PracticeSession } from "../../shared/types";
-import { SCENARIOS, SKILLS, SKILL_ORDER } from "../../shared/curriculum";
+import { SCENARIOS, SKILLS } from "../../shared/curriculum";
 import { audioStore } from "../lib/audioStore";
-import { summarize, upsertSession } from "../lib/state";
-import { summarizeExperiments } from "../../shared/confidence";
+import { upsertSession } from "../lib/state";
+import { compareSafetyBehaviours, summarizeExperiments } from "../../shared/confidence";
 import { phraseBank } from "./Phrases";
 import { href } from "../lib/router";
 import { localDayKey } from "../../shared/dates";
 import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
-import { CAMERA_DRILLS, cameraProgress, fillerWords, viewerAddress, wordsPerMinute } from "../../shared/camera";
+import { CAMERA_DRILLS, improvementSince, takeStats } from "../../shared/camera";
+import { allSteps, stepRecord } from "../../shared/steps";
+import { takesThisWeek } from "../../shared/vlog";
 import { PlanCard } from "../components/PlanCard";
 
 function getCameraDrillTitle(id?: string): string {
   return CAMERA_DRILLS.find((d) => d.id === id)?.title ?? "drill";
 }
 
+/** Four things: this week, change since the first take, a few counts, and the past. Everything else is folded away. */
 export function Progress() {
   const { data } = useApp();
-  const sum = summarize(data);
+  const nowIso = new Date().toISOString();
+  const takes = data.sessions.filter((s) => s.mode === "camera" && s.completedAt && s.camera?.promptId).sort((a, b) => a.completedAt!.localeCompare(b.completedAt!));
+  const target = data.prefs.weeklyTakes ?? 5;
+  const week = takesThisWeek(takes.map((s) => s.completedAt!), nowIso);
+  const spoken = (s: PracticeSession) => [...s.attempts].reverse().find((a) => a.text.trim());
+  const first = takes.map(spoken).find(Boolean);
+  const latest = [...takes].reverse().map(spoken).find(Boolean);
+  const change = first && latest && first.id !== latest.id ? improvementSince(takeStats(first.text, first.durationSeconds), takeStats(latest.text, latest.durationSeconds)) : [];
+  const steps = allSteps(data);
+  const stepsTried = steps.filter((st) => stepRecord(st, data).count > 0).length;
+  const fears = summarizeExperiments(data.experiments);
+  const checkins = data.experiments.filter((e) => e.completedAt && e.anxietyAfter != null);
+  const cmp = compareSafetyBehaviours(data.experiments);
+  const avg = (xs: number[]) => (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1);
   const sessions = [...data.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const due = data.reviews.filter((r) => r.status === "active").length;
+  const phrases = phraseBank(data.sessions).length;
 
   return (
     <main className="screen" id="main">
-      <h2>Progress</h2>
+      <h2 className="page-title">Progress</h2>
+      <p className="week" aria-label={`${week} of ${target} takes this week`}>
+        <span className="week-dots" aria-hidden="true">
+          {Array.from({ length: target }, (_, i) => (
+            <span key={i} className={i < week ? "dot on" : "dot"} />
+          ))}
+        </span>
+        {week} of {target} takes this week
+      </p>
       <ActivityDots />
-      <PlanCard />
 
-      <section aria-labelledby="counts-h">
-        <h3 id="counts-h">Practice</h3>
-        <dl className="stats">
-          <div>
-            <dt>Spoken sessions</dt>
-            <dd>{sum.spokenSessions}</dd>
-          </div>
-          <div>
-            <dt>Written sessions</dt>
-            <dd>{sum.writtenSessions}</dd>
-          </div>
-          <div>
-            <dt>Retries</dt>
-            <dd>{sum.retries}</dd>
-          </div>
-          <div>
-            <dt>Brave steps taken</dt>
-            <dd>{summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world")).completed}</dd>
-          </div>
-        </dl>
-        {sum.unfinished > 0 && <p className="hint">{sum.unfinished} unfinished session(s) aren't counted.</p>}
-      </section>
-
-      <OnCamera />
-
-      <section aria-labelledby="skills-h">
-        <h3 id="skills-h">Skills practiced</h3>
-        <table className="skills-table">
-          <thead>
-            <tr>
-              <th scope="col">Skill</th>
-              <th scope="col">Sessions</th>
-              <th scope="col">Goal met (AI-coached attempts)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SKILL_ORDER.map((k) => (
-              <tr key={k}>
-                <th scope="row">{SKILLS[k].name}</th>
-                <td>{sum.skills[k].sessions}</td>
-                <td>{sum.skills[k].liveFeedbackCount ? `${sum.skills[k].goalMetLive} of ${sum.skills[k].liveFeedbackCount}` : "—"}</td>
-              </tr>
+      <section aria-labelledby="since-h" className="since">
+        <p className="eyebrow" id="since-h">
+          Since your first take
+        </p>
+        {change.length > 0 ? (
+          <ul className="plain">
+            {change.map((i) => (
+              <li key={i.label} className={i.better === true ? "since-better" : i.better === false ? "since-worse" : ""}>
+                {i.label}: {i.before} → {i.after}
+                {i.better === true ? " ✓" : ""}
+              </li>
             ))}
-          </tbody>
-        </table>
-        <p className="hint">“Goal met” counts AI judgements on individual attempts, including retries of the same prompt. It isn't a measure of mastery.</p>
-        {sum.feedbackRated > 0 && (
-          <p>
-            You rated {sum.feedbackUseful} of {sum.feedbackRated} pieces of feedback useful.
-          </p>
+          </ul>
+        ) : (
+          <p className="hint">{takes.length < 2 ? "Record two takes to see what's changing." : "Nothing has moved yet. Keep going."}</p>
         )}
       </section>
 
-      <section aria-labelledby="rev-h">
-        <h3 id="rev-h">Reviews</h3>
-        <p>
-          Recalled {sum.reviewCounts.recalled} · Partly {sum.reviewCounts.partly} · Missed {sum.reviewCounts.missed} · Skipped {sum.reviewCounts.skipped}
-        </p>
-        <p className="hint">Self-assessed after revealing the answer.</p>
-      </section>
+      <dl className="stats">
+        <div>
+          <dt>Takes</dt>
+          <dd>{takes.length}</dd>
+        </div>
+        <div>
+          <dt>Steps tried</dt>
+          <dd>
+            {stepsTried} of {steps.length}
+          </dd>
+        </div>
+        {fears.tested > 0 && (
+          <div>
+            <dt>Fears that didn't happen</dt>
+            <dd>
+              {fears.fearNotHappened} of {fears.tested}
+            </dd>
+          </div>
+        )}
+        {cmp && (
+          <div>
+            <dt>Anxiety without a safety habit vs with</dt>
+            <dd>
+              {cmp.dropped.avgAnxiety} vs {cmp.kept.avgAnxiety}
+            </dd>
+          </div>
+        )}
+        {checkins.length >= 2 && (
+          <div>
+            <dt>Anxiety, before → during</dt>
+            <dd>
+              {avg(checkins.map((e) => e.anxietyBefore))} → {avg(checkins.map((e) => e.anxietyAfter!))}
+            </dd>
+          </div>
+        )}
+      </dl>
 
-      <a className="pill-link" href={href({ name: "review" })}>
-        <span>
-          <strong>Your reviews</strong> · {data.reviews.filter((r) => r.status === "active").length} saved
-        </span>
-        <span aria-hidden="true">→</span>
-      </a>
-      <a className="pill-link" href={href({ name: "phrases" })}>
-        <span>
-          <strong>Phrase bank</strong> · {phraseBank(data.sessions).length} phrase{phraseBank(data.sessions).length === 1 ? "" : "s"}
-        </span>
-        <span aria-hidden="true">→</span>
-      </a>
+      <ul className="quick">
+        {due > 0 && (
+          <li>
+            <a className="pill-link" href={href({ name: "review" })}>
+              <span>
+                <strong>Reviews</strong> · {due} saved
+              </span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </li>
+        )}
+        {phrases > 0 && (
+          <li>
+            <a className="pill-link" href={href({ name: "phrases" })}>
+              <span>
+                <strong>Phrase bank</strong> · {phrases} phrase{phrases === 1 ? "" : "s"}
+              </span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </li>
+        )}
+      </ul>
 
-      <ConfidenceSummary />
-
-      <section aria-labelledby="real-h">
-        <h3 id="real-h">Try it for real</h3>
-        <p className="hint">The point of practice is the next real conversation. Plan one small brave step, predict what you fear, and see what happens.</p>
-        <a className="button secondary" href={href({ name: "steps" })}>
-          Plan a brave step
-        </a>
-      </section>
-
-      <section aria-labelledby="hist-h">
-        <h3 id="hist-h">History</h3>
-        {sessions.length === 0 ? <p className="hint">Your sessions will appear here.</p> : sessions.map((s) => <SessionEntry key={s.id} s={s} />)}
-      </section>
+      {sessions.length > 0 && (
+        <details className="more">
+          <summary>Past takes and sessions</summary>
+          {sessions.slice(0, 20).map((s) => (
+            <SessionEntry key={s.id} s={s} />
+          ))}
+        </details>
+      )}
+      <details className="more">
+        <summary>4-week plan</summary>
+        <PlanCard />
+      </details>
     </main>
   );
 }
 
-/** Last four weeks as dots: a day is filled if anything was practiced. No streaks, no counts of misses. */
 function ActivityDots() {
   const { data } = useApp();
   const days = new Set<string>();
@@ -148,58 +174,7 @@ function ActivityDots() {
           </li>
         ))}
       </ul>
-      <p className="hint">
-        {active} day{active === 1 ? "" : "s"} with practice in the last four weeks. Gaps are normal; what matters is coming back.
-      </p>
-    </section>
-  );
-}
-
-function ConfidenceSummary() {
-  const { data } = useApp();
-  const c = summarizeExperiments(data.experiments.filter((e) => e.kind === "real-world"));
-  const checkins = data.experiments.filter((e) => e.kind !== "real-world" && e.completedAt).length;
-  const views = data.sessions.flatMap((s) => s.attempts.map((a) => a.selfView).filter((v): v is NonNullable<typeof v> => !!v));
-  const better = views.filter((v) => v.observed > v.predicted).length;
-  if (c.completed === 0 && checkins === 0 && data.reframes.length === 0 && views.length === 0) return null;
-  return (
-    <section aria-labelledby="conf-h">
-      <h3 id="conf-h">Confidence</h3>
-      <dl className="stats">
-        <div>
-          <dt>Real-life steps done</dt>
-          <dd>{c.completed}</dd>
-        </div>
-        <div>
-          <dt>Session check-ins</dt>
-          <dd>{checkins}</dd>
-        </div>
-        <div>
-          <dt>Fears that didn't happen</dt>
-          <dd>
-            {c.fearNotHappened}
-            {c.completed ? <span className="of"> of {c.completed}</span> : null}
-          </dd>
-        </div>
-        <div>
-          <dt>Thoughts untangled</dt>
-          <dd>{data.reframes.length}</dd>
-        </div>
-        {c.avgBefore != null && c.avgAfter != null && (
-          <div>
-            <dt>Anxiety before → during</dt>
-            <dd className="small-dd">
-              {c.avgBefore} → {c.avgAfter}
-            </dd>
-          </div>
-        )}
-      </dl>
-      {views.length > 0 && (
-        <p>
-          Listened back as an observer {views.length} time{views.length === 1 ? "" : "s"} — came across better than expected in {better}.
-        </p>
-      )}
-      <p className="hint">Self-reported ratings, kept separate from coaching feedback. Averages across different situations, so treat them as a rough guide.</p>
+      <p className="hint">{active} of the last 28 days</p>
     </section>
   );
 }
@@ -289,79 +264,3 @@ function AttemptEntry({ a, session }: { a: Attempt; session: PracticeSession }) 
   );
 }
 
-function OnCamera() {
-  const { data } = useApp();
-  const takes = data.sessions.filter((s) => s.mode === "camera" && s.completedAt);
-  if (takes.length === 0) return null;
-  const minutes = takes.reduce((n, s) => n + s.attempts.reduce((m, a) => m + (a.durationSeconds ?? 0), 0), 0) / 60;
-  const rated = data.experiments.filter((e) => e.kind === "camera" && e.completedAt && e.anxietyAfter != null);
-  const avg = (xs: number[]) => (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1);
-  const drills = cameraProgress(data.sessions).filter((p) => p.completed > 0).length;
-  const recent = [...takes]
-    .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!))
-    .map((s) => ({ s, a: s.attempts.filter((x) => x.text.trim()).pop() }))
-    .filter((x): x is { s: (typeof takes)[number]; a: NonNullable<(typeof x)["a"]> } => !!x.a)
-    .slice(0, 6);
-  return (
-    <section aria-labelledby="camera-h">
-      <h3 id="camera-h">On camera</h3>
-      <dl className="stats">
-        <div>
-          <dt>Takes</dt>
-          <dd>{takes.length}</dd>
-        </div>
-        <div>
-          <dt>Minutes on camera</dt>
-          <dd>{minutes < 1 ? "<1" : Math.round(minutes)}</dd>
-        </div>
-        <div>
-          <dt>Drills tried</dt>
-          <dd>
-            {drills} of {CAMERA_DRILLS.length}
-          </dd>
-        </div>
-        {rated.length >= 2 && (
-          <div>
-            <dt>Anxiety, before → during</dt>
-            <dd>
-              {avg(rated.map((e) => e.anxietyBefore))} → {avg(rated.map((e) => e.anxietyAfter!))}
-            </dd>
-          </div>
-        )}
-      </dl>
-      <p className="hint">Anxiety is self-reported, 0–10, when you check in around a take.</p>
-      {recent.length > 0 && (
-        <details className="more">
-          <summary>Last takes, measured here</summary>
-          <table className="compare-table">
-            <thead>
-              <tr>
-                <th scope="col">Drill</th>
-                <th scope="col">Pace</th>
-                <th scope="col">Fillers</th>
-                <th scope="col">“You”</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map(({ s, a }) => {
-                const wpm = wordsPerMinute(a.text, a.durationSeconds);
-                return (
-                  <tr key={a.id}>
-                    <th scope="row">
-                      {getCameraDrillTitle(s.camera?.drillId)}
-                      <span className="basis">{formatDate(s.completedAt!)}</span>
-                    </th>
-                    <td>{wpm != null ? `${wpm} wpm` : "—"}</td>
-                    <td>{fillerWords(a.text).total}</td>
-                    <td>{viewerAddress(a.text)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="hint">Pace is words over recording length. Fillers are counted in the transcript, which often omits them. Not a score; a direction.</p>
-        </details>
-      )}
-    </section>
-  );
-}
