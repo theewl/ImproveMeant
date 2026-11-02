@@ -32,6 +32,16 @@ export function speechRecognitionCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+/**
+ * WebKit (every browser on iOS, and Safari on macOS) can't run speech recognition and
+ * MediaRecorder on the microphone at the same time: starting one stops the other.
+ */
+export function isAppleWebKit(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /iP(hone|ad|od)/.test(ua) || (/AppleWebKit/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|CriOS|Edg|Android/.test(ua));
+}
+
 export function speechCaptureSupported(): boolean {
   return speechRecognitionCtor() !== null;
 }

@@ -148,14 +148,27 @@ export function Today() {
   const interestsKey = data.prefs.interests.join(",");
 
   const [seed, setSeed] = useState(0);
+  const [picking, setPicking] = useState(false);
   const load = (refresh = false, nextSeed = seed) => {
     setError(null);
     setCards(null);
+    setPicking(false);
     api
       .stories(data.prefs.interests, { refresh, seed: nextSeed })
       .then((r) => {
         setCards(r.cards);
         setLive(r.live);
+        if (r.curation === "available") {
+          // Ask for the AI-chosen ordering separately so the page never waits on it.
+          setPicking(true);
+          api
+            .storyPicks(data.prefs.interests)
+            .then((p) => {
+              if (p.cards.length) setCards((cur) => [...p.cards, ...(cur ?? []).filter((c) => c.kind !== "current")]);
+            })
+            .catch(() => undefined) // keep the plain selection
+            .finally(() => setPicking(false));
+        }
       })
       .catch(setError);
   };
@@ -196,6 +209,7 @@ export function Today() {
         </a>
       )}
 
+      {picking && <p className="hint" role="status">Choosing today's picks for you…</p>}
       {live?.status === "stale" && <p className="notice warn">{live.message}</p>}
       {live?.status === "unavailable" && <p className="notice warn">Today's news couldn't load. Showing curated ideas.</p>}
       {error != null && <ErrorNotice error={error} onRetry={() => load()} />}

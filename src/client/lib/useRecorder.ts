@@ -32,6 +32,9 @@ export function useRecorder() {
   const timer = useRef<number | null>(null);
   const cancelled = useRef(false);
   const pausedAt = useRef<number | null>(null);
+  const finalized = useRef(false);
+  const finalizeRef = useRef<(() => void) | null>(null);
+  const watchdog = useRef<number | null>(null);
   const pausedTotal = useRef(0);
   const audioCtx = useRef<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
@@ -43,6 +46,8 @@ export function useRecorder() {
     stream.current = null;
     if (timer.current) window.clearInterval(timer.current);
     timer.current = null;
+    if (watchdog.current) window.clearTimeout(watchdog.current);
+    watchdog.current = null;
     void audioCtx.current?.close().catch(() => undefined);
     audioCtx.current = null;
     setAnalyser(null);
@@ -99,10 +104,14 @@ export function useRecorder() {
     }
     chunks.current = [];
     cancelled.current = false;
+    finalized.current = false;
     mr.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunks.current.push(e.data);
     };
-    mr.onstop = () => {
+    const finalize = () => {
+      if (finalized.current) return;
+      finalized.current = true;
+      if (watchdog.current) window.clearTimeout(watchdog.current);
       const seconds = elapsedNow();
       cleanupStream();
       if (cancelled.current) {
@@ -118,6 +127,11 @@ export function useRecorder() {
       setRecording({ blob, url: URL.createObjectURL(blob), seconds });
       setState("stopped");
     };
+    finalizeRef.current = finalize;
+    mr.onstop = finalize;
+    mr.onerror = () => finalize();
+    // If the microphone is taken away mid-recording (another app, or the OS), finish with what we have.
+    for (const track of stream.current.getAudioTracks()) track.onended = () => finalize();
     rec.current = mr;
     startedAt.current = performance.now();
     pausedAt.current = null;
@@ -161,8 +175,28 @@ export function useRecorder() {
     setState("recording");
   }, []);
 
+  /**
+   * Stop and finish the recording. Never leaves the UI stuck on "Recording": if the
+   * recorder has already gone inactive, throws, or never fires onstop, we finish from
+   * the chunks collected so far.
+   */
   const stop = useCallback(() => {
-    if (rec.current && rec.current.state !== "inactive") rec.current.stop();
+    const mr = rec.current;
+    if (!mr) return;
+    if (mr.state === "inactive") {
+      finalizeRef.current?.();
+      return;
+    }
+    try {
+      if (mr.state === "paused" && typeof mr.resume === "function") mr.resume();
+      if (typeof mr.requestData === "function") mr.requestData();
+      mr.stop();
+    } catch {
+      // requestData() may still deliver its chunk; give it a moment, then finish regardless.
+      watchdog.current = window.setTimeout(() => finalizeRef.current?.(), 300);
+      return;
+    }
+    watchdog.current = window.setTimeout(() => finalizeRef.current?.(), 1500);
   }, []);
 
   const cancel = useCallback(() => {

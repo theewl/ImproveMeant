@@ -148,6 +148,15 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(await content.listStories(interests, { refresh: c.req.query("refresh") === "1", seed: Number.isFinite(seed) ? Math.max(0, Math.min(1000, Math.floor(seed))) : 0 }));
   });
 
+  app.get("/api/stories/picks", async (c) => {
+    const valid = new Set(ALL_INTERESTS.map((i) => i.id));
+    const interests = (c.req.query("interests") ?? "")
+      .split(",")
+      .filter((i): i is Interest => valid.has(i as Interest))
+      .slice(0, 3);
+    return c.json(await content.curatedStories(interests));
+  });
+
   app.get("/api/stories/:id/briefing", async (c) => {
     const id = c.req.param("id");
     if (!/^[a-z0-9-]{1,80}$/i.test(id)) throw new AppError("bad_request", "Invalid story id.", 400);

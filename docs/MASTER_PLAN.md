@@ -572,6 +572,14 @@ Sources: `docs/research/2026-11-ui-ux-patterns.md`, `docs/research/2026-11-featu
 - **Refresh.** "Show different stories" re-fetches the live feed and rotates the curated ideas.
 - **AI-curated topics within the learner's categories [D].** Once a day per interest set, the coach reads everything in the feed (news, most-read, featured, up to 40 items) and picks up to six that are most worth explaining, each with a one-line reason, plus up to three timeless topics. Validation: picks must match real candidate titles exactly; timeless suggestions are resolved through Wikipedia search and lookup, so nothing invented reaches the learner. Cost about one cent a day. If curation fails, the plain interest match is used. Wikipedia stays the source of article text because its licence clearly allows AI processing; most news publishers' terms do not. **[Q]** Public-domain sources (US government science and health releases) are a possible second source later; they need an HTML extraction step and live testing.
 
+### Round 6 (2026-11-02): first real phone use — access token and recording bugs
+
+- **Saved access token ignored after a reload [D].** The token was applied in a provider effect, but a child screen's effect (the first stories request on Today) runs before the provider's, so every fresh page load sent the first request without the token, got HTTP 401 and showed "Try again". The token is now set synchronously before any screen renders. Settings also has **Check connection**, which shows the exact server reply (for example `HTTP 401 [unauthorized]`), and every error now carries its HTTP status.
+- **Recording that could not be stopped (iPhone).** WebKit cannot run speech recognition and MediaRecorder on the microphone together: starting the recogniser silently killed the recorder, and the stop button then did nothing. On iPhone, iPad and Safari without a Deepgram key, the app now uses a **speech-only** mode (live transcript, no playback) so feedback still works; elsewhere, the two run together as before. The recorder's stop now always finishes: it handles a recorder that has gone inactive, a stop that throws, a microphone taken away mid-recording, and a missing `onstop` event (1.5 s watchdog). An empty result says so instead of hanging.
+- **Requests on older iOS.** `AbortSignal.timeout` is not available on older iOS Safari and threw before any request was sent; a small polyfill replaces it.
+- **Story list no longer waits on the model.** AI curation moved to `GET /api/stories/picks`, loaded after the list is shown ("Choosing today's picks for you…"), so the Today screen cannot hit the hosting function's time limit.
+- **[Q]** Still untested on a real iPhone in this session; the speech-only mode was verified with a simulated recogniser.
+
 ### Backlog additions
 | When | Item |
 |---|---|

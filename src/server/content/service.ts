@@ -105,18 +105,31 @@ export class ContentService {
         const c = byTitle.get(p.title.trim().toLowerCase());
         if (c && !picks.some((x) => x.storyId === c.storyId)) picks.push({ storyId: c.storyId, why: p.why });
       }
-      // Timeless suggestions: resolve each title through the provider; keep only real articles.
+      // Timeless suggestions: resolve each title through the provider, in parallel and bounded; keep only real articles.
       const extra: LiveCandidate[] = [];
-      for (const sug of out.suggestions.slice(0, 3)) {
-        try {
-          const hit = (await this.provider!.searchTopics(sug.title))[0];
-          const c = hit ? await this.provider!.lookup(hit.pageid) : null;
-          if (c && !byTitle.has(c.title.toLowerCase()) && !picks.some((x) => x.storyId === c.storyId)) {
-            extra.push({ ...c, feed: "timeless" });
-            picks.push({ storyId: c.storyId, why: sug.why });
+      const resolved = await Promise.all(
+        out.suggestions.slice(0, 3).map(async (sug) => {
+          try {
+            const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000));
+            const c = await Promise.race([
+              (async () => {
+                const hit = (await this.provider!.searchTopics(sug.title))[0];
+                return hit ? await this.provider!.lookup(hit.pageid) : null;
+              })(),
+              timeout,
+            ]);
+            return c ? { c, why: sug.why } : null;
+          } catch {
+            return null;
           }
-        } catch {
-          /* skip this suggestion */
+        }),
+      );
+      for (const r of resolved) {
+        if (!r) continue;
+        const { c, why } = r;
+        if (!byTitle.has(c.title.toLowerCase()) && !picks.some((x) => x.storyId === c.storyId) && !extra.some((e) => e.storyId === c.storyId)) {
+          extra.push({ ...c, feed: "timeless" });
+          picks.push({ storyId: c.storyId, why });
         }
       }
       if (extra.length) {
@@ -130,12 +143,19 @@ export class ContentService {
     }
   }
 
-  async listStories(interests: Interest[], opts: { refresh?: boolean; seed?: number } = {}): Promise<{ cards: StoryCard[]; live: LiveFeedState }> {
+  /**
+   * Fast path: today's live stories by plain interest match plus curated evergreen ideas.
+   * The AI-curated ordering is a separate, slower call (`curatedStories`) so this never
+   * waits on the model. `curation` tells the client whether to ask for it.
+   */
+  async listStories(interests: Interest[], opts: { refresh?: boolean; seed?: number; curated?: boolean } = {}): Promise<{ cards: StoryCard[]; live: LiveFeedState; curation: "available" | "none" }> {
     const picks: StoryCard[] = [];
     const { list, state } = await this.liveList(!!opts.refresh);
+    let curation: "available" | "none" = "none";
     if (list) {
       const usable = list.candidates.filter((c) => !list.insufficient.includes(c.storyId));
-      const curated = await this.curatedPicks(list, interests);
+      curation = usable.length > 0 ? "available" : "none";
+      const curated = opts.curated ? await this.curatedPicks(list, interests) : null;
       const custom = (await this.store.read<LiveCandidate[]>("custom-topics")) ?? []; // after curation, which may add timeless topics
       let chosen: { c: LiveCandidate; why: string }[] = [];
       if (curated && curated.length) {
@@ -192,7 +212,13 @@ export class ContentService {
       if (ordered.length >= 3) break;
       if (!ordered.some((o) => o.id === c.id)) ordered.push({ ...c, whySelected: "Curated idea worth knowing." });
     }
-    return { cards: [...picks, ...ordered].slice(0, 9), live: state };
+    return { cards: [...picks, ...ordered].slice(0, 9), live: state, curation };
+  }
+
+  /** The AI-curated live stories for these interests (cached per day). May take several seconds. */
+  async curatedStories(interests: Interest[]): Promise<{ cards: StoryCard[] }> {
+    const r = await this.listStories(interests, { curated: true });
+    return { cards: r.cards.filter((c) => c.kind === "current") };
   }
 
   async searchTopics(query: string): Promise<TopicHit[]> {
