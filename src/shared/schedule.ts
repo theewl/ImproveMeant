@@ -1,5 +1,6 @@
 import { createEmptyCard, fsrs, generatorParameters, Rating, type Card, type Grade } from "ts-fsrs";
 import type { FsrsState, ReviewItem, ReviewResult } from "./types";
+import { localDayKey } from "./dates";
 
 // Review scheduling with FSRS (the open-source scheduler used by Anki), via
 // ts-fsrs. Deterministic: no fuzz, no same-day learning steps (this is a
@@ -79,8 +80,8 @@ export function applyReview(item: ReviewItem, result: ReviewResult, nowIso: stri
  * Items reviewed (not skipped) earlier today count against the cap.
  */
 export function dueQueue(items: ReviewItem[], nowIso: string, cap = DAILY_REVIEW_CAP): { queue: ReviewItem[]; waiting: number; doneToday: number } {
-  const today = nowIso.slice(0, 10);
-  const doneToday = items.filter((i) => i.history.some((h) => h.at.slice(0, 10) === today && h.result !== "skipped")).length;
+  const today = localDayKey(nowIso);
+  const doneToday = items.filter((i) => i.history.some((h) => localDayKey(h.at) === today && h.result !== "skipped")).length;
   const due = items
     .filter((i) => isDue(i, nowIso))
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt) || a.createdAt.localeCompare(b.createdAt));

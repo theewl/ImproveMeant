@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Attempt, Briefing } from "../../shared/types";
-import { fillPrompt, getExercise, pickLearnExercise, SKILLS } from "../../shared/curriculum";
+import { fillPrompt, getExercise, pickLearnExercise, pickLearnExerciseForSkill, SKILLS, SKILL_ORDER } from "../../shared/curriculum";
+import type { SkillId } from "../../shared/types";
 import { PLAN, currentWeek } from "../../shared/plan";
 import { api } from "../lib/api";
 import { useApp } from "../lib/store";
 import { useSession } from "../lib/useSession";
 import { uid } from "../lib/storage";
-import { addReviewItem, buildReviewItem, type SaveChoice } from "../lib/state";
+import { addReviewItem, buildReviewItem, summarize, type SaveChoice } from "../lib/state";
 import { href } from "../lib/router";
 import { ResponseCapture, type AttemptDraft } from "../components/ResponseCapture";
 import { CompareAttempts, FeedbackPanel, WrapUp } from "../components/Feedback";
@@ -66,12 +67,15 @@ export function LearnSession({ storyId }: { storyId: string }) {
   const { data, update, status } = useApp();
   // Fixed for the whole session (finishing increments the completed count).
   const [exercise] = useState(() => {
+    // Within a skill, move to the harder version once the goal has been met twice with live feedback.
+    const goalMet = summarize(data).skills;
+    const metBySkill = Object.fromEntries(SKILL_ORDER.map((k) => [k, goalMet[k].goalMetLive])) as Record<SkillId, number>;
     // In a guided plan, practise this week's skill; otherwise rotate through skills.
     if (data.plan) {
       const wk = PLAN[currentWeek(data.plan, new Date().toISOString()) - 1];
-      if (wk) return getExercise(wk.learnExerciseId);
+      if (wk) return pickLearnExerciseForSkill(wk.skill, metBySkill[wk.skill]);
     }
-    return pickLearnExercise(data.sessions.filter((s) => s.mode === "learn" && s.completedAt).length);
+    return pickLearnExercise(data.sessions.filter((s) => s.mode === "learn" && s.completedAt).length, metBySkill);
   });
   const followUpExercise = getExercise("fu-answer-directly");
   const [briefing, setBriefing] = useState<(Briefing & { sourceChanged: boolean }) | null>(null);
@@ -223,7 +227,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
 
       {(phase === "recall" || phase === "retry") && (
         <section>
-          <StepHeader eyebrow={SKILLS[exercise.skill].name} title={phase === "retry" ? "Try again" : "Explain it from memory"} />
+          <StepHeader eyebrow={`${SKILLS[exercise.skill].name}${exercise.difficulty !== "starter" ? " · harder version" : ""}`} title={phase === "retry" ? "Try again" : "Explain it from memory"} />
           <p className="task">{task}</p>
           {phase === "retry" && last?.feedback?.retryFocus && <p className="focus-tip">Focus: {last.feedback.retryFocus}</p>}
           <ResponseCapture {...capture} label="Your explanation" submitLabel="Get feedback" onSubmit={(d) => void submitMain(d, phase === "retry")} />
@@ -249,7 +253,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
       {phase === "improve" && last?.feedback && (
         <section>
           <StepHeader eyebrow={SKILLS[exercise.skill].name} title="Your feedback" />
-          <FeedbackPanel feedback={last.feedback} attempt={last} />
+          <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r) => s.rateAttempt(last.id, r)} />
           {first && first.id !== last.id && <CompareAttempts first={first} second={last} />}
           <div className="actions sticky">
             <button className="primary" type="button" onClick={() => setPhase("apply")}>
@@ -290,7 +294,7 @@ export function LearnSession({ storyId }: { storyId: string }) {
           )}
           {followUpAnswer?.feedback && (
             <>
-              <FeedbackPanel feedback={followUpAnswer.feedback} attempt={followUpAnswer} />
+              <FeedbackPanel feedback={followUpAnswer.feedback} attempt={followUpAnswer} onRate={(r) => s.rateAttempt(followUpAnswer.id, r)} />
               <div className="actions sticky">
                 <button className="primary" type="button" onClick={() => setPhase("save")}>
                   Continue

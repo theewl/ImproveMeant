@@ -62,6 +62,11 @@ export function Progress() {
           </tbody>
         </table>
         <p className="hint">“Goal met” counts AI judgements on individual attempts, including retries of the same prompt. It isn't a measure of mastery.</p>
+        {sum.feedbackRated > 0 && (
+          <p>
+            You rated {sum.feedbackUseful} of {sum.feedbackRated} pieces of feedback useful.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="rev-h">
@@ -72,6 +77,12 @@ export function Progress() {
         <p className="hint">Self-assessed after revealing the answer.</p>
       </section>
 
+      <a className="pill-link" href={href({ name: "review" })}>
+        <span>
+          <strong>Your reviews</strong> · {data.reviews.filter((r) => r.status === "active").length} saved
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
       <a className="pill-link" href={href({ name: "phrases" })}>
         <span>
           <strong>Phrase bank</strong> · {phraseBank(data.sessions).length} phrase{phraseBank(data.sessions).length === 1 ? "" : "s"}

@@ -1,5 +1,6 @@
 import type { Experiment, GuidedPlan, LadderStep, PracticeSession, Reframe, ReviewItem, ScenarioId, SkillId } from "./types";
 import { activeLadder } from "./confidence";
+import { localDayKey } from "./dates";
 
 // A 4-week guided plan. Each week focuses on one communication skill and mixes
 // explaining, rehearsing, a real-world brave step, and one supporting task.
@@ -75,7 +76,7 @@ export function weekTasks(d: PlanData, week: number): PlanTask[] {
       break;
     case "review":
       extraLabel = "Do your reviews on two different days";
-      extraDone = new Set(d.reviews.flatMap((r) => r.history.filter((h) => h.result !== "skipped" && within(h.at, w)).map((h) => h.at.slice(0, 10)))).size >= 2;
+      extraDone = new Set(d.reviews.flatMap((r) => r.history.filter((h) => h.result !== "skipped" && within(h.at, w)).map((h) => localDayKey(h.at)))).size >= 2;
       break;
     case "lookback":
       extraLabel = "Look back on your four weeks";

@@ -155,6 +155,8 @@ export interface Attempt {
   /** Observer review (self-reported): how they thought they came across before vs after listening back. 0–10. */
   selfView?: { predicted: number; observed: number };
   feedback?: Feedback;
+  /** Learner's rating of the feedback's usefulness (live feedback only). */
+  feedbackRating?: "useful" | "not-useful";
 }
 
 export type FidelityStatus = "accurate" | "minor_gaps" | "factual_error" | "not_applicable";

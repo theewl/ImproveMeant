@@ -20,7 +20,7 @@ export function AttemptTags({ a }: { a: Attempt }) {
   );
 }
 
-export function FeedbackPanel({ feedback: f, attempt }: { feedback: Feedback; attempt: Attempt }) {
+export function FeedbackPanel({ feedback: f, attempt, onRate }: { feedback: Feedback; attempt: Attempt; onRate?: (r: "useful" | "not-useful") => void }) {
   const { data } = useApp();
   const quiet = !!data.prefs.quietMode;
   const measured = measureAttempt(attempt);
@@ -87,6 +87,18 @@ export function FeedbackPanel({ feedback: f, attempt }: { feedback: Feedback; at
       )}
 
       <AttemptTags a={attempt} />
+
+      {live && onRate && (
+        <div className="rate" role="group" aria-label="Was this feedback useful?">
+          <span className="hint">Was this useful?</span>
+          <button type="button" className={attempt.feedbackRating === "useful" ? "chip on" : "chip"} aria-pressed={attempt.feedbackRating === "useful"} onClick={() => onRate("useful")}>
+            Yes
+          </button>
+          <button type="button" className={attempt.feedbackRating === "not-useful" ? "chip on" : "chip"} aria-pressed={attempt.feedbackRating === "not-useful"} onClick={() => onRate("not-useful")}>
+            Not really
+          </button>
+        </div>
+      )}
 
       <details className="more">
         <summary>More detail</summary>

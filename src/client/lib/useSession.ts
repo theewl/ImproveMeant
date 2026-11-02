@@ -78,7 +78,13 @@ export function useSession(init: () => PracticeSession) {
 
   const addAttempt = useCallback((a: Attempt) => setSession((s) => ({ ...s, attempts: [...s.attempts.filter((x) => x.id !== a.id), a] })), []);
 
+  const rateAttempt = useCallback(
+    (id: string, feedbackRating: Attempt["feedbackRating"]) =>
+      setSession((s) => ({ ...s, attempts: s.attempts.map((a) => (a.id === id ? { ...a, feedbackRating } : a)), followUps: s.followUps.map((f) => (f.answer?.id === id ? { ...f, answer: { ...f.answer, feedbackRating } } : f)) })),
+    [],
+  );
+
   const finish = useCallback(() => setSession((s) => ({ ...s, completedAt: s.completedAt ?? new Date().toISOString() })), []);
 
-  return { session, setSession, busy, setBusy, error, setError, makeAttempt, getFeedback, addAttempt, finish };
+  return { session, setSession, busy, setBusy, error, setError, makeAttempt, getFeedback, addAttempt, rateAttempt, finish };
 }

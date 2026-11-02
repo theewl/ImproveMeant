@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { App } from "../../src/client/App";
 import { AppProvider } from "../../src/client/lib/store";
 import { emptyData, loadData, STORAGE_KEY, type AppData } from "../../src/client/lib/storage";
-import { buildTestApp, fakeTransport, textMessage } from "../helpers";
+import { buildTestApp, fakeTransport, goodFeedback, textMessage } from "../helpers";
 import type { ReviewItem } from "../../src/shared/types";
 
 // The browser client talks to the real Hono app in-process (demo providers unless overridden).
@@ -102,6 +102,27 @@ describe("Learn & Explain journey (demo mode, typed)", () => {
     expect(screen.getByText(/Recording isn't supported/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Type your answer instead" }));
     expect(screen.getByRole("textbox", { name: "Your explanation" })).toBeInTheDocument();
+  });
+
+  it("lets the learner rate live feedback and counts it in Progress", async () => {
+    routeFetchTo(buildTestApp({ transport: fakeTransport([textMessage(goodFeedback)]) }).app);
+    const user = userEvent.setup();
+    start("#/learn/eg-goodhart", onboarded());
+    await user.click(await screen.findByRole("button", { name: /hide the briefing/ }));
+    await user.type(screen.getByRole("textbox", { name: "Your explanation" }), "If you only look at survivors you miss the planes that came back and the ones that did not.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByText("What worked");
+    await user.click(screen.getByRole("button", { name: "Yes" }));
+    expect(screen.getByRole("button", { name: "Yes" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+    await user.click(screen.getByRole("button", { name: "Finish session" }));
+    await screen.findByText("Session complete");
+    expect(stored().sessions[0]!.attempts[0]!.feedbackRating).toBe("useful");
+    cleanup();
+    start("#/progress", stored());
+    expect(await screen.findByText(/rated 1 of 1 pieces of feedback useful/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Your reviews/ })).toBeInTheDocument();
   });
 
   it("shows the live-provider error instead of silently substituting demo feedback", async () => {

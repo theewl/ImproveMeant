@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../lib/store";
 import { exportJson } from "../lib/storage";
+import { localDayKey } from "../../shared/dates";
 import { PreferencesForm } from "./Onboarding";
 import { CrisisList } from "./Confidence";
 
@@ -95,7 +96,7 @@ export function Settings() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `clearline-export-${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `clearline-export-${localDayKey()}.json`;
             document.body.appendChild(a);
             a.click();
             a.remove();

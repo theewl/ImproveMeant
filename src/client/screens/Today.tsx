@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { StoryCard } from "../../shared/types";
 import { dueQueue } from "../../shared/schedule";
+import { localDayKey } from "../../shared/dates";
 import { ALL_INTERESTS } from "../../shared/evergreen";
 import { api, type LiveFeedState } from "../lib/api";
 import { useApp } from "../lib/store";
@@ -28,9 +29,9 @@ export function Today() {
   };
   useEffect(load, [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDayKey();
   const { queue } = dueQueue(data.reviews, new Date().toISOString());
-  const doneToday = data.sessions.filter((s) => s.completedAt?.slice(0, 10) === today).length;
+  const doneToday = data.sessions.filter((s) => s.completedAt && localDayKey(s.completedAt) === today).length;
   const max = data.prefs.sessionMinutes === 3 ? 3 : 4;
   const [featured, ...rest] = cards?.slice(0, max) ?? [];
   const interestNames = data.prefs.interests.map((i) => ALL_INTERESTS.find((x) => x.id === i)?.label ?? i);

@@ -1377,3 +1377,14 @@ button.small {
   font-size: 0.8rem;
   margin: 0.35rem 0 0;
 }
+
+.rate {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.25rem;
+}
+.rate .chip {
+  min-height: 40px;
+  padding: 0.35rem 0.9rem;
+}

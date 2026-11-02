@@ -358,7 +358,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
       {phase === "feedback" && last?.feedback && (
         <section>
           <StepHeader eyebrow={SKILLS[exercise.skill].name} title="Your feedback" />
-          <FeedbackPanel feedback={last.feedback} attempt={last} />
+          <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r) => s.rateAttempt(last.id, r)} />
           {first && first.id !== last.id && <CompareAttempts first={first} second={last} />}
           {questions[1] && <SecondQuestion q={questions[1]} audience={setup.audience} answer={secondAnswer} captureProps={captureProps} error={s.error} onSubmit={submitSecondAnswer} />}
           <div className="actions sticky">
