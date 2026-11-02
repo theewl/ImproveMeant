@@ -278,6 +278,8 @@ describe("Confidence tools", () => {
     expect(screen.getByRole("textbox", { name: "What will you do?" })).toHaveValue("Ask a question in a meeting");
     await user.type(screen.getByRole("textbox", { name: "What are you worried will happen?" }), "My voice will shake and people will notice");
     await user.click(screen.getByLabelText("Avoiding eye contact"));
+    await user.type(screen.getByLabelText("If"), "I lose my thread");
+    await user.type(screen.getByLabelText("then I will"), "pause and restate my point");
     await user.click(screen.getByRole("button", { name: "Save my plan" }));
 
     await user.click(await screen.findByRole("button", { name: /How did it go\?/ }));
@@ -290,7 +292,13 @@ describe("Confidence tools", () => {
     const d = stored();
     expect(d.ladder).toHaveLength(2);
     expect(d.experiments).toHaveLength(1);
-    expect(d.experiments[0]).toMatchObject({ situation: "Ask a question in a meeting", outcome: "didnt-happen", safetyBehaviourToDrop: "Avoiding eye contact", wentOkay: "I asked it clearly" });
+    expect(d.experiments[0]).toMatchObject({
+      situation: "Ask a question in a meeting",
+      outcome: "didnt-happen",
+      safetyBehaviourToDrop: "Avoiding eye contact",
+      wentOkay: "I asked it clearly",
+      ifThen: { obstacle: "I lose my thread", action: "pause and restate my point" },
+    });
     expect(d.experiments[0]!.ladderStepId).toBe(d.ladder.find((l) => l.title.startsWith("Ask"))!.id);
   });
 

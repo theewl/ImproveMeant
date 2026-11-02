@@ -284,6 +284,9 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
   const [likelihood, setLikelihood] = useState(60);
   const [anxiety, setAnxiety] = useState(5);
   const [drop, setDrop] = useState<string | undefined>();
+  const [obstacle, setObstacle] = useState("");
+  const [action, setAction] = useState("");
+  const [worry, setWorry] = useState(""); // deliberately not saved
   const ok = situation.trim().length > 2 && prediction.trim().length > 2;
   return (
     <SubScreen eyebrow="Brave step" title="Plan it" onBack={onCancel}>
@@ -301,6 +304,7 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
             predictionLikelihood: likelihood,
             anxietyBefore: anxiety,
             safetyBehaviourToDrop: drop,
+            ifThen: obstacle.trim() && action.trim() ? { obstacle: obstacle.trim(), action: action.trim() } : undefined,
           });
         }}
       >
@@ -317,8 +321,36 @@ function PlanStep({ step, onCancel, onSave }: { step?: LadderStep; onCancel: () 
             </label>
           ))}
         </fieldset>
+        <div className="ifthen">
+          <p className="label">If something gets in the way, then I will… (optional)</p>
+          <p className="hint">Planning one obstacle and one response in advance makes follow-through more likely. Keep both short.</p>
+          <label className="sr-only" htmlFor="if-obstacle">
+            If
+          </label>
+          <div className="ifthen-row">
+            <span>If</span>
+            <input id="if-obstacle" value={obstacle} maxLength={160} placeholder="I'm asked a follow-up I can't answer" onChange={(e) => setObstacle(e.target.value)} />
+          </div>
+          <label className="sr-only" htmlFor="if-action">
+            then I will
+          </label>
+          <div className="ifthen-row">
+            <span>then I will</span>
+            <input id="if-action" value={action} maxLength={160} placeholder="say “Good question — the short answer is…”" onChange={(e) => setAction(e.target.value)} />
+          </div>
+        </div>
+        {anxiety >= 7 && (
+          <div className="worry-box">
+            <p className="label">Feeling very anxious about it? Write out your worries (optional)</p>
+            <p className="hint">
+              Spend a couple of minutes writing freely about what you're worried about. In one study, people who did this before a high-pressure task performed better than
+              those who sat quietly. This box isn't saved anywhere.
+            </p>
+            <textarea aria-label="Write out your worries" rows={5} value={worry} onChange={(e) => setWorry(e.target.value)} />
+          </div>
+        )}
         <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
-        <CrisisNotice texts={[situation, prediction]} />
+        <CrisisNotice texts={[situation, prediction, worry]} />
         <div className="actions sticky">
           <button className="primary" type="submit" disabled={!ok}>
             Save my plan
@@ -343,6 +375,11 @@ function CheckIn({ exp, onCancel, onSave }: { exp: Experiment; onCancel: () => v
       <div className="callout">
         <p className="eyebrow">You predicted ({exp.predictionLikelihood}% likely)</p>
         <p>{exp.prediction}</p>
+        {exp.ifThen && (
+          <p className="hint">
+            Your plan: if {exp.ifThen.obstacle}, then {exp.ifThen.action}.
+          </p>
+        )}
       </div>
       <form
         onSubmit={(e) => {
@@ -530,7 +567,13 @@ function ReframeFlow({ onCancel, onSave }: { onCancel: () => void; onSave: (r: R
             </ul>
           )}
           <TextField label="What doesn't fit the thought?" value={evidenceAgainst} onChange={setEvidenceAgainst} hint="Times it went fine, things people actually said, what you know about the topic." rows={3} />
-          <TextField label="What would you tell a friend who thought this?" value={friendAdvice} onChange={setFriendAdvice} rows={3} />
+          <TextField
+            label="What would you tell a friend who thought this?"
+            value={friendAdvice}
+            onChange={setFriendAdvice}
+            rows={3}
+            hint="Or talk to yourself by name, as a friend would: “Sam, you've explained this before.” A little distance makes it easier to be fair."
+          />
           <div className="actions sticky">
             <button className="primary" type="button" onClick={() => setStep(4)}>
               Next

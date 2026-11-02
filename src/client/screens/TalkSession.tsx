@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Attempt, AudienceQuestion, Briefing, Experiment, ScenarioId, TalkSetup } from "../../shared/types";
 import { OUTWARD_FOCUS_TIP, SAFETY_BEHAVIOURS } from "../../shared/confidence";
 import { SCENARIOS, SKILLS, fillPrompt, getExercise, getScenario } from "../../shared/curriculum";
-import { formatSeconds } from "../../shared/observations";
+import { formatSeconds, notesCoverage } from "../../shared/observations";
 import { api } from "../lib/api";
 import { useApp } from "../lib/store";
 import { useSession } from "../lib/useSession";
@@ -359,6 +359,7 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
         <section>
           <StepHeader eyebrow={SKILLS[exercise.skill].name} title="Your feedback" />
           <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r) => s.rateAttempt(last.id, r)} />
+          <NotesCoverage notes={setup.notes} text={last.text} />
           {first && first.id !== last.id && <CompareAttempts first={first} second={last} />}
           {questions[1] && <SecondQuestion q={questions[1]} audience={setup.audience} answer={secondAnswer} captureProps={captureProps} error={s.error} onSubmit={submitSecondAnswer} />}
           <div className="actions sticky">
@@ -449,6 +450,30 @@ export function TalkSession({ fromStoryId, scenario: initialScenario }: { fromSt
         </section>
       )}
     </main>
+  );
+}
+
+function NotesCoverage({ notes, text }: { notes: string; text: string }) {
+  const { data } = useApp();
+  if (!notes.trim() || data.prefs.quietMode) return null;
+  const c = notesCoverage(notes, text);
+  if (c.total === 0) return null;
+  return (
+    <details className="more">
+      <summary>
+        Notes covered: {c.covered} of {c.total}
+      </summary>
+      {c.missed.length > 0 && (
+        <>
+          <p className="hint">Lines that didn't come up (rough word match, not a grade):</p>
+          <ul className="plain">
+            {c.missed.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </details>
   );
 }
 
@@ -602,6 +627,10 @@ function Prepare({
             ))}
           </fieldset>
           <p className="focus-tip">{OUTWARD_FOCUS_TIP}</p>
+          <p className="focus-tip">
+            Try saying out loud: <strong>“I'm excited.”</strong> Nerves and excitement feel similar in the body. In one study, speakers who said this before a talk were
+            rated more persuasive than those who tried to calm down.
+          </p>
         </details>
       )}
       <div className="actions sticky">

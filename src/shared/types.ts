@@ -357,6 +357,8 @@ export interface Experiment {
   /** Anxiety before, 0–10 (self-reported). */
   anxietyBefore: number;
   safetyBehaviourToDrop?: string;
+  /** Implementation intention: "If <obstacle>, then I will <action>". */
+  ifThen?: { obstacle: string; action: string };
   completedAt?: string;
   anxietyAfter?: number;
   outcome?: "happened" | "partly" | "didnt-happen";

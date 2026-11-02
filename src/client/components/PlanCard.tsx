@@ -104,7 +104,9 @@ export function PlanCard({ learnStoryId }: { learnStoryId?: string }) {
 function Lookback({ week }: { week: number }) {
   const { data, update } = useApp();
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState("");
+  const [well, setWell] = useState("");
+  const [inWay, setInWay] = useState("");
+  const [next, setNext] = useState("");
   const s = weekSummary(data, week);
   if (!s) return null;
   return (
@@ -117,7 +119,11 @@ function Lookback({ week }: { week: number }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            update((d) => (d.plan ? { ...d, plan: { ...d.plan, reflections: [...d.plan.reflections, { week, at: new Date().toISOString(), text: text.trim().slice(0, 600) }] } } : d));
+            const text = [well.trim() && `Went well: ${well.trim()}`, inWay.trim() && `Got in the way: ${inWay.trim()}`, next.trim() && `Next week: ${next.trim()}`]
+              .filter(Boolean)
+              .join("\n")
+              .slice(0, 900);
+            update((d) => (d.plan ? { ...d, plan: { ...d.plan, reflections: [...d.plan.reflections, { week, at: new Date().toISOString(), text }] } } : d));
           }}
         >
           <p className="eyebrow">Week {week} look-back</p>
@@ -125,10 +131,18 @@ function Lookback({ week }: { week: number }) {
             {s.learnSessions + s.talkSessions} sessions ({s.spokenSessions} spoken) · {s.braveSteps} brave step{s.braveSteps === 1 ? "" : "s"}
             {s.braveSteps ? ` · ${s.fearsNotHappened} fear${s.fearsNotHappened === 1 ? "" : "s"} didn't happen` : ""} · {s.reviewsDone} review{s.reviewsDone === 1 ? "" : "s"}
           </p>
-          <label className="label" htmlFor={`lb-${week}`}>
-            What feels a little easier than before?
+          <label className="label" htmlFor={`lb-well-${week}`}>
+            One thing that went well
           </label>
-          <textarea id={`lb-${week}`} rows={2} maxLength={600} value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea id={`lb-well-${week}`} rows={2} maxLength={300} value={well} onChange={(e) => setWell(e.target.value)} />
+          <label className="label" htmlFor={`lb-way-${week}`}>
+            One thing that got in the way
+          </label>
+          <textarea id={`lb-way-${week}`} rows={2} maxLength={300} value={inWay} onChange={(e) => setInWay(e.target.value)} />
+          <label className="label" htmlFor={`lb-next-${week}`}>
+            One small thing to try next week
+          </label>
+          <textarea id={`lb-next-${week}`} rows={2} maxLength={300} value={next} onChange={(e) => setNext(e.target.value)} />
           <button className="primary" type="submit">
             Save look-back
           </button>

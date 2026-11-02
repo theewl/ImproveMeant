@@ -1388,3 +1388,21 @@ button.small {
   min-height: 40px;
   padding: 0.35rem 0.9rem;
 }
+
+.ifthen {
+  margin-top: 1rem;
+}
+.ifthen-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.4rem 0;
+  font-weight: 600;
+}
+.worry-box {
+  margin-top: 1rem;
+}
+.share-clip {
+  margin-top: 0.25rem;
+}

@@ -106,6 +106,19 @@ export const EXERCISES: Exercise[] = [
     laterVariation: "Explain a process you know well (e.g. onboarding a new hire) to a group of newcomers in three signposted steps.",
   },
   {
+    id: "org-what-so-what",
+    skill: "organize",
+    difficulty: "core",
+    title: "What? So what? Now what?",
+    prompt:
+      "Explain \"{topic}\" in three short parts, in this order: What (what it is), So what (why it matters to the listener), Now what (what to do or watch for). You can use the stems \"The idea is…\", \"This matters because…\", \"So the next step is…\".",
+    successDefinition:
+      "All three parts appear, in order, and each is one to three sentences. The 'so what' is about the listener, not a restatement of the 'what'.",
+    exampleFeedback:
+      "Your 'what' and 'so what' are clear. The 'now what' is missing: you ended on why it matters. Add one sentence on what the listener could do or watch for.",
+    laterVariation: "Someone asks what you've been working on. Answer in three parts: what it is, why it matters to them, what happens next.",
+  },
+  {
     id: "org-stretch-objection",
     skill: "organize",
     difficulty: "stretch",
@@ -128,6 +141,18 @@ export const EXERCISES: Exercise[] = [
     exampleFeedback:
       "\"It affects a lot of people\" is general. You mentioned the town in the article; naming it and the number of homes affected would make the point concrete.",
     laterVariation: "Explain why a habit of yours works, using one specific day when it helped.",
+  },
+  {
+    id: "ex-twelve",
+    skill: "example",
+    difficulty: "core",
+    title: "Explain it to a curious 12-year-old",
+    prompt: "Explain \"{topic}\" to a curious 12-year-old. No jargon; use one example from everyday life they'd recognise.",
+    successDefinition:
+      "No unexplained technical terms, at least one everyday example, and the main idea survives the simplification without becoming wrong.",
+    exampleFeedback:
+      "\"Incentives\" would need explaining to a 12-year-old. You could say \"rewards\" and keep your pocket-money example, which works well.",
+    laterVariation: "Explain what your job involves to a curious 12-year-old, with one example from their world.",
   },
   {
     id: "ex-analogy",
@@ -301,8 +326,8 @@ export function getScenario(id: string): Scenario {
 /** Learn & Explain exercises per skill, easier first. Later entries are harder versions of the same skill. */
 export const LEARN_EXERCISES: Record<SkillId, string[]> = {
   "main-point": ["mp-explain-story", "mp-one-sentence"],
-  organize: ["org-two-reasons", "org-stretch-objection"],
-  example: ["ex-concrete-case", "ex-analogy"],
+  organize: ["org-two-reasons", "org-what-so-what", "org-stretch-objection"],
+  example: ["ex-concrete-case", "ex-twelve", "ex-analogy"],
   conclusion: ["con-takeaway", "con-call-to-action"],
 };
 

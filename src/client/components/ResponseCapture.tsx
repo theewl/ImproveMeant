@@ -290,6 +290,7 @@ function SpokenAnswer(p: Props & { onSwitchToTyped: () => void }) {
             <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} />
             Keep this recording on this device
           </label>
+          <ShareClip blob={rec.blob} />
         </div>
       )}
       {txState === "working" && (
@@ -363,6 +364,35 @@ function ObserverSlider({ id, label, value, onChange }: { id: string; label: str
         <span>Nervous, unclear</span>
         <span>Calm, clear</span>
       </div>
+    </div>
+  );
+}
+
+/** Send the recording to one person and ask for one word back. Uses the device share sheet when available. */
+function ShareClip({ blob }: { blob: Blob }) {
+  const [status, setStatus] = useState<"idle" | "shared" | "failed">("idle");
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function" || typeof navigator.canShare !== "function") return null;
+  const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+  const file = new File([blob], `practice.${ext}`, { type: blob.type });
+  if (!navigator.canShare({ files: [file] })) return null;
+  return (
+    <div className="share-clip">
+      <button
+        type="button"
+        className="link"
+        onClick={async () => {
+          try {
+            await navigator.share({ files: [file], text: "Could you listen to this and tell me, in one word, how it came across? And one moment that was clearest?" });
+            setStatus("shared");
+          } catch (e) {
+            setStatus((e as Error).name === "AbortError" ? "idle" : "failed");
+          }
+        }}
+      >
+        Send to one person for a one-word reaction
+      </button>
+      {status === "shared" && <p className="hint">Sent. Real listeners are the best test of whether your point landed.</p>}
+      {status === "failed" && <p className="hint">Sharing didn't work on this device.</p>}
     </div>
   );
 }

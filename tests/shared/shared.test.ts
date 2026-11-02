@@ -138,3 +138,34 @@ describe("curriculum and library integrity", () => {
     }
   });
 });
+
+import { notesCoverage, repeatedWords } from "../../src/shared/observations";
+import { LEARN_EXERCISES } from "../../src/shared/curriculum";
+
+describe("repeated words and notes coverage", () => {
+  it("counts content words used three or more times, ignoring function words", () => {
+    const t = "Basically the plan is basically simple. The plan works, and basically that is the plan.";
+    expect(repeatedWords(t)).toEqual([
+      { word: "basically", count: 3 },
+      { word: "plan", count: 3 },
+    ]);
+    expect(repeatedWords("the the the and and")).toEqual([]);
+  });
+  it("checks which note lines came up, by content-word overlap", () => {
+    const notes = "- Budget is flat this year\n- Hire two engineers\n- Launch in March";
+    const c = notesCoverage(notes, "Our budget stays flat this year, so we want to hire two engineers before summer.");
+    expect(c).toEqual({ covered: 2, total: 3, missed: ["Launch in March"] });
+    expect(notesCoverage("", "anything").total).toBe(0);
+  });
+});
+
+describe("learn exercise progression lists", () => {
+  it("reference real exercises of the right skill, easier first", () => {
+    for (const [skill, ids] of Object.entries(LEARN_EXERCISES)) {
+      const ex = ids.map((id) => getExercise(id));
+      expect(ex.every((e) => e.skill === skill)).toBe(true);
+      const rank = { starter: 0, core: 1, stretch: 2 } as const;
+      for (let i = 1; i < ex.length; i++) expect(rank[ex[i]!.difficulty]).toBeGreaterThanOrEqual(rank[ex[i - 1]!.difficulty]);
+    }
+  });
+});
