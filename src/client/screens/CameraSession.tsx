@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Attempt } from "../../shared/types";
-import { CAMERA_SETUP, getCameraDrill, hookText, measureCameraTake, nextCameraDrill } from "../../shared/camera";
+import { CAMERA_SETUP, getCameraDrill, hookText, improvementSince, measureCameraTake, nextCameraDrill, takeStats } from "../../shared/camera";
+import { HOOK_PATTERNS, STRUCTURES, fillPromptText, takesThisWeek, todayPrompt, type HookPatternId, type VlogPrompt } from "../../shared/vlog";
 import { fillPrompt } from "../../shared/curriculum";
 import { formatSeconds } from "../../shared/observations";
 import { wordCount } from "../../shared/text";
@@ -21,14 +22,18 @@ const MAX_RETRIES = 2;
 const HOOK_SECONDS = 10;
 const VIEWER_CHECKS = ["Did the first ten seconds give a reason to stay?", "Were your eyes on the lens when it mattered?", "Did it sound like talking to one person?"];
 
-export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromStoryId?: string }) {
+export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: string; fromStoryId?: string; prompt?: VlogPrompt }) {
   const { data, update, status } = useApp();
   const drill = getCameraDrill(drillId);
   const live = status?.mode === "live";
   const transcriptionAvailable = status?.transcription === "deepgram";
   const [phase, setPhase] = useState<Phase>("setup");
-  const [topic, setTopic] = useState("");
+  const viewer = data.prefs.viewerName?.trim() || "";
+  const [topic, setTopic] = useState(() => (prompt ? fillPromptText(prompt, viewer) : ""));
   const [notes, setNotes] = useState("");
+  const [throughline, setThroughline] = useState("");
+  const [hookPattern, setHookPattern] = useState<HookPatternId | "">(prompt?.hook ?? "");
+  const structure = prompt ? STRUCTURES.find((x) => x.id === prompt.structure) : undefined;
   const [checkin, setCheckin] = useState<Checkin | null>(null);
   const [checkinSaved, setCheckinSaved] = useState<string | null>(null);
   const [sendFrames, setSendFrames] = useState(data.cameraFramesConsent);
@@ -46,7 +51,7 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
     storyId: fromStoryId,
     exerciseId: drill.exercise.id,
     skill: drill.skill,
-    camera: { drillId: drill.id, topic: "", notes: "" },
+    camera: { drillId: drill.id, promptId: prompt?.id, topic: "", notes: "" },
     attempts: [],
     followUps: [],
     usedLive: false,
@@ -66,10 +71,10 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
   }, [fromStoryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    s.setSession((x) => ({ ...x, camera: { ...(x.camera ?? { drillId: drill.id }), drillId: drill.id, topic, notes, comfortBefore: x.camera?.comfortBefore } }));
-  }, [topic, notes, drill.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    s.setSession((x) => ({ ...x, camera: { ...(x.camera ?? { drillId: drill.id }), drillId: drill.id, promptId: prompt?.id, topic, notes, throughline, hookPattern: hookPattern || undefined } }));
+  }, [topic, notes, throughline, hookPattern, drill.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const task = fillPrompt(drill.prompt, { topic: topic || "your topic" });
+  const task = prompt ? topic : fillPrompt(drill.prompt, { topic: topic || "your topic" });
   const attempts = s.session.attempts;
   const last = attempts[attempts.length - 1];
   const first = attempts[0];
@@ -105,6 +110,8 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
         drillId: drill.id,
         topic,
         notes,
+        throughline,
+        hookPattern,
         response: { text: attempt.text, transcriptSource: attempt.transcriptSource ?? "typed-by-user", transcriptEdited: attempt.transcriptEdited, durationSeconds: attempt.durationSeconds ?? null },
         frames: sendFrames ? frames : [],
         previous: prev ? { text: prev.text, retryFocus: prev.feedback?.retryFocus ?? null } : null,
@@ -126,6 +133,19 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
   };
 
   const deleted = !!drill.noReview && !first?.text;
+  const nowIso = new Date().toISOString();
+  const weekTarget = data.prefs.weeklyTakes ?? 5;
+  const weekTakes = takesThisWeek(
+    [...data.sessions.filter((x) => x.mode === "camera" && x.completedAt && x.id !== s.session.id).map((x) => x.completedAt!), ...(phase === "done" ? [nowIso] : [])],
+    nowIso,
+  );
+  const firstEver = data.sessions
+    .filter((x) => x.mode === "camera" && x.id !== s.session.id)
+    .flatMap((x) => x.attempts)
+    .find((a) => a.text.trim());
+  const improvement = firstEver && last?.text.trim() ? improvementSince(takeStats(firstEver.text, firstEver.durationSeconds), takeStats(last.text, last.durationSeconds)) : [];
+  const doneIds = data.sessions.filter((x) => x.mode === "camera" && x.completedAt && x.camera?.promptId).map((x) => x.camera!.promptId!);
+  const anotherPrompt = todayPrompt((data.prefs.niches ?? []) as never, [...doneIds, ...(prompt ? [prompt.id] : [])], nowIso, 1);
   const next = nextCameraDrill([...data.sessions.filter((x) => x.id !== s.session.id), { ...s.session, completedAt: s.session.completedAt ?? new Date().toISOString() }]);
 
   return (
@@ -134,14 +154,18 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
 
       {phase === "setup" && (
         <section>
-          <StepHeader eyebrow={`Camera drill ${drill.level} · about ${formatSeconds(drill.seconds)}`} title={drill.title} />
-          <p className="task">{task}</p>
-          <p className="hint">{drill.why}</p>
-          <ul className="plain checks">
-            {drill.goodLooksLike.map((g) => (
-              <li key={g}>{g}</li>
-            ))}
-          </ul>
+          <StepHeader
+            eyebrow={prompt ? `Today's take · about ${formatSeconds(drill.seconds)}` : `Step ${drill.level} · about ${formatSeconds(drill.seconds)}`}
+            title={prompt ? (viewer ? `Talk to ${viewer}` : "Talk to one person") : drill.title}
+          />
+          <p className="task big">{task}</p>
+          {!prompt && (
+            <ul className="plain checks">
+              {drill.goodLooksLike.map((g) => (
+                <li key={g}>{g}</li>
+              ))}
+            </ul>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -149,7 +173,7 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
               setPhase("record");
             }}
           >
-            {drill.needsTopic && (
+            {!prompt && drill.needsTopic && (
               <>
                 <label className="label" htmlFor="cam-topic">
                   Topic
@@ -159,32 +183,29 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
             )}
             {!drill.noReview && (
               <>
-                <label className="label" htmlFor="cam-notes">
-                  Three talking points (optional, shown near the lens)
+                <label className="label" htmlFor="cam-idea">
+                  The one thing they should walk away with
                 </label>
-                <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Not a script. Three words or short lines." />
+                <input id="cam-idea" value={throughline} maxLength={300} onChange={(e) => setThroughline(e.target.value)} placeholder="One sentence. Optional, but it makes the take." />
+                <fieldset className="pills">
+                  <legend className="label">Open with</legend>
+                  {HOOK_PATTERNS.map((h) => (
+                    <label key={h.id} className={hookPattern === h.id ? "pill on" : "pill"}>
+                      <input type="radio" name="hook" checked={hookPattern === h.id} onChange={() => setHookPattern(h.id)} />
+                      {h.name}
+                    </label>
+                  ))}
+                </fieldset>
+                {hookPattern && <p className="hint">e.g. “{HOOK_PATTERNS.find((h) => h.id === hookPattern)!.example}”</p>}
+                {structure && (
+                  <p className="hint">
+                    Shape: {structure.beats.join(" → ")}
+                  </p>
+                )}
               </>
             )}
             <BeforeCheckin defaultDrop={data.myHabits?.[0]} onChange={setCheckin} />
-            <details className="more">
-              <summary>30-second warm-up</summary>
-              <ul className="plain checks">
-                <li>Breathe out slowly three times; drop your shoulders.</li>
-                <li>Say “red leather, yellow leather” five times, fast, to wake up your mouth.</li>
-                <li>Look at the lens, smile, and say “hi” to the one person you're talking to.</li>
-              </ul>
-            </details>
-            <details className="more">
-              <summary>Before you record: five checks</summary>
-              <ul className="plain checks">
-                {CAMERA_SETUP.map((c) => (
-                  <li key={c.id}>
-                    <strong>{c.text}.</strong> {c.why}
-                  </li>
-                ))}
-              </ul>
-            </details>
-            {live && !drill.noReview && (
+            {live && !drill.noReview && !data.cameraFramesConsent && (
               <label className={sendFrames ? "option on" : "option"}>
                 <input
                   type="checkbox"
@@ -194,10 +215,42 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
                     if (e.target.checked) update((d) => ({ ...d, cameraFramesConsent: true }));
                   }}
                 />
-                Send three still frames to the AI for feedback on framing, light and eye line. The video itself never leaves your phone; the stills aren't stored.
+                Send three still frames to the AI for notes on framing, light and eye line. The video stays on your phone.
               </label>
             )}
-            {!live && !drill.noReview && <p className="hint">Demo mode: you'll see an example of feedback, and your own measurements. AI feedback on your take needs the server's API key.</p>}
+            <details className="more">
+              <summary>More: talking points, warm-up, camera checks</summary>
+              {!drill.noReview && (
+                <>
+                  <label className="label" htmlFor="cam-notes">
+                    Three talking points, shown near the lens (optional)
+                  </label>
+                  <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={structure ? structure.beats.join("\n") : "Not a script. Three words or short lines."} />
+                </>
+              )}
+              <p className="hint">{drill.why}</p>
+              <p className="label">30-second warm-up</p>
+              <ul className="plain checks">
+                <li>Breathe out slowly three times; drop your shoulders.</li>
+                <li>Say “red leather, yellow leather” five times, fast.</li>
+                <li>Look at the lens, smile, and say “hi” to {viewer || "your one viewer"}.</li>
+              </ul>
+              <p className="label">Camera checks</p>
+              <ul className="plain checks">
+                {CAMERA_SETUP.map((c) => (
+                  <li key={c.id}>
+                    <strong>{c.text}.</strong> {c.why}
+                  </li>
+                ))}
+              </ul>
+              {live && !drill.noReview && data.cameraFramesConsent && (
+                <label className={sendFrames ? "option on" : "option"}>
+                  <input type="checkbox" checked={sendFrames} onChange={(e) => setSendFrames(e.target.checked)} />
+                  Send three stills to the AI for camera notes
+                </label>
+              )}
+              {!live && !drill.noReview && <p className="hint">Demo mode: example feedback plus your own measurements. AI feedback on your take needs the server's API key.</p>}
+            </details>
             <div className="actions sticky">
               <button className="primary" type="submit" disabled={drill.needsTopic && !topic.trim()}>
                 Open the camera
@@ -296,14 +349,42 @@ export function CameraSession({ drillId, fromStoryId }: { drillId: string; fromS
               {checkinSaved}
             </p>
           )}
-          <p className="hint">Next up: drill {next.level}, {next.title}.</p>
+          {improvement.length > 0 && (
+            <div className="since">
+              <p className="eyebrow">Since your first take</p>
+              <ul className="plain">
+                {improvement.map((i) => (
+                  <li key={i.label} className={i.better === true ? "since-better" : i.better === false ? "since-worse" : ""}>
+                    {i.label}: {i.before} → {i.after}
+                    {i.better === true ? " ✓" : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="hint">
+            {weekTakes} of {weekTarget} takes this week.{prompt ? "" : ` Next step on the ladder: ${next.title}.`}
+          </p>
           <div className="actions">
-            <a className="button primary" href={href({ name: "camera", drillId: next.id })}>
-              Next drill
-            </a>
-            <a className="button secondary" href={href({ name: "camera" })}>
-              All drills
-            </a>
+            {prompt ? (
+              <>
+                <a className="button primary" href={href({ name: "today" })}>
+                  Done for today
+                </a>
+                <a className="button secondary" href={href({ name: "take", promptId: anotherPrompt.id })}>
+                  One more take
+                </a>
+              </>
+            ) : (
+              <>
+                <a className="button primary" href={href({ name: "camera", drillId: next.id })}>
+                  Next step
+                </a>
+                <a className="button secondary" href={href({ name: "today" })}>
+                  Done for today
+                </a>
+              </>
+            )}
           </div>
         </section>
       )}

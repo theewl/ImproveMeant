@@ -14,6 +14,7 @@ import {
 } from "../../shared/confidence";
 import { CrisisList, CrisisNotice } from "../components/Crisis";
 import { CAMERA_PRINCIPLES, CAMERA_SETUP } from "../../shared/camera";
+import { PLAYBOOK } from "../../shared/vlog";
 import { allSteps, nextStep, realStepIdeas, stepKindLabel, stepRecord, type Step } from "../../shared/steps";
 import { href } from "../lib/router";
 import { useApp } from "../lib/store";
@@ -248,6 +249,16 @@ export function Confidence() {
           {CAMERA_SETUP.map((c) => (
             <li key={c.id}>
               <strong>{c.text}.</strong> {c.why}
+            </li>
+          ))}
+        </ul>
+      </details>
+      <details className="more">
+        <summary>What the best creators do, and what this app does about it</summary>
+        <ul className="plain checks">
+          {PLAYBOOK.map((p) => (
+            <li key={p.who}>
+              <strong>{p.who}:</strong> {p.what} <em>Here: {p.inApp}</em>
             </li>
           ))}
         </ul>

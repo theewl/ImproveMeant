@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { dueQueue } from "../shared/schedule";
 import { useApp } from "./lib/store";
 import { href, navigate, useRoute, type Route } from "./lib/router";
-import { Today } from "./screens/Today";
 import { LearnSession } from "./screens/LearnSession";
 import { TalkSession } from "./screens/TalkSession";
 import { Review } from "./screens/Review";
@@ -13,6 +12,10 @@ import { Confidence } from "./screens/Confidence";
 import { Phrases } from "./screens/Phrases";
 import { CameraSession } from "./screens/CameraSession";
 import { isCameraDrill } from "../shared/camera";
+import { getPrompt, PROMPT_DRILL } from "../shared/vlog";
+
+const PROMPT_DRILL_FOR = (id: string) => PROMPT_DRILL[getPrompt(id)!.kind];
+import { Today } from "./screens/Today";
 
 const GEAR = "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z";
 
@@ -26,7 +29,7 @@ export function App() {
   const route = useRoute();
   const { data, status, statusError, saveFailed } = useApp();
   const due = dueQueue(data.reviews, new Date().toISOString()).queue.length;
-  const inSession = route.name === "learn" || (route.name === "camera" && !!route.drillId);
+  const inSession = route.name === "learn" || (route.name === "camera" && !!route.drillId) || route.name === "take";
 
   useEffect(() => {
     if (!data.prefs.onboarded && route.name === "today") navigate({ name: "onboarding" });
@@ -68,6 +71,7 @@ export function App() {
       {route.name === "review" && <Review />}
       {route.name === "progress" && <Progress />}
       {route.name === "settings" && <Settings />}
+      {route.name === "take" && (getPrompt(route.promptId) ? <CameraSession key={route.promptId} drillId={PROMPT_DRILL_FOR(route.promptId)} prompt={getPrompt(route.promptId)} /> : <Today />)}
       {route.name === "steps" && <Confidence />}
       {route.name === "camera" && !route.drillId && <Confidence />}
       {route.name === "phrases" && <Phrases />}
@@ -78,6 +82,7 @@ export function App() {
           const active =
             n.route.name === route.name ||
             (n.route.name === "today" && (route.name === "review" || route.name === "learn")) ||
+            (n.route.name === "today" && route.name === "take") ||
             (n.route.name === "steps" && (route.name === "camera" || route.name === "talk")) ||
             (n.route.name === "progress" && route.name === "phrases");
           return (

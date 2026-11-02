@@ -97,6 +97,10 @@ export const CameraFeedbackOutput = z.object({
     })
     .nullable()
     .describe("Null when no stills were supplied."),
+  throughline: z
+    .string()
+    .nullable()
+    .describe("The one idea a viewer would walk away with, in one sentence using the speaker's own words; null if the take has no single idea. If the speaker stated a throughline beforehand, say whether the take delivered it."),
   explanation: z.string().describe("One or two sentences on why the priority matters for someone watching on a phone."),
   retryFocus: z.string().nullable().describe("One sentence telling the speaker what to try in the next take, or null."),
 });

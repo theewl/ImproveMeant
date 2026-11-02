@@ -666,6 +666,45 @@ Sources: YouTube Creator Playbook on the first 15 seconds (blog.youtube), Backli
 | **Next** | Real-iPhone test of the camera path (still outstanding from §10). |
 | **Later** | Let the learner reorder or rate the discomfort of camera and talk steps, as they can for real-life ones. |
 
+## 12. Vlogging first (added 2026-11-02)
+
+**The ask.** Make the app for becoming a confident speaker and vlogger, with topics and logic built from what successful speakers and creators do, and keep it simple, easy to follow and rewarding to come back to, with visible improvement.
+
+### 12.1 What the best do, and what the app does because of it
+
+| Who | What they do | In the app |
+|---|---|---|
+| Chris Anderson (TED) | One idea worth spreading: a throughline the audience can repeat. | Every take starts with "the one thing they should walk away with"; the coach returns the idea a viewer would take away, in the speaker's words, and says whether the take delivered the stated one. |
+| YouTube's Creator Playbook; MrBeast's production guide | The first 15 seconds decide who stays; the first minute is where viewers leave; retention is watched obsessively. | A hook pattern chosen before recording, a hook window while recording, the first ten seconds shown back, and the coach's hook note with an optional rewrite. |
+| Ali Abdaal | Smile before the first line, warm up, don't read, speak to one person, accept imperfection. | "Who's your one viewer?" at onboarding; every prompt is written to them by name; warm-up and smile cues; cues near the lens instead of a script. |
+| Casey Neistat | A daily vlog still has setup, tension and payoff; shoot more than you use. | Story prompts with the setup → turn → payoff scaffold; one short take a day. |
+| Nancy Duarte | Great talks alternate what is with what could be. | Contrast prompts and the what is → what could be scaffold. |
+| Emma Chamberlain | Unpolished moments and failures read as honest. | No restarts; record-and-delete warm-up; the coach never grades polish or appearance. |
+| Marques Brownlee | Explain simply, never talk down; treat the camera as a person. | Explainer prompts ("a 12-year-old could repeat it"); eye-line coaching from stills. |
+| Food and travel creators | Texture, smell, sound and a verdict, because taste doesn't cross the screen. | Sensory prompts, the three-senses scaffold, vague-word count. |
+| Toastmasters | One commendation, one recommendation, end on what went well. | One strength, one change, and a wrap-up that names what worked. |
+
+### 12.2 What changed
+
+- **Onboarding is three questions:** who's your one viewer (a first name), what will you talk about (up to three niches), takes a week (3, 5 or 7). Goal defaults to the camera; news interests are derived from niches. Everything else is under "More" in Settings.
+- **Today is one take.** A prompt from a reviewed bank of 60 (ten niches, six kinds: quick, story, opinion, explainer, sensory, hook), deterministic per day, skipping prompts already done, with "Different prompt". Underneath: a 20-second warm-up (deleted unwatched), the next step on the ladder, reviews when due, and three stories to react to.
+- **The take screen is short:** the prompt, the one idea, a hook pattern (prefilled from the prompt, with an example), the shape as one line. Talking points, warm-up, camera checks and the stills toggle are under "More".
+- **Visible improvement without scores:** week dots (n of target takes), and after each take "Since your first take" lines for fillers per minute, pace, vague words per minute and times you said "you", each with a tick when it moved in the helpful direction. Progress keeps the per-take table.
+- **Coaching:** the rubric adds "one idea per take, explained simply without talking down"; the request carries the stated throughline and chosen hook pattern; feedback shows "What a viewer walks away with".
+- **Prompt bank design:** every prompt names the viewer, asks for one concrete thing, and is paired with a hook pattern and a shape, so the setup screen can be short. Prompts are evaluated against the matching camera drill's definition of success (story → "Tell a 60-second story", sensory → "Describe what you ate", and so on), so no new rubric was needed.
+
+**What "addictive" means here.** A loop under three minutes, a fresh prompt every day, one tap to the next take, a weekly target with dots that fill, and a before/after line you can see move. No streak loss, no scores, no badges.
+
+**[Q]** The prompt bank is hand-written; AI-personalised prompts from the learner's niches and recent takes are a cheap later addition (one call a day). Still untested on a real iPhone.
+
+### Backlog additions
+| When | Item |
+|---|---|
+| **Next** | Real-iPhone test of the take flow. |
+| **Next** | AI-personalised daily prompts from niches and the last three takes (about one cent a day). |
+| **Later** | A "best take of the week" pick from the learner's saved takes, for posting. |
+| **Later** | Two-hooks drill: record two openings for the same take, choose one. |
+
 ## Appendix A: Implementation plan used for the MVP
 1. **Shared domain:** types, curriculum, the evergreen library, scheduling, and text and measurement utilities.
 2. **Server:**

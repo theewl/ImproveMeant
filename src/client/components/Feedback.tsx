@@ -66,6 +66,13 @@ export function FeedbackPanel({
         </div>
       )}
 
+      {f.throughline && (
+        <div className="fb-block">
+          <h3>What a viewer walks away with</h3>
+          <p className="suggestion">“{f.throughline}”</p>
+        </div>
+      )}
+
       {f.hook && (f.hook.observation || f.hook.rewrite) && (
         <div className="fb-block">
           <h3>Your opening</h3>

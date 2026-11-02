@@ -1,8 +1,10 @@
 # Clearline (working name)
 
-**Stay informed. Remember what matters. Have something to say.**
+**One take a day. Talk to one person, for a minute, about one thing. Get one note. Watch yourself get better.**
 
-Clearline is a mobile-first practice app for people who know what they mean but ramble. Each short session follows the same loop:
+Clearline is a mobile-first app for becoming a confident speaker and vlogger: someone who can talk to a camera (or a room) naturally. Onboarding asks three things: who your one viewer is, what you'll talk about, and how many takes a week. Today then gives you one prompt, written to that person, with a one-sentence "throughline" and a hook pattern drawn from how successful creators and speakers work (see [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) §12). After each take: one strength, one change, what a viewer walks away with, and a "since your first take" line so improvement is visible without scores.
+
+The same loop also powers reading-and-explaining a story, rehearsing a talk and real-life steps:
 
 1. Read a sourced briefing.
 2. Explain it from memory, out loud or in writing.

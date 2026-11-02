@@ -148,6 +148,8 @@ export function cameraUser(p: {
   taskPrompt: string;
   topic: string;
   notes: string;
+  throughline: string;
+  hookPattern: string;
   response: string;
   durationSeconds: number | null;
   transcriptSource: string;
@@ -166,6 +168,10 @@ export function cameraUser(p: {
   if (p.topic.trim()) lines.push(`<talk_setup>
 Topic: ${data(p.topic)}
 </talk_setup>`);
+  if (p.throughline.trim()) lines.push(`<learner_notes>
+The one idea the speaker wanted the viewer to walk away with: ${data(p.throughline)}
+</learner_notes>`);
+  if (p.hookPattern.trim()) lines.push(`Hook pattern the speaker chose: ${data(p.hookPattern)}.`);
   if (p.notes.trim()) lines.push(`<learner_notes>
 Talking points the speaker wrote beforehand: ${data(p.notes)}
 </learner_notes>`);

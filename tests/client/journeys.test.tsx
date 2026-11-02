@@ -284,7 +284,7 @@ describe("Review and history", () => {
 describe("Confidence tools", () => {
   it("builds a ladder, plans a brave step, checks in afterwards, and shows prediction vs outcome", async () => {
     const user = userEvent.setup();
-    start("#/confidence", onboarded());
+    start("#/confidence", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "meetings" } }));
     await screen.findByRole("heading", { name: "Why speaking feels so hard" });
     expect(screen.getByText(/not therapy or a diagnosis/)).toBeInTheDocument();
     await user.click(screen.getByLabelText("I avoid eye contact"));
@@ -381,9 +381,9 @@ describe("Confidence tools", () => {
 });
 
 describe("Guided plan and phrase bank", () => {
-  it("starts a 4-week plan on Today with this week's tasks linked", async () => {
+  it("starts a 4-week plan from Progress with this week's tasks linked", async () => {
     const user = userEvent.setup();
-    start("#/today", onboarded());
+    start("#/progress", onboarded());
     await user.click(await screen.findByRole("button", { name: /Start a 4-week plan/ }));
     expect(await screen.findByText(/Week 1 of 4/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Lead with your point" })).toBeInTheDocument();
@@ -457,15 +457,28 @@ describe("Self-check, quiet mode and safety-habit comparison", () => {
 });
 
 describe("onboarding", () => {
-  it("is short, limits interests to three, and is skippable", async () => {
+  it("asks three things (one viewer, niches, takes a week), limits niches to three, and is skippable", async () => {
     const user = userEvent.setup();
     start("#/today", emptyData());
-    await screen.findByRole("heading", { name: "Welcome" });
-    for (const n of ["Technology", "Science", "Health"]) await user.click(screen.getByRole("button", { name: n }));
-    expect(screen.getByRole("button", { name: "Culture & communication" })).toBeDisabled();
+    await screen.findByRole("heading", { name: "One take a day" });
+    for (const n of ["Food & cooking", "Travel & places", "Stories from my life"]) await user.click(screen.getByRole("button", { name: n }));
+    expect(screen.getByRole("button", { name: "Daily life" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Skip for now" }));
     await act(async () => {});
     expect(stored().prefs.onboarded).toBe(true);
+  });
+
+  it("saves the viewer's name and niches, derives news interests, and uses the name in today's prompt", async () => {
+    const user = userEvent.setup();
+    start("#/today", emptyData());
+    await screen.findByRole("heading", { name: "One take a day" });
+    await user.type(screen.getByRole("textbox", { name: /Who's your one viewer/ }), "Sam");
+    await user.click(screen.getByRole("button", { name: "Food & cooking" }));
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await screen.findByRole("heading", { name: "Today" });
+    expect(stored().prefs).toMatchObject({ viewerName: "Sam", niches: ["food"], interests: ["culture"], weeklyTakes: 5, goal: "camera" });
+    expect(screen.getAllByText(/Sam/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", expect.stringMatching(/^#\/take\/f\d$/));
   });
 });
 
@@ -490,7 +503,7 @@ describe("Camera drills (demo mode, no camera in jsdom)", () => {
 
     await user.click(screen.getByRole("button", { name: "Finish" }));
     await screen.findByRole("heading", { name: "Take done" });
-    expect(screen.getByRole("link", { name: "Next drill" })).toHaveAttribute("href", "#/camera/cam-one-person");
+    expect(screen.getByRole("link", { name: "Next step" })).toHaveAttribute("href", "#/camera/cam-one-person");
 
     const saved = stored().sessions.find((s) => s.mode === "camera")!;
     expect(saved.completedAt).toBeTruthy();
@@ -498,11 +511,17 @@ describe("Camera drills (demo mode, no camera in jsdom)", () => {
     expect(saved.attempts[0]?.feedback?.kind).toBe("illustrative");
   });
 
-  it("puts the day's path on Today: explain, the next step (a camera drill for a camera goal), reviews", async () => {
+  it("puts today's take first on Today, with a warm-up, the next step, and three tabs", async () => {
+    const user = userEvent.setup();
     start("#/today", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["business"], goal: "camera" } }));
-    const step = await screen.findByRole("link", { name: "Next step: Just press record" });
-    expect(step).toHaveAttribute("href", expect.stringMatching(/^#\/camera\/cam-press-record/));
-    expect(screen.getByRole("heading", { name: "Read it, say it, take a step" })).toBeInTheDocument();
+    const record = await screen.findByRole("link", { name: "Record" });
+    const firstHref = record.getAttribute("href")!;
+    expect(firstHref).toMatch(/^#\/take\//);
+    await user.click(screen.getByRole("button", { name: "Different prompt" }));
+    expect(screen.getByRole("link", { name: "Record" }).getAttribute("href")).not.toBe(firstHref);
+    expect(screen.getByRole("link", { name: /Warm-up/ })).toHaveAttribute("href", "#/camera/cam-press-record");
+    expect(screen.getByRole("link", { name: /Next step/ })).toHaveAttribute("href", "#/steps");
+    expect(screen.getByText(/0 of 5 takes this week/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Steps" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Camera" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Talk" })).not.toBeInTheDocument();
@@ -551,5 +570,51 @@ describe("Camera drills: feedback request failure", () => {
     expect(screen.getByRole("textbox", { name: /No camera here/ })).toHaveValue("Hi, it's me. If you've ever fixed a bike at midnight, you know.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open the camera" })).not.toBeInTheDocument();
+  });
+});
+
+
+describe("Today's take from a prompt", () => {
+  it("sends the throughline and hook pattern with the take, then shows change since the first take", async () => {
+    const user = userEvent.setup();
+    const { app } = buildTestApp();
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      if (url.startsWith("/api/camera-feedback")) bodies.push(JSON.parse(String(init.body)));
+      const { signal: _signal, ...rest } = init;
+      return app.request(new Request(`http://localhost${url}`, rest as RequestInit));
+    });
+    const earlier: AppData["sessions"][number] = {
+      id: "s-first",
+      mode: "camera",
+      startedAt: "2026-10-20T10:00:00Z",
+      completedAt: "2026-10-20T10:03:00Z",
+      exerciseId: "cam-story",
+      skill: "organize",
+      camera: { drillId: "cam-story", promptId: "s1", topic: "", notes: "" },
+      attempts: [{ id: "a-first", createdAt: "2026-10-20T10:02:00Z", modality: "spoken", text: "um so like " + "word ".repeat(40) + "um yeah", transcriptEdited: false, assisted: false, isRetry: false, durationSeconds: 30 }],
+      followUps: [],
+      usedLive: false,
+    };
+    start("#/take/f1", onboarded({ sessions: [earlier], prefs: { ...emptyData().prefs, onboarded: true, interests: ["culture"], viewerName: "Sam", niches: ["food"], goal: "camera" } }));
+    await screen.findByRole("heading", { name: "Talk to Sam" });
+    expect(screen.getByText(/Describe the last thing you ate to Sam/)).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /one thing they should walk away with/ }), "Order the dumplings, skip the soup.");
+    await user.click(screen.getByLabelText("A bold, specific claim"));
+    await user.click(screen.getByRole("button", { name: "Open the camera" }));
+    await screen.findByRole("heading", { name: "Camera not available" });
+    await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "You need to order the dumplings. The skin shattered and then it was all steam and ginger. Skip the soup.");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByRole("heading", { name: "Your feedback" });
+    expect(bodies[0], JSON.stringify(bodies[0])).toMatchObject({ drillId: "cam-describe-food", throughline: "Order the dumplings, skip the soup.", hookPattern: "claim" });
+    expect(String(bodies[0]!.topic)).toContain("Sam");
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    await screen.findByRole("heading", { name: "Take done" });
+    // Typed fallback has no recording length, so no pace comparison; the "you" count still compares.
+    expect(screen.getByText(/Since your first take/)).toBeInTheDocument();
+    expect(screen.getByText(/Times you said “you”: 0 → 1/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Done for today" })).toHaveAttribute("href", "#/today");
+    const saved = stored().sessions.find((s) => s.camera?.promptId === "f1")!;
+    expect(saved.camera).toMatchObject({ throughline: "Order the dumplings, skip the soup.", hookPattern: "claim" });
   });
 });

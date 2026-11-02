@@ -29,6 +29,12 @@ export interface Preferences {
   quietMode?: boolean;
   /** Optional access token for a protected deployment. Never a provider key. */
   accessToken?: string;
+  /** Vlogging: the one person you talk to on camera (a first name). */
+  viewerName?: string;
+  /** Vlogging niches, up to three. */
+  niches?: string[];
+  /** Takes per week the learner is aiming for. */
+  weeklyTakes?: 3 | 5 | 7;
 }
 
 // ---------- Content ----------
@@ -189,6 +195,8 @@ export interface Feedback {
   hook?: { observation: string; quote: string | null; rewrite: string | null } | null;
   /** Camera drills: what the coach saw in a few still frames. Null when no frames were sent. */
   camera?: CameraNotes | null;
+  /** Camera drills: the one idea a viewer would take away, in the speaker's words, or null if there isn't one. */
+  throughline?: string | null;
   goalMet: boolean | null;
   strength: QuotedObservation | null;
   priority: (QuotedObservation & { suggestion: string }) | null;
@@ -215,6 +223,11 @@ export type SessionMode = "learn" | "talk" | "camera";
 /** Settings for a talk-to-camera drill. */
 export interface CameraSetup {
   drillId: string;
+  /** Prompt from the vlog bank, if the take came from one. */
+  promptId?: string;
+  /** The one idea the viewer should walk away with, in the speaker's words. */
+  throughline?: string;
+  hookPattern?: string;
   topic: string;
   /** Three talking points shown near the lens (not a script). */
   notes: string;

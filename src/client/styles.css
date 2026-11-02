@@ -1759,3 +1759,79 @@ button.small {
   overflow: visible;
   text-overflow: clip;
 }
+
+/* ---------- Vlog-first Today ---------- */
+.week {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink-2);
+  margin: -0.25rem 0 0.9rem;
+  font-size: 0.95rem;
+}
+.week-dots {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.week-dots .dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--line);
+}
+.week-dots .dot.on {
+  background: var(--accent);
+}
+.take-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.1rem 1rem;
+  margin: 0 0 1rem;
+}
+.take-prompt {
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  line-height: 1.35;
+  margin: 0.3rem 0 0.9rem;
+}
+.task.big {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  line-height: 1.35;
+}
+.quick {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.quick .pill-link {
+  margin: 0;
+}
+.react .rows {
+  margin-top: 0.25rem;
+}
+.since {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  margin: 0.75rem 0;
+  text-align: left;
+}
+.since .eyebrow {
+  margin: 0 0 0.3rem;
+}
+.since ul {
+  margin: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+.since-better {
+  color: var(--ok);
+  font-weight: 600;
+}
+.since-worse {
+  color: var(--ink-2);
+}

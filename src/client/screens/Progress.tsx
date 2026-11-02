@@ -11,6 +11,7 @@ import { useApp } from "../lib/store";
 import { AttemptTags } from "../components/Feedback";
 import { formatDate } from "../components/common";
 import { CAMERA_DRILLS, cameraProgress, fillerWords, viewerAddress, wordsPerMinute } from "../../shared/camera";
+import { PlanCard } from "../components/PlanCard";
 
 function getCameraDrillTitle(id?: string): string {
   return CAMERA_DRILLS.find((d) => d.id === id)?.title ?? "drill";
@@ -25,6 +26,7 @@ export function Progress() {
     <main className="screen" id="main">
       <h2>Progress</h2>
       <ActivityDots />
+      <PlanCard />
 
       <section aria-labelledby="counts-h">
         <h3 id="counts-h">Practice</h3>

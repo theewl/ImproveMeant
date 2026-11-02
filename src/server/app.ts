@@ -229,6 +229,8 @@ export function createApp(deps: AppDeps): Hono {
     drillId: z.string().refine(isCameraDrill, "Unknown drill"),
     topic: z.string().max(300).default(""),
     notes: z.string().max(600).default(""),
+    throughline: z.string().max(300).default(""),
+    hookPattern: z.string().max(40).default(""),
     response: z.object({
       text: z.string(),
       transcriptSource: z.enum(["provider", "browser-speech", "typed-by-user"]),
@@ -258,6 +260,8 @@ export function createApp(deps: AppDeps): Hono {
         taskPrompt,
         topic: req.topic,
         notes: req.notes,
+        throughline: req.throughline,
+        hookPattern: req.hookPattern,
         response: text,
         durationSeconds: req.response.durationSeconds,
         transcriptSource: req.response.transcriptSource,

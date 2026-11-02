@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import type { StoryCard } from "../../shared/types";
 import { dueQueue } from "../../shared/schedule";
 import { localDayKey } from "../../shared/dates";
-import { ALL_INTERESTS } from "../../shared/evergreen";
+import { nextStep } from "../../shared/steps";
+import { fillPromptText, takesThisWeek, todayPrompt, type Niche } from "../../shared/vlog";
+import { formatSeconds } from "../../shared/observations";
 import { api, topics, type LiveFeedState, type TopicHit } from "../lib/api";
 import { useApp } from "../lib/store";
 import { href, navigate } from "../lib/router";
-import { ErrorNotice, Loading, SourceLine } from "../components/common";
-import { PlanCard } from "../components/PlanCard";
-import { todayPath, type PathItem } from "../../shared/steps";
+import { ErrorNotice, SourceLine } from "../components/common";
 
-/** Type a topic (Wikipedia search) or paste your own material to explain. Live mode only. */
+/** Type a topic (Wikipedia search) or paste your own material to talk about. Live mode only. */
 function AnyTopic({ live }: { live: boolean }) {
   const { update } = useApp();
   const [mode, setMode] = useState<"closed" | "search" | "paste">("closed");
@@ -21,9 +21,7 @@ function AnyTopic({ live }: { live: boolean }) {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
 
-  if (!live) {
-    return <p className="hint">With AI coaching on, you can also type any topic or paste your own material to explain.</p>;
-  }
+  if (!live) return null;
   const search = async () => {
     setBusy(true);
     setErr(null);
@@ -59,16 +57,13 @@ function AnyTopic({ live }: { live: boolean }) {
     }
   };
   return (
-    <section className="any-topic" aria-labelledby="any-h">
-      <h3 id="any-h" className="section-title">
-        Explain something else
-      </h3>
+    <div className="any-topic">
       {mode === "closed" && (
         <div className="row wrap">
-          <button className="secondary small" type="button" onClick={() => setMode("search")}>
+          <button className="link" type="button" onClick={() => setMode("search")}>
             Type a topic
           </button>
-          <button className="secondary small" type="button" onClick={() => setMode("paste")}>
+          <button className="link" type="button" onClick={() => setMode("paste")}>
             Paste my own material
           </button>
         </div>
@@ -102,7 +97,6 @@ function AnyTopic({ live }: { live: boolean }) {
               ))}
             </ul>
           )}
-          <p className="hint">Articles come from Wikipedia; a briefing is written from the article text (about 5¢ of AI each).</p>
           <button className="link" type="button" onClick={() => setMode("closed")}>
             Cancel
           </button>
@@ -122,9 +116,9 @@ function AnyTopic({ live }: { live: boolean }) {
           <label className="label" htmlFor="own-text">
             Paste the material
           </label>
-          <textarea id="own-text" rows={6} maxLength={60000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Notes, an email, a document section — anything you need to explain." />
+          <textarea id="own-text" rows={6} maxLength={60000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Notes, an article, anything you want to talk about." />
           <p className="hint">
-            {text.trim().length < 400 ? `${Math.max(0, 400 - text.trim().length)} more characters needed. ` : ""}Sent once to the AI to write a briefing; the briefing is kept only on this device. Don't paste anything confidential you wouldn't send to an AI service.
+            {text.trim().length < 400 ? `${Math.max(0, 400 - text.trim().length)} more characters needed. ` : ""}Sent once to the AI for a briefing, kept only on this device.
           </p>
           <div className="row wrap">
             <button className="primary small" type="submit" disabled={busy || text.trim().length < 400}>
@@ -137,61 +131,7 @@ function AnyTopic({ live }: { live: boolean }) {
         </form>
       )}
       {err != null && <ErrorNotice error={err} />}
-    </section>
-  );
-}
-
-/** The one method, as today's three things. */
-function DailyPath({ storyId }: { storyId?: string }) {
-  const { data } = useApp();
-  const items = todayPath(data, data.prefs.goal, new Date().toISOString());
-  const target = (it: PathItem): string | null => {
-    if (it.id === "explain") return storyId ? href({ name: "learn", storyId }) : null;
-    if (it.id === "review") return href({ name: "review" });
-    const st = it.step!;
-    switch (st.target.kind) {
-      case "camera":
-        return href({ name: "camera", drillId: st.target.drillId, fromStoryId: storyId });
-      case "talk":
-        return href({ name: "talk", scenario: st.target.scenario });
-      default:
-        return href({ name: "steps" });
-    }
-  };
-  const first = items.find((it) => !it.done);
-  const minutes = items.filter((it) => !it.done).reduce((n, it) => n + it.minutes, 0);
-  return (
-    <article className="path" aria-labelledby="path-h">
-      <p className="eyebrow">Today · {first ? `about ${minutes} min` : "done"}</p>
-      <h3 id="path-h">{first ? "Read it, say it, take a step" : "All three done. Anything else is optional."}</h3>
-      <ol className="path-list">
-        {items.map((it) => {
-          const h = target(it);
-          return (
-            <li key={it.id} className={it.done ? "path-item done" : "path-item"}>
-              <span className="path-mark" aria-hidden="true">
-                {it.done ? "✓" : ""}
-              </span>
-              <span className="path-body">
-                {h && !it.done ? (
-                  <a href={h} className="row-title">
-                    {it.title}
-                  </a>
-                ) : (
-                  <span className="row-title">{it.title}</span>
-                )}
-                <span className="row-desc">{it.detail}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      {first && target(first) && (
-        <a className="button primary" href={target(first)!}>
-          Start<span className="sr-only">: {first.title}</span>
-        </a>
-      )}
-    </article>
+    </div>
   );
 }
 
@@ -200,95 +140,116 @@ export function Today() {
   const [cards, setCards] = useState<StoryCard[] | null>(null);
   const [live, setLive] = useState<LiveFeedState | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [offset, setOffset] = useState(0);
   const interestsKey = data.prefs.interests.join(",");
 
-  const [seed, setSeed] = useState(0);
-  const [picking, setPicking] = useState(false);
-  const load = (refresh = false, nextSeed = seed) => {
+  const load = () => {
     setError(null);
     setCards(null);
-    setPicking(false);
     api
-      .stories(data.prefs.interests, { refresh, seed: nextSeed })
+      .stories(data.prefs.interests)
       .then((r) => {
         setCards(r.cards);
         setLive(r.live);
         if (r.curation === "available") {
-          // Ask for the AI-chosen ordering separately so the page never waits on it.
-          setPicking(true);
           api
             .storyPicks(data.prefs.interests)
             .then((p) => {
               if (p.cards.length) setCards((cur) => [...p.cards, ...(cur ?? []).filter((c) => c.kind !== "current")]);
             })
-            .catch(() => undefined) // keep the plain selection
-            .finally(() => setPicking(false));
+            .catch(() => undefined);
         }
       })
       .catch(setError);
   };
   useEffect(() => load(), [interestsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const today = localDayKey();
-  const { queue } = dueQueue(data.reviews, new Date().toISOString());
-  const doneToday = data.sessions.filter((s) => s.completedAt && localDayKey(s.completedAt) === today).length;
-  const max = data.prefs.sessionMinutes === 3 ? 3 : 4;
-  const planActive = !!data.plan;
-  const shown = cards?.slice(0, max) ?? [];
-  const featured = planActive ? undefined : shown[0];
-  const rest = planActive ? shown : shown.slice(1);
-  const interestNames = data.prefs.interests.map((i) => ALL_INTERESTS.find((x) => x.id === i)?.label ?? i);
+  const nowIso = new Date().toISOString();
+  const today = localDayKey(nowIso);
+  const cameraDone = data.sessions.filter((s) => s.mode === "camera" && s.completedAt);
+  const takeToday = cameraDone.find((s) => s.camera?.promptId && localDayKey(s.completedAt!) === today);
+  const warmedUp = cameraDone.some((s) => s.camera?.drillId === "cam-press-record" && localDayKey(s.completedAt!) === today);
+  const doneIds = cameraDone.filter((s) => s.camera?.promptId).map((s) => s.camera!.promptId!);
+  const prompt = todayPrompt((data.prefs.niches ?? []) as Niche[], doneIds, nowIso, offset);
+  const viewer = data.prefs.viewerName?.trim();
+  const target = data.prefs.weeklyTakes ?? 5;
+  const week = takesThisWeek(cameraDone.map((s) => s.completedAt!), nowIso);
+  const due = dueQueue(data.reviews, nowIso).queue.length;
+  const step = nextStep(data, data.prefs.goal);
+  const stories = (cards ?? []).slice(0, 3);
 
   return (
     <main className="screen" id="main">
-      <h2 className="page-title">{doneToday > 0 ? "Nice work today" : "Today"}</h2>
-      <p className="hint">
-        {doneToday > 0
-          ? `${doneToday} session${doneToday === 1 ? "" : "s"} done. Another is optional.`
-          : interestNames.length
-            ? `Picked for you: ${interestNames.join(", ")}`
-            : "A mix of ideas worth knowing"}
+      <h2 className="page-title">{takeToday ? "Take done" : "Today"}</h2>
+      <p className="week" aria-label={`${week} of ${target} takes this week`}>
+        <span className="week-dots" aria-hidden="true">
+          {Array.from({ length: target }, (_, i) => (
+            <span key={i} className={i < week ? "dot on" : "dot"} />
+          ))}
+        </span>
+        {week} of {target} takes this week
       </p>
 
-      <DailyPath storyId={(featured ?? rest[0])?.id} />
-      <PlanCard learnStoryId={(featured ?? rest[0])?.id} />
-
-      {queue.length > 0 && (
-        <a className="pill-link" href={href({ name: "review" })}>
-          <span>
-            <strong>
-              {queue.length} review{queue.length === 1 ? "" : "s"}
-            </strong>{" "}
-            ready · about {queue.length} min
-          </span>
-          <span aria-hidden="true">→</span>
-        </a>
-      )}
-
-      {picking && <p className="hint" role="status">Choosing today's picks for you…</p>}
-      {live?.status === "stale" && <p className="notice warn">{live.message}</p>}
-      {live?.status === "unavailable" && <p className="notice warn">Today's news couldn't load. Showing curated ideas.</p>}
-      {error != null && <ErrorNotice error={error} onRetry={() => load()} />}
-      {!cards && error == null && <Loading label="Finding today's stories…" />}
-
-      {featured && (
-        <article className="featured">
-          <SourceLine source={featured.source} kind={featured.kind} feed={featured.feed} minutes={featured.estimatedMinutes} />
-          <h3>{featured.title}</h3>
-          <p>{featured.description}</p>
-          <a className="button primary" href={href({ name: "learn", storyId: featured.id })}>
-            Start<span className="sr-only">: {featured.title}</span>
+      <article className="take-card">
+        <p className="eyebrow">
+          {takeToday ? "Done today" : "Today's take"} · about {formatSeconds(prompt.seconds)}
+          {viewer ? ` · to ${viewer}` : ""}
+        </p>
+        <p className="take-prompt">{fillPromptText(prompt, viewer)}</p>
+        <div className="row wrap">
+          <a className="button primary" href={href({ name: "take", promptId: prompt.id })}>
+            {takeToday ? "One more take" : "Record"}
           </a>
-        </article>
-      )}
+          <button className="link" type="button" onClick={() => setOffset((o) => o + 1)}>
+            Different prompt
+          </button>
+        </div>
+      </article>
 
-      {rest.length > 0 && (
-        <section aria-labelledby="more-h">
-          <h3 id="more-h" className="section-title">
-            {planActive ? "Pick a story to explain" : "Or pick another"}
-          </h3>
+      <ul className="quick">
+        {!warmedUp && (
+          <li>
+            <a className="pill-link" href={href({ name: "camera", drillId: "cam-press-record" })}>
+              <span>
+                <strong>Warm-up</strong> · 20 seconds, deleted unwatched
+              </span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </li>
+        )}
+        <li>
+          <a className="pill-link" href={href({ name: "steps" })}>
+            <span>
+              <strong>Next step</strong> · {step.title}
+            </span>
+            <span aria-hidden="true">→</span>
+          </a>
+        </li>
+        {due > 0 && (
+          <li>
+            <a className="pill-link" href={href({ name: "review" })}>
+              <span>
+                <strong>
+                  {due} review{due === 1 ? "" : "s"}
+                </strong>{" "}
+                · about {due} min
+              </span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </li>
+        )}
+      </ul>
+
+      <section aria-labelledby="react-h" className="react">
+        <h3 id="react-h" className="section-title">
+          Something to react to
+        </h3>
+        {live?.status === "unavailable" && <p className="hint">Today's news couldn't load. Showing ideas worth knowing.</p>}
+        {error != null && <ErrorNotice error={error} onRetry={() => load()} />}
+        {!cards && error == null && <p className="hint">Finding today's stories…</p>}
+        {stories.length > 0 && (
           <ul className="rows">
-            {rest.map((c) => (
+            {stories.map((c) => (
               <li key={c.id} className="row-item">
                 <a className="row-title" href={href({ name: "learn", storyId: c.id })}>
                   {c.title}
@@ -298,25 +259,10 @@ export function Today() {
               </li>
             ))}
           </ul>
-        </section>
-      )}
-
-      {cards && (
-        <button
-          className="link"
-          type="button"
-          onClick={() => {
-            const s = seed + 1;
-            setSeed(s);
-            load(true, s);
-          }}
-        >
-          Show different stories
-        </button>
-      )}
-
-      <AnyTopic live={status?.mode === "live"} />
-
+        )}
+        <p className="hint">Read a two-minute briefing, then say it to the camera in your own words.</p>
+        <AnyTopic live={status?.mode === "live"} />
+      </section>
     </main>
   );
 }
