@@ -74,3 +74,33 @@ describe("camera measures", () => {
     expect(m[1]!.basis).toMatch(/undercounts/);
   });
 });
+
+import { quickChecks } from "../../src/shared/camera";
+import { PROMPTS, promptQuestions } from "../../src/shared/vlog";
+
+describe("prompt questions", () => {
+  it("gives every prompt three questions, with the viewer's name filled in", () => {
+    for (const p of PROMPTS) {
+      const q = promptQuestions(p, "Sam");
+      expect(q, p.id).toHaveLength(3);
+      for (const x of q) expect(x).not.toContain("{name}");
+    }
+    expect(promptQuestions(undefined, "Sam")[2]).toBe("What should Sam do or think now?");
+  });
+});
+
+describe("quickChecks", () => {
+  it("flags a greeting opening and a trailing ending, and suggests the first fix next time", () => {
+    const s = quickChecks("So, um, today I went to the market. It was busy and loud. So yeah.", 20, "Sam");
+    expect(s.source).toBe("checks");
+    expect(s.keyPoints).toEqual(["Today I went to the market.", "It was busy and loud."]);
+    expect(s.toFix.map((x) => x.part)).toEqual(["beginning", "delivery"]);
+    expect(s.nextTime).toBe("Start with your answer to the first question.");
+  });
+
+  it("credits a direct opening, talking to one person, and a closing question", () => {
+    const s = quickChecks("The dumplings at Lin's are the best in town. You have to try the pork ones. Have you been?", 20);
+    expect(s.didWell.map((x) => x.part)).toEqual(["beginning", "delivery"]);
+    expect(s.toFix).toHaveLength(0);
+  });
+});

@@ -41,6 +41,7 @@ export function FeedbackPanel({
   onRate?: (r: "useful" | "not-useful", reason?: Attempt["feedbackRatingReason"]) => void;
 }) {
   const { data } = useApp();
+  if (f.summary) return <TakeFeedback feedback={f} attempt={attempt} onRate={onRate} />;
   const quiet = !!data.prefs.quietMode;
   const measured = measureAttempt(attempt);
   const accuracyIssue = f.fidelity.status === "minor_gaps" || f.fidelity.status === "factual_error";
@@ -212,6 +213,92 @@ export function FeedbackPanel({
           </p>
         )}
       </details>
+    </section>
+  );
+}
+
+const PART_LABEL: Record<string, string> = { beginning: "Beginning", middle: "Middle", end: "End", delivery: "Delivery", camera: "Camera" };
+
+/** Camera takes: four plain sections, in the order a person reads them. */
+function TakeFeedback({ feedback: f, attempt, onRate }: { feedback: Feedback; attempt: Attempt; onRate?: (r: "useful" | "not-useful", reason?: Attempt["feedbackRatingReason"]) => void }) {
+  const sm = f.summary!;
+  return (
+    <section className="feedback take-fb" aria-label="Feedback">
+      {sm.source === "checks" && <p className="demo-note">Automatic checks on your words and timing. AI coaching is off.</p>}
+      {f.offTopic && <p className="verdict notyet">That didn't answer the questions yet. Try again.</p>}
+
+      {sm.keyPoints.length > 0 && (
+        <div className="fb-block">
+          <h3>What you said</h3>
+          <ul className="plain fb-list">
+            {sm.keyPoints.map((k) => (
+              <li key={k}>{k}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {sm.didWell.length > 0 && (
+        <div className="fb-block good">
+          <h3>What worked</h3>
+          <ul className="plain fb-list">
+            {sm.didWell.map((d) => (
+              <li key={d.text}>
+                <span className="fb-part">{PART_LABEL[d.part]}</span> {d.text}
+                {d.quote && <span className="fb-quote">“{d.quote}”</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {sm.toFix.length > 0 && (
+        <div className="fb-block try">
+          <h3>What to fix</h3>
+          <ul className="plain fb-list">
+            {sm.toFix.map((d) => (
+              <li key={d.text}>
+                <span className="fb-part">{PART_LABEL[d.part]}</span> {d.text}
+                {d.quote && <span className="fb-quote">“{d.quote}”</span>}
+                <span className="fb-fix">→ {d.fix}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {sm.nextTime && (
+        <div className="next-time">
+          <p className="eyebrow">Next time</p>
+          <p>{sm.nextTime}</p>
+        </div>
+      )}
+
+      {f.camera && f.camera.observations.length > 0 && (
+        <details className="more">
+          <summary>On camera ({f.camera.framesReviewed} stills)</summary>
+          <ul className="plain checks">
+            {f.camera.observations.map((o) => (
+              <li key={o.aspect + o.observation}>
+                <strong>{CAMERA_ASPECT[o.aspect]}.</strong> {o.observation}
+                {o.fix ? ` ${o.fix}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {f.kind === "live" && onRate && (
+        <div className="rate" role="group" aria-label="Was this feedback useful?">
+          <span className="hint">Useful?</span>
+          <button type="button" className={attempt.feedbackRating === "useful" ? "chip on" : "chip"} aria-pressed={attempt.feedbackRating === "useful"} onClick={() => onRate("useful")}>
+            Yes
+          </button>
+          <button type="button" className={attempt.feedbackRating === "not-useful" ? "chip on" : "chip"} aria-pressed={attempt.feedbackRating === "not-useful"} onClick={() => onRate("not-useful")}>
+            Not really
+          </button>
+        </div>
+      )}
     </section>
   );
 }

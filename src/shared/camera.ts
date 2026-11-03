@@ -1,4 +1,4 @@
-import type { Exercise, PracticeSession, SkillId } from "./types";
+import type { Exercise, PracticeSession, SkillId, TakeSummary } from "./types";
 import { wordCount } from "./text";
 
 // Talk-to-camera drills (vlogging). Reviewed content: the AI adapts wording to a
@@ -463,4 +463,68 @@ export function improvementSince(first: TakeStats, latest: TakeStats): Improveme
   }
   if (first.you !== latest.you) out.push({ label: "Times you said “you”", before: String(first.you), after: String(latest.you), better: latest.you > first.you });
   return out;
+}
+
+// ---------- Automatic checks (no AI) ----------
+
+
+const GREETING = /^(hey|hi|hello|yo|so|okay|ok|um|uh|welcome|what's up|whats up|today)\b/i;
+const TRAILING = /(so yeah|yeah\.?|that's it|thats it|anyway|um|uh|i guess|or whatever|and stuff)[.!…\s]*$/i;
+
+function sentences(text: string): string[] {
+  return text
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map((x) => x.trim())
+    .filter((x) => wordCount(x) > 0);
+}
+
+function shorten(s: string, max = 110): string {
+  return s.length <= max ? s : s.slice(0, max - 1).trimEnd() + "…";
+}
+
+/**
+ * Honest, deterministic feedback from the transcript and timer alone. Used when AI
+ * coaching is off, and labelled as automatic checks. Never guesses at delivery it can't measure.
+ */
+export function quickChecks(text: string, seconds: number | undefined, viewerName?: string): TakeSummary {
+  const ss = sentences(text);
+  const first = ss[0] ?? text.trim();
+  const last = ss[ss.length - 1] ?? "";
+  // What you said: the real sentences, without leading "so, um" and without filler-only lines.
+  const clean = (x: string) => x.replace(/^((so|um|uh|like|okay|ok|well|yeah)[,.\s]+)+/i, "").replace(/^\w/, (c) => c.toUpperCase());
+  const real = ss.map(clean).filter((x) => wordCount(x) >= 3 && !TRAILING.test(x));
+  const pick = real.length <= 3 ? real : [real[0]!, real[Math.floor(real.length / 2)]!, real[real.length - 1]!];
+  const keyPoints = pick.map((x) => shorten(x));
+  const st = takeStats(text, seconds);
+  const name = viewerName?.trim() || "your viewer";
+  const didWell: TakeSummary["didWell"] = [];
+  const toFix: TakeSummary["toFix"] = [];
+
+  if (GREETING.test(first)) toFix.push({ part: "beginning", text: "You opened with a warm-up word, not the point.", quote: shorten(first, 60), fix: "Start with your answer to the first question." });
+  else didWell.push({ part: "beginning", text: "You got straight into it, no greeting.", quote: shorten(first, 60) });
+
+  if (st.you > 0) didWell.push({ part: "delivery", text: `You talked to one person (“you” ×${st.you}).`, quote: null });
+  else toFix.push({ part: "delivery", text: "It sounded like talking to no one in particular.", quote: null, fix: `Say “you” at least once, to ${name}.` });
+
+  if (st.fillersPerMinute != null) {
+    if (st.fillersPerMinute >= 3) toFix.push({ part: "delivery", text: `Lots of fillers (about ${st.fillersPerMinute} a minute).`, quote: null, fix: "When you'd say “um”, pause instead." });
+    else if (st.fillersPerMinute < 1.5) didWell.push({ part: "delivery", text: "Very few filler words.", quote: null });
+  }
+
+  const endsWithQuestion = /\?\s*$/.test(last);
+  if (last && TRAILING.test(last)) toFix.push({ part: "end", text: "The ending trails off.", quote: shorten(last, 60), fix: "End on your answer to the last question, or ask a question." });
+  else if (endsWithQuestion) didWell.push({ part: "end", text: "You ended with a question for the viewer.", quote: shorten(last, 60) });
+
+  if (st.genericPerMinute != null && st.genericPerMinute >= 3) toFix.push({ part: "middle", text: "Lots of vague words like “amazing” or “really good”.", quote: null, fix: "Swap one for a detail: a sound, a number, a moment." });
+
+  if (st.wpm != null && st.wpm > 185) toFix.push({ part: "delivery", text: `Fast (about ${st.wpm} words a minute).`, quote: null, fix: "Slow down and pause after each answer." });
+
+  return {
+    keyPoints,
+    didWell: didWell.slice(0, 2),
+    toFix: toFix.slice(0, 2),
+    nextTime: toFix[0]?.fix ?? "Same again, with a little more energy than feels normal.",
+    source: "checks",
+  };
 }

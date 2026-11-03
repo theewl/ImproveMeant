@@ -1,5 +1,6 @@
 import type { AudienceQuestion, Briefing, Exercise, Feedback } from "../../shared/types";
 import { getScenario } from "../../shared/curriculum";
+import { quickChecks } from "../../shared/camera";
 import { AppError } from "../errors";
 import type { SourceDocument } from "../content/types";
 import type { AudienceInput, CameraFeedbackInput, CoachProvider, FeedbackInput } from "./types";
@@ -21,7 +22,19 @@ export class DemoCoach implements CoachProvider {
   }
 
   async cameraFeedback(input: CameraFeedbackInput): Promise<Feedback> {
-    return { ...illustrativeFeedback(input.exercise), hook: null, ending: null, camera: null, throughline: null };
+    // No AI: honest automatic checks on the words and timer, labelled as such.
+    const summary = quickChecks(input.response, input.durationSeconds ?? undefined);
+    return {
+      ...illustrativeFeedback(input.exercise),
+      summary,
+      strength: summary.didWell[0] ? { observation: summary.didWell[0].text, quote: summary.didWell[0].quote } : null,
+      priority: summary.toFix[0] ? { observation: summary.toFix[0].text, quote: summary.toFix[0].quote, suggestion: summary.toFix[0].fix } : null,
+      retryFocus: summary.nextTime,
+      hook: null,
+      ending: null,
+      camera: null,
+      throughline: null,
+    };
   }
 
   async audienceQuestion(input: AudienceInput): Promise<AudienceQuestion> {

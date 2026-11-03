@@ -103,6 +103,7 @@ export interface CameraFeedbackBody {
   notes: string;
   throughline?: string;
   hookPattern?: string;
+  questions?: string[];
   response: { text: string; transcriptSource: "provider" | "browser-speech" | "typed-by-user"; transcriptEdited: boolean; durationSeconds: number | null };
   frames: { at: number; jpegBase64: string }[];
   previous?: { text: string; retryFocus: string | null } | null;

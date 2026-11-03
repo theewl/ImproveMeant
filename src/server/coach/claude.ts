@@ -315,12 +315,9 @@ export function buildCameraFeedback(out: CameraFeedbackOutput, response: string,
     removed++;
     return null;
   };
-  const strength = out.strength ? { observation: clamp(out.strength.observation, 400), quote: verify(out.strength.quote) } : null;
-  const priority = out.priority
-    ? { observation: clamp(out.priority.observation, 400), quote: verify(out.priority.quote), suggestion: clamp(out.priority.suggestion, 400) }
-    : null;
-  const hook = out.hook ? { observation: clamp(out.hook.observation, 400), quote: verify(out.hook.quote), rewrite: out.hook.rewrite ? clamp(out.hook.rewrite, 300) : null } : null;
-  const ending = out.ending ? { observation: clamp(out.ending.observation, 300), quote: verify(out.ending.quote) } : null;
+  const didWell = out.didWell.slice(0, 2).map((d) => ({ part: d.part, text: clamp(d.text, 240), quote: verify(d.quote) }));
+  const toFix = out.toFix.slice(0, 2).map((d) => ({ part: d.part, text: clamp(d.text, 240), quote: verify(d.quote), fix: clamp(d.fix, 200) }));
+  const nextTime = out.nextTime ? clamp(out.nextTime, 200) : (toFix[0]?.fix ?? null);
   const camera =
     framesSent > 0 && out.camera
       ? {
@@ -332,16 +329,15 @@ export function buildCameraFeedback(out: CameraFeedbackOutput, response: string,
     kind: "live",
     goalMet: out.offTopic ? false : out.goalMet,
     offTopic: out.offTopic,
-    strength,
-    priority,
-    hook,
-    ending,
+    summary: { keyPoints: out.keyPoints.slice(0, 3).map((k) => clamp(k, 160)), didWell, toFix, nextTime, source: "ai" },
+    // Older fields, kept so history and comparisons still read.
+    strength: didWell[0] ? { observation: didWell[0].text, quote: didWell[0].quote } : null,
+    priority: toFix[0] ? { observation: toFix[0].text, quote: toFix[0].quote, suggestion: toFix[0].fix } : null,
     camera,
-    throughline: out.throughline ? clamp(out.throughline, 300) : null,
-    explanation: clamp(out.explanation, 600),
+    explanation: "",
     fidelity: { status: "not_applicable", note: null },
     opinionNote: null,
-    retryFocus: out.retryFocus ? clamp(out.retryFocus, 300) : null,
+    retryFocus: nextTime,
     followUpNote: null,
     unverifiedQuotesRemoved: removed,
     model,

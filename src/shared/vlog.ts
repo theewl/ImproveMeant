@@ -269,3 +269,75 @@ export function currentBeat(elapsed: number, targetSeconds: number): 0 | 1 | 2 {
   if (elapsed >= Math.max(15, targetSeconds - Math.max(10, targetSeconds * 0.25))) return 2;
   return 1;
 }
+
+// ---------- Three questions per prompt ----------
+// Answering three plain questions in order is easier than following instructions.
+// The first opens the video, the second is the body, the third ends it.
+
+const Q: Record<string, [string, string, string]> = {
+  d1: ["What went wrong, and when?", "What did you do next?", "How did it end? What would you do differently?"],
+  d2: ["Where are you right now?", "What are three things you can see, hear or smell?", "Why are you here today?"],
+  d3: ["What does your morning look like right now?", "What would the better version look like?", "What's one change you'll try tomorrow?"],
+  d4: ["What did you stop doing?", "What happened after you stopped?", "Would you tell {name} to try it? Why?"],
+  d5: ["Who was it, and what did they say?", "Why did it stick with you?", "What would you say to them now?"],
+  d6: ["What's the most interesting part of today?", "What's the first thing you're doing?", "What should {name} watch for?"],
+  d7: ["What's step one?", "What are steps two and three?", "Which step do you skip, and why?"],
+  d8: ["What are you looking forward to this week?", "What are you dreading?", "What would make this week a good one?"],
+  f1: ["What did you eat, and where?", "What was the first bite like: texture, temperature, smell?", "Would you order it again?"],
+  f2: ["What's the overrated food?", "What's your one reason?", "What meal proves it?"],
+  f3: ["What do you cook well?", "What are the three steps?", "Which step do people get wrong?"],
+  f4: ["What went wrong with the meal?", "What did you do about it?", "Did you eat it anyway?"],
+  f5: ["What are you drinking?", "What does it smell, sound and taste like?", "Would you recommend it to {name}?"],
+  f6: ["Where did you eat?", "What's the one thing to know before going?", "What should {name} order?"],
+  f7: ["Which tool would you keep?", "When did it prove itself?", "What should {name} buy?"],
+  t1: ["Where did you go?", "What did you hear, smell or touch there?", "What surprised you?"],
+  t2: ["Where were you, and what went wrong?", "What did you do?", "How did it end?"],
+  t3: ["Where would you tell {name} not to go?", "What's your one honest reason?", "Where should they go instead?"],
+  t4: ["What's your first packing rule?", "What are rules two and three?", "Which one did you learn the hard way?"],
+  t5: ["Where do you live, in one line?", "Where would you take {name} first?", "What should they skip?"],
+  t6: ["How do you travel now?", "How would you like to travel?", "What's the first step to get there?"],
+  o1: ["What's your hot take?", "Why do you believe it?", "What happened that proves it?"],
+  o2: ["What does everyone say you should do?", "Why did you stop?", "What happened after?"],
+  o3: ["What did you used to think?", "What changed your mind?", "What do you think now?"],
+  o4: ["What's the news story, in one line?", "What's your first honest reaction?", "What do you think happens next?"],
+  o5: ["What annoys you?", "Why does it bother you?", "What should change?"],
+  o6: ["What's the opinion you disagree with?", "What's the best case for it?", "Where do you land?"],
+  s1: ["What was happening right before?", "What was the embarrassing moment?", "How did you get out of it?"],
+  s2: ["Who did you misjudge?", "What did you think, and what was true?", "What did you learn?"],
+  s3: ["What's the object?", "Where did it come from?", "Why do you keep it?"],
+  s4: ["What was the win?", "Why did it matter to you?", "Who would you tell first?"],
+  s5: ["What was the moment just before it went wrong?", "What happened?", "How did it end?"],
+  s6: ["Who was it?", "What exactly did they say?", "What do you do differently because of it?"],
+  x1: ["What tech would you buy again?", "When did it prove itself?", "Who should buy it?"],
+  x2: ["What do you use every day?", "How does it actually work, in plain words?", "What surprised you about it?"],
+  x3: ["What did you try?", "What did it promise, and what did it do?", "Would you keep it?"],
+  x4: ["What are you reviewing?", "What's the one thing that decides it?", "Buy it or skip it?"],
+  x5: ["Which device?", "What are the three settings or habits?", "Which would you do first?"],
+  h1: ["How is your energy right now?", "What change are you testing?", "How will you know it worked?"],
+  h2: ["What went badly?", "Why do you think it happened?", "What did you learn?"],
+  h3: ["What's the exercise or habit?", "What are the three steps?", "What mistake did you make at first?"],
+  h4: ["What advice is overrated?", "Why?", "What do you do instead?"],
+  h5: ["What's today's plan?", "What's the first real moment?", "What should {name} watch for?"],
+  m1: ["What was the decision?", "What happened after?", "Would you do it again?"],
+  m2: ["What would you never pay for again?", "When did you realise?", "What do you do instead?"],
+  m3: ["What's your job, in one sentence?", "What do you actually do all day?", "What's the best part?"],
+  m4: ["What do your work days look like now?", "What are you working toward?", "What's the next step?"],
+  m5: ["What's the lesson?", "How did you learn it?", "How can {name} use it?"],
+  l1: ["What did you learn this week?", "What's the main idea, in plain words?", "What do you make of it?"],
+  l2: ["What word or idea do people misuse?", "What does it actually mean?", "What's an everyday example?"],
+  l3: ["What question does it answer?", "What's the answer, in plain words?", "Why should {name} care?"],
+  l4: ["What book, video or article?", "What did it change for you?", "Should {name} read or watch it?"],
+  c1: ["What did you make?", "What does it feel like in your hands?", "What's wrong with it?"],
+  c2: ["What was the project?", "What went wrong?", "What did you keep from it?"],
+  c3: ["What's your hobby?", "What should a beginner do first?", "What should they ignore?"],
+  c4: ["Where is your skill now?", "Where do you want it in a year?", "What's the next step?"],
+  c5: ["What are you making?", "What's it for?", "What could go wrong?"],
+};
+
+/** For a topic the learner types in themselves. */
+export const OWN_TOPIC_QUESTIONS: [string, string, string] = ["What is it, in one line?", "What happened, or why does it matter to you?", "What should {name} do or think now?"];
+
+export function promptQuestions(p: VlogPrompt | undefined, viewerName: string | undefined): [string, string, string] {
+  const q = (p && Q[p.id]) || OWN_TOPIC_QUESTIONS;
+  return q.map((x) => fillName(x, viewerName)) as [string, string, string];
+}

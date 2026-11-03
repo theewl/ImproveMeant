@@ -499,8 +499,11 @@ describe("Camera drills (demo mode, no camera in jsdom)", () => {
     await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "I am Eric, in my kitchen, and I had toast.");
     await user.click(screen.getByRole("button", { name: "Get feedback" }));
     await screen.findByRole("heading", { name: "Your feedback" });
-    expect(screen.getByText("Example feedback")).toBeInTheDocument();
-    expect(screen.getByText(/Your first ten seconds/)).toBeInTheDocument();
+    // No AI in tests: automatic checks, in the four plain sections.
+    expect(screen.getByText(/Automatic checks on your words/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What you said" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What worked" })).toBeInTheDocument();
+    expect(screen.getByText("Next time")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Finish" }));
     await screen.findByRole("heading", { name: "Take done" });
@@ -601,15 +604,17 @@ describe("Today's take from a prompt", () => {
     await screen.findByRole("heading", { name: "Talk to Sam" });
     expect(screen.getByText(/Describe the last thing you ate to Sam/)).toBeInTheDocument();
     // The guide: who's watching, then beginning / middle / end with examples written to Sam.
-    expect(screen.getByText(/Sam, alone on a phone. They can't taste it/)).toBeInTheDocument();
-    expect(screen.getByText("Beginning", { exact: false })).toBeInTheDocument();
+    // Three questions to answer, in order, plus an example tucked away.
+    expect(screen.getByText("Answer these, in order")).toBeInTheDocument();
+    expect(screen.getByText("What did you eat, and where?")).toBeInTheDocument();
+    expect(screen.getByText("Would you order it again?")).toBeInTheDocument();
     expect(screen.getByText(/Sam, you have to order the dumplings/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open the camera" }));
     await screen.findByRole("heading", { name: "Camera not available" });
     await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "You need to order the dumplings. The skin shattered and then it was all steam and ginger. Skip the soup.");
     await user.click(screen.getByRole("button", { name: "Get feedback" }));
     await screen.findByRole("heading", { name: "Your feedback" });
-    expect(bodies[0], JSON.stringify(bodies[0])).toMatchObject({ drillId: "cam-describe-food", hookPattern: "claim" });
+    expect(bodies[0], JSON.stringify(bodies[0])).toMatchObject({ drillId: "cam-describe-food", hookPattern: "claim", questions: ["What did you eat, and where?", "What was the first bite like: texture, temperature, smell?", "Would you order it again?"] });
     expect(String(bodies[0]!.topic)).toContain("Sam");
     await user.click(screen.getByRole("button", { name: "Finish" }));
     await screen.findByRole("heading", { name: "Take done" });
@@ -664,5 +669,31 @@ describe("Today's stories and week count", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Show different stories" })).toBeEnabled());
     const second = screen.getAllByRole("link", { name: /Source/ })[0]!.closest("li")!.querySelector(".row-title")!.textContent;
     expect(second).not.toBe(first);
+  });
+});
+
+
+describe("Today's take: own topic", () => {
+  it("lets the learner talk about their own topic with three general questions", async () => {
+    const user = userEvent.setup();
+    const { app } = buildTestApp();
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      if (url.startsWith("/api/camera-feedback")) bodies.push(JSON.parse(String(init.body)));
+      const { signal: _signal, ...rest } = init;
+      return app.request(new Request(`http://localhost${url}`, rest as RequestInit));
+    });
+    start("#/take/d1", onboarded({ prefs: { ...emptyData().prefs, onboarded: true, interests: ["culture"], viewerName: "Sam", niches: ["daily"], goal: "camera" } }));
+    await screen.findByRole("heading", { name: "Talk to Sam" });
+    await user.click(screen.getByRole("button", { name: "Talk about something else" }));
+    expect(screen.getByRole("button", { name: "Open the camera" })).toBeDisabled();
+    await user.type(screen.getByRole("textbox", { name: "Your topic" }), "my first week at the gym");
+    expect(screen.getByText("What should Sam do or think now?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open the camera" }));
+    await screen.findByRole("heading", { name: "Camera not available" });
+    await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "My first week at the gym was rough. You know that feeling? Would you go back?");
+    await user.click(screen.getByRole("button", { name: "Get feedback" }));
+    await screen.findByRole("heading", { name: "What you said" });
+    expect(bodies[0]).toMatchObject({ topic: "my first week at the gym", questions: ["What is it, in one line?", "What happened, or why does it matter to you?", "What should Sam do or think now?"] });
   });
 });
