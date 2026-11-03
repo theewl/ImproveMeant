@@ -10,6 +10,7 @@ const cameraOut = {
   strength: { observation: "You opened on the viewer's problem, not on yourself.", quote: "this is for you" },
   priority: { observation: "The payoff is promised but not delivered.", quote: "Here's what I'd do differently", suggestion: "Say the one thing you'd change, then stop." },
   hook: { observation: "A viewer who has burned rice would stay.", quote: "If you've ever burned rice twice in one night", rewrite: null },
+  ending: { observation: "Promises a payoff instead of landing one.", quote: "Here's what I'd do differently." },
   camera: {
     observations: [
       { aspect: "eye-line", observation: "Eyes are on the screen, slightly below the lens.", fix: "Look at the lens when you land a line." },
@@ -48,6 +49,7 @@ describe("POST /api/camera-feedback (live)", () => {
     const { feedback } = await r.json();
     expect(feedback.kind).toBe("live");
     expect(feedback.hook.quote).toBe("If you've ever burned rice twice in one night");
+    expect(feedback.ending.quote).toBe("Here's what I'd do differently.");
     expect(feedback.camera.framesReviewed).toBe(3);
     expect(feedback.camera.observations).toHaveLength(2);
     expect(feedback.fidelity.status).toBe("not_applicable");
@@ -65,6 +67,7 @@ describe("POST /api/camera-feedback (live)", () => {
     expect(content[3]!.text).toContain("Hook pattern the speaker chose: question");
     expect(feedback.throughline).toBe("Burn it twice and you'll still eat it.");
     expect(String(params.system)).toContain("Never comment on appearance");
+    expect(String(params.system)).toContain("beginning, middle and end");
     const usage = await deps.usage.summary();
     expect(usage.today.requests).toBe(1);
   });

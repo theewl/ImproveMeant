@@ -83,6 +83,13 @@ export const CameraFeedbackOutput = z.object({
     })
     .nullable()
     .describe("Null only for drills where the opening is irrelevant."),
+  ending: z
+    .object({
+      observation: z.string().describe("Did the take end on a takeaway or a question for the viewer, or trail off ('so yeah')? One sentence."),
+      quote: z.string().describe("The exact closing words (last sentence) from the transcript."),
+    })
+    .nullable()
+    .describe("Null only when the transcript is too short to have an ending."),
   camera: z
     .object({
       observations: z

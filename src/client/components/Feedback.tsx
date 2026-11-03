@@ -75,7 +75,7 @@ export function FeedbackPanel({
 
       {f.hook && (f.hook.observation || f.hook.rewrite) && (
         <div className="fb-block">
-          <h3>Your opening</h3>
+          <h3>Beginning</h3>
           <p>{f.hook.observation}</p>
           {f.hook.quote && <blockquote>“{f.hook.quote}”</blockquote>}
           {f.hook.rewrite && (
@@ -83,6 +83,14 @@ export function FeedbackPanel({
               Try opening with: <em>“{f.hook.rewrite}”</em>
             </p>
           )}
+        </div>
+      )}
+
+      {f.ending && f.ending.observation && (
+        <div className="fb-block">
+          <h3>End</h3>
+          <p>{f.ending.observation}</p>
+          {f.ending.quote && <blockquote>“{f.ending.quote}”</blockquote>}
         </div>
       )}
 

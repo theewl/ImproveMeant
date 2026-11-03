@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Attempt } from "../../shared/types";
 import { CAMERA_SETUP, getCameraDrill, hookText, improvementSince, measureCameraTake, nextCameraDrill, takeStats } from "../../shared/camera";
-import { HOOK_PATTERNS, STRUCTURES, fillPromptText, takesThisWeek, todayPrompt, type HookPatternId, type VlogPrompt } from "../../shared/vlog";
+import { AUDIENCE, VIDEO_GUIDE, currentBeat, fillName, fillPromptText, takesThisWeek, todayPrompt, type GuideBeat, type VlogPrompt } from "../../shared/vlog";
 import { fillPrompt } from "../../shared/curriculum";
 import { formatSeconds } from "../../shared/observations";
 import { wordCount } from "../../shared/text";
@@ -32,8 +32,8 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   const [topic, setTopic] = useState(() => (prompt ? fillPromptText(prompt, viewer) : ""));
   const [notes, setNotes] = useState("");
   const [throughline, setThroughline] = useState("");
-  const [hookPattern, setHookPattern] = useState<HookPatternId | "">(prompt?.hook ?? "");
-  const structure = prompt ? STRUCTURES.find((x) => x.id === prompt.structure) : undefined;
+  const hookPattern = prompt?.hook ?? "";
+  const guide: GuideBeat[] | undefined = prompt ? VIDEO_GUIDE[prompt.kind] : undefined;
   const [checkin, setCheckin] = useState<Checkin | null>(null);
   const [checkinSaved, setCheckinSaved] = useState<string | null>(null);
   const [sendFrames, setSendFrames] = useState(data.cameraFramesConsent);
@@ -194,27 +194,21 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
                 <input id="cam-topic" value={topic} maxLength={300} required onChange={(e) => setTopic(e.target.value)} placeholder="e.g. why I stopped using a to-do app" />
               </>
             )}
-            {!drill.noReview && (
+            {prompt && guide && (
               <>
-                <label className="label" htmlFor="cam-idea">
-                  The one thing they should walk away with
-                </label>
-                <input id="cam-idea" value={throughline} maxLength={300} onChange={(e) => setThroughline(e.target.value)} placeholder="One sentence. Optional, but it makes the take." />
-                <fieldset className="pills">
-                  <legend className="label">Open with</legend>
-                  {HOOK_PATTERNS.map((h) => (
-                    <label key={h.id} className={hookPattern === h.id ? "pill on" : "pill"}>
-                      <input type="radio" name="hook" checked={hookPattern === h.id} onChange={() => setHookPattern(h.id)} />
-                      {h.name}
-                    </label>
+                <p className="label">Who's watching</p>
+                <p className="audience">{fillName(AUDIENCE[prompt.kind], viewer)}</p>
+                <ol className="guide" aria-label="Beginning, middle, end">
+                  {guide.map((g) => (
+                    <li key={g.name} className="guide-beat">
+                      <span className="guide-name">
+                        {g.name} <span className="guide-when">{g.when}</span>
+                      </span>
+                      <span className="guide-do">{fillName(g.do, viewer)}</span>
+                      <span className="guide-example">“{fillName(g.example, viewer)}”</span>
+                    </li>
                   ))}
-                </fieldset>
-                {hookPattern && <p className="hint">e.g. “{HOOK_PATTERNS.find((h) => h.id === hookPattern)!.example}”</p>}
-                {structure && (
-                  <p className="hint">
-                    Shape: {structure.beats.join(" → ")}
-                  </p>
-                )}
+                </ol>
               </>
             )}
             <BeforeCheckin defaultDrop={data.myHabits?.[0]} onChange={setCheckin} />
@@ -238,7 +232,11 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
                   <label className="label" htmlFor="cam-notes">
                     Three talking points, shown near the lens (optional)
                   </label>
-                  <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={structure ? structure.beats.join("\n") : "Not a script. Three words or short lines."} />
+                  <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={guide ? guide.map((g) => fillName(g.do, viewer)).join("\n") : "Not a script. Three words or short lines."} />
+                  <label className="label" htmlFor="cam-idea">
+                    The one thing to remember (optional)
+                  </label>
+                  <input id="cam-idea" value={throughline} maxLength={300} onChange={(e) => setThroughline(e.target.value)} placeholder="One sentence." />
                 </>
               )}
               <p className="hint">{drill.why}</p>
@@ -278,6 +276,8 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
           key={takeKey}
           task={task}
           notes={drill.noReview ? "" : notes}
+          guide={guide}
+          viewer={viewer}
           targetSeconds={drill.seconds}
           noReview={!!drill.noReview}
           retryFocus={isRetry ? last?.feedback?.retryFocus ?? null : null}
@@ -454,6 +454,8 @@ interface TakeResult {
 interface TakeProps {
   task: string;
   notes: string;
+  guide?: GuideBeat[];
+  viewer: string;
   targetSeconds: number;
   noReview: boolean;
   retryFocus: string | null;
@@ -587,17 +589,25 @@ function CameraTake(p: TakeProps) {
             <line x1="0" y1="1.33" x2="3" y2="1.33" className="eye" />
             <line x1="0" y1="2.67" x2="3" y2="2.67" />
           </svg>
-          {p.notes.trim() && (
+          {p.notes.trim() ? (
             <p className="cam-notes" aria-label="Your talking points">
               {p.notes}
             </p>
-          )}
+          ) : p.guide ? (
+            <ol className="cam-notes cam-beats" aria-label="Beginning, middle, end">
+              {p.guide.map((g, i) => (
+                <li key={g.name} className={r.state === "recording" && currentBeat(r.elapsed, p.targetSeconds) === i ? "on" : ""}>
+                  <strong>{g.name}:</strong> {fillName(g.do, p.viewer)}
+                </li>
+              ))}
+            </ol>
+          ) : null}
           {r.state === "recording" && (
             <p className="cam-timer" aria-live="off">
               <span className="dot pulse" aria-hidden="true" /> {formatSeconds(r.elapsed)} / {formatSeconds(p.targetSeconds)}
             </p>
           )}
-          {inHook && <p className="cam-hook">Hook window: give them a reason to stay</p>}
+          {inHook && !p.guide && <p className="cam-hook">Hook window: give them a reason to stay</p>}
           {overTarget && <p className="cam-hook">Target reached. Finish your thought.</p>}
         </div>
         {r.state === "ready" && <p className="cam-task">{p.task}</p>}

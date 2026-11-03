@@ -202,3 +202,70 @@ export const PLAYBOOK: { who: string; what: string; inApp: string }[] = [
   { who: "Food and travel creators", what: "Taste and place don't cross the screen; texture, smell, sound and a verdict do.", inApp: "Sensory prompts, the three-senses scaffold, and a count of vague words like 'amazing'." },
   { who: "Toastmasters evaluations", what: "One commendation, one recommendation, end on what went well.", inApp: "Every feedback is one strength, one change, and a wrap-up that names what worked." },
 ];
+
+// ---------- The video guide: beginning, middle, end ----------
+// The shape most popular vlogs and talking-head videos share: a hook and one line
+// on what this is (first ~10 s), the thing itself, then a takeaway and a question
+// for the viewer (last ~15 s). Written as what to do plus one concrete example.
+
+export interface GuideBeat {
+  name: "Beginning" | "Middle" | "End";
+  when: string;
+  do: string;
+  /** May contain {name}. */
+  example: string;
+}
+
+export const VIDEO_GUIDE: Record<PromptKind, [GuideBeat, GuideBeat, GuideBeat]> = {
+  quick: [
+    { name: "Beginning", when: "first 10 seconds", do: "Say who you are in one line, to {name}.", example: "Hey {name}. I'm Eric, and I've spent a month trying to fix a bike that doesn't want fixing." },
+    { name: "Middle", when: "the body", do: "One thing you're into right now, with a detail.", example: "Every night it's the same chain, the same grease, the same tutorial. Last night it clicked for about four seconds." },
+    { name: "End", when: "last 10 seconds", do: "Ask them something.", example: "What have you been stuck on this month? Tell me." },
+  ],
+  story: [
+    { name: "Beginning", when: "first 10 seconds", do: "Start at the moment it went wrong.", example: "So the key snapped in the lock, {name}. Half in my hand, half in the door." },
+    { name: "Middle", when: "the body", do: "What you tried, what happened next.", example: "I tried the kitchen window. The neighbour came out. I ended up explaining myself to a man in a bathrobe." },
+    { name: "End", when: "last 10 seconds", do: "What it left you with, then a question.", example: "Now the bathrobe man has my spare key. Where's yours?" },
+  ],
+  opinion: [
+    { name: "Beginning", when: "first 10 seconds", do: "Say the opinion, bluntly.", example: "{name}, standing desks are overrated." },
+    { name: "Middle", when: "the body", do: "One reason, and one thing that happened to you.", example: "Mine lasted three weeks. By week two I was leaning on it like a bar. My back hurt more, not less." },
+    { name: "End", when: "last 10 seconds", do: "What you do instead, then ask.", example: "Now I walk for ten minutes every hour. Do you actually stand at yours?" },
+  ],
+  explainer: [
+    { name: "Beginning", when: "first 10 seconds", do: "The question it answers.", example: "{name}, why does every app ask you to rate it right after it works?" },
+    { name: "Middle", when: "the body", do: "The idea in plain words, with one example.", example: "They ask when you're happiest with it. Same reason the waiter asks about dessert when the plates are clean." },
+    { name: "End", when: "last 10 seconds", do: "What to do with it, then ask.", example: "Next time one asks, notice when. Have you ever rated one star right after a crash?" },
+  ],
+  sensory: [
+    { name: "Beginning", when: "first 10 seconds", do: "The verdict first.", example: "{name}, you have to order the dumplings at that place." },
+    { name: "Middle", when: "the body", do: "Texture, smell, temperature, the first bite.", example: "The skin shattered, then it was all steam and ginger. I burned my tongue and didn't care." },
+    { name: "End", when: "last 10 seconds", do: "How to do it, then ask.", example: "Order them first, skip the soup. What should I try next time?" },
+  ],
+  hook: [
+    { name: "Beginning", when: "first 10 seconds", do: "Hook, then one line on what this is.", example: "I spent $400 on this and it lasted nine days. {name}, this is the review I wish I'd watched." },
+    { name: "Middle", when: "the body", do: "The first real moment.", example: "Day one it was perfect. Day nine, this happened." },
+    { name: "End", when: "last 10 seconds", do: "Say what's coming, then ask.", example: "Stick around for what I bought instead. Have you had one die this fast?" },
+  ],
+};
+
+/** Who's watching and what they want, in one line. May contain {name}. */
+export const AUDIENCE: Record<PromptKind, string> = {
+  quick: "{name}, alone on a phone. They want it to feel like a friend talking. They stay if the first line sounds like one.",
+  story: "{name}, alone on a phone. They want to know what happens. They stay if you start close to the trouble.",
+  opinion: "{name}, alone on a phone. They want a real opinion and a reason. They stay if you say it in the first line.",
+  explainer: "{name}, alone on a phone. They want to get one thing without being talked down to. They stay if the question is theirs.",
+  sensory: "{name}, alone on a phone. They can't taste it. They stay if you give them texture and a verdict.",
+  hook: "{name}, alone on a phone, deciding in ten seconds. They stay if the first line is about them or the payoff.",
+};
+
+export function fillName(text: string, viewerName: string | undefined): string {
+  return text.replaceAll("{name}", viewerName?.trim() || "your one viewer");
+}
+
+/** Which beat the speaker should be in at this point of the take. */
+export function currentBeat(elapsed: number, targetSeconds: number): 0 | 1 | 2 {
+  if (elapsed < 10) return 0;
+  if (elapsed >= Math.max(15, targetSeconds - Math.max(10, targetSeconds * 0.25))) return 2;
+  return 1;
+}
