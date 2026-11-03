@@ -304,6 +304,14 @@ describe("transcription endpoint", () => {
     expect((await deps.usage.summary()).today.transcriptionMinutes).toBeCloseTo(0.5);
   });
 
+  it("accepts a two-minute WAV extracted on the phone, and video containers", async () => {
+    const { call } = buildTestApp({ transcription: ok });
+    const wav = await call("/api/transcribe?seconds=120", { method: "POST", headers: { "Content-Type": "audio/wav", "Idempotency-Key": "tx-wav-0001" }, body: new Uint8Array(120 * 32000) });
+    expect(wav.status).toBe(200); // ~3.8 MB of 16 kHz WAV is about two minutes, not "too long"
+    const mp4 = await call("/api/transcribe?seconds=20", { method: "POST", headers: { "Content-Type": "video/mp4", "Idempotency-Key": "tx-mp4-0001" }, body: new Uint8Array(2_000_000) });
+    expect(mp4.status).toBe(200);
+  });
+
   it("rejects empty recordings, bad types and missing keys", async () => {
     const { call } = buildTestApp({ transcription: ok });
     const h = { "Content-Type": "audio/webm", "Idempotency-Key": "tx-12345678" };

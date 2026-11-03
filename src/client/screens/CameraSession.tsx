@@ -11,6 +11,7 @@ import { useSession } from "../lib/useSession";
 import { uid } from "../lib/storage";
 import { href } from "../lib/router";
 import { stillToBase64, useVideoRecorder, videoRecordingSupported } from "../lib/useVideoRecorder";
+import { toWav16k } from "../lib/audioExtract";
 import { isAppleWebKit, speechCaptureSupported, useSpeechCapture } from "../lib/useSpeechCapture";
 import { FeedbackPanel, WrapUp } from "../components/Feedback";
 import { AfterCheckin, BeforeCheckin, checkinExperiment, checkinSavedMessage, type Checkin } from "../components/Checkin";
@@ -20,7 +21,6 @@ type Phase = "setup" | "record" | "review" | "feedback" | "done";
 const STEP: Record<Phase, number> = { setup: 1, record: 2, review: 3, feedback: 4, done: 4 };
 const MAX_RETRIES = 2;
 const HOOK_SECONDS = 10;
-const VIEWER_CHECKS = ["Did the first ten seconds give a reason to stay?", "Were your eyes on the lens when it mattered?", "Did it sound like talking to one person?"];
 
 export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: string; fromStoryId?: string; prompt?: VlogPrompt }) {
   const { data, update, status } = useApp();
@@ -45,6 +45,11 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [pending, setPending] = useState<Attempt | null>(null);
+  const [video, setVideo] = useState<{ url: string; mimeType: string } | null>(null);
+  const [fixText, setFixText] = useState<string | null>(null);
+  useEffect(() => () => {
+    if (video) URL.revokeObjectURL(video.url);
+  }, [video]);
 
   const s = useSession(() => ({
     id: uid("s-"),
@@ -84,6 +89,10 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   const maxChars = status?.maxResponseChars ?? 6000;
 
   const submitTake = async (take: TakeResult) => {
+    if (take.video) setVideo((v) => {
+      if (v) URL.revokeObjectURL(v.url);
+      return { url: URL.createObjectURL(take.video!.blob), mimeType: take.video!.mimeType };
+    });
     // A resubmit after a failed request reuses the pending attempt instead of adding another.
     if (pending && pending.text === take.text.trim()) {
       await requestFeedback(pending, take.frames);
@@ -340,7 +349,39 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
       {phase === "feedback" && last?.feedback && (
         <section>
           <StepHeader eyebrow={drill.title} title="Your feedback" />
+          {video && (
+            <>
+              <video className="playback" controls playsInline src={video.url} aria-label="Play back your take" />
+              <p className="row wrap">
+                <a className="link" href={video.url} download={`take-${new Date().toISOString().slice(0, 10)}.${video.mimeType.includes("mp4") ? "mp4" : "webm"}`}>
+                  Save this take
+                </a>
+              </p>
+            </>
+          )}
           <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r, why) => s.rateAttempt(last.id, r, why)} />
+          <details className="more" onToggle={(e) => (e.target as HTMLDetailsElement).open && fixText == null && setFixText(last.text)}>
+            <summary>Misheard you? Fix the words</summary>
+            <label className="sr-only" htmlFor="fix-text">
+              Your words
+            </label>
+            <textarea id="fix-text" rows={5} value={fixText ?? last.text} onChange={(e) => setFixText(e.target.value)} />
+            <button
+              className="secondary"
+              type="button"
+              disabled={busy || !fixText || fixText.trim() === last.text.trim() || wordCount(fixText) < 3}
+              onClick={() => {
+                const text = fixText!.trim();
+                // Replace this take's words rather than adding a second take.
+                s.setSession((x) => ({ ...x, attempts: x.attempts.filter((a) => a.id !== last.id) }));
+                setFixText(null);
+                void submitTake({ text, original: last.originalTranscript ?? last.text, source: last.transcriptSource ?? "typed-by-user", seconds: last.durationSeconds ?? 0, frames: lastFrames.current });
+              }}
+            >
+              {busy ? "Updating…" : "Update feedback"}
+            </button>
+            {error != null && <ErrorNotice error={error} />}
+          </details>
           <CameraMeasures attempt={last} />
           <div className="actions sticky">
             <button
@@ -469,6 +510,7 @@ interface TakeResult {
   source: "provider" | "browser-speech" | "typed-by-user";
   seconds: number;
   frames: { at: number; jpegBase64: string }[];
+  video?: { blob: Blob; mimeType: string };
 }
 
 interface TakeProps {
@@ -508,10 +550,9 @@ function CameraTake(p: TakeProps) {
   const [source, setSource] = useState<TakeResult["source"]>("typed-by-user");
   const [txState, setTxState] = useState<"none" | "working" | "done" | "error">("none");
   const [txError, setTxError] = useState<string | null>(null);
-  const [watched, setWatched] = useState(false);
-  const [obs, setObs] = useState<"predict" | "watch" | "rate" | "done">("predict");
-  const [predicted, setPredicted] = useState(5);
-  const [observed, setObserved] = useState(5);
+  const autoSent = useRef(false);
+  const transcriptRef = useRef("");
+  transcriptRef.current = transcript;
   const txKey = useRef(uid("tx-"));
   const tid = useId();
   const supported = videoRecordingSupported();
@@ -546,6 +587,31 @@ function CameraTake(p: TakeProps) {
     if (!concurrentSpeech && p.transcriptionAvailable && p.transcriptionConsent && transcribable) void transcribe();
   }, [r.state, r.recording, speech.text, speech.failed, txState]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const send = (text: string) => {
+    if (!r.recording) return;
+    const rec0 = r.recording;
+    p.onSubmit({
+      text: text.trim(),
+      original,
+      source,
+      seconds: rec0.seconds,
+      frames: rec0.frames.map((f) => ({ at: Math.round(f.at * 10) / 10, jpegBase64: stillToBase64(f.dataUrl) })),
+      video: { blob: rec0.blob, mimeType: rec0.mimeType },
+    });
+  };
+
+  // Hands-free: as soon as there's a transcript (browser or service), get feedback. A short wait lets the
+  // browser finalise the last sentence first. Typed transcripts still use the button.
+  useEffect(() => {
+    if (txState !== "done" || source === "typed-by-user" || autoSent.current || p.noReview) return;
+    autoSent.current = true;
+    const t = window.setTimeout(() => {
+      if (wordCount(transcriptRef.current) >= 3) send(transcriptRef.current);
+      else autoSent.current = false;
+    }, source === "browser-speech" ? 900 : 0);
+    return () => window.clearTimeout(t);
+  }, [txState, source]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The recogniser finalises the last sentence a moment after stop: keep the transcript in sync until the learner edits it.
   useEffect(() => {
     if (txState !== "done" || source !== "browser-speech" || original == null) return;
@@ -556,13 +622,19 @@ function CameraTake(p: TakeProps) {
     }
   }, [speech.text, speech.interim]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const transcribable = r.recording ? (r.recording.audio ?? (r.recording.blob.size < 4_000_000 ? r.recording.blob : null)) : null;
+  const transcribable = !!r.recording;
   const transcribe = async () => {
-    if (!r.recording || !transcribable) return;
+    if (!r.recording) return;
     setTxState("working");
     setTxError(null);
     try {
-      const res = await api.transcribe(transcribable, r.recording.seconds, txKey.current);
+      const payload = r.recording.audio ?? (await toWav16k(r.recording.blob)) ?? (r.recording.blob.size < 4_000_000 ? r.recording.blob : null);
+      if (!payload) {
+        setTxError("Couldn't get the sound out of this recording. Type what you said below.");
+        setTxState("error");
+        return;
+      }
+      const res = await api.transcribe(payload, r.recording.seconds, txKey.current);
       setTranscript(res.transcript);
       setOriginal(res.transcript);
       setSource("provider");
@@ -688,61 +760,20 @@ function CameraTake(p: TakeProps) {
   const words = wordCount(transcript);
   const tooLong = transcript.length > p.maxChars;
 
-  if (obs !== "done") {
+  const handsFree = (txState === "working" || (txState === "done" && source !== "typed-by-user")) && p.error == null;
+  if (handsFree) {
     return (
-      <section className="rec-box done-rec observer">
-        <p className="eyebrow">Watch it back as a viewer · optional</p>
-        {obs === "predict" && (
-          <>
-            <ObserverSlider id="cam-pred" label="Before watching: how do you think you came across?" value={predicted} onChange={setPredicted} />
-            <div className="stack">
-              <button className="primary" type="button" onClick={() => setObs("watch")}>
-                Watch it back
-              </button>
-              <button className="link" type="button" onClick={() => setObs("done")}>
-                Skip
-              </button>
-            </div>
-          </>
-        )}
-        {obs === "watch" && (
-          <>
-            <p className="hint">Watch as a stranger scrolling past would. Would you keep watching after ten seconds?</p>
-            <video className="playback" controls autoPlay playsInline src={rec.url} onEnded={() => setWatched(true)} aria-label={`Play back your take (${formatSeconds(rec.seconds)})`} />
-            {videoOnly && <p className="hint">Silent playback on this device; the transcript below has your words.</p>}
-            <fieldset className="viewer-checks">
-              <legend className="label">While you watch</legend>
-              {VIEWER_CHECKS.map((c) => (
-                <label key={c} className="option">
-                  <input type="checkbox" />
-                  {c}
-                </label>
-              ))}
-            </fieldset>
-            <button className="primary" type="button" onClick={() => setObs("rate")}>
-              {watched ? "Done watching" : "Skip ahead"}
-            </button>
-          </>
-        )}
-        {obs === "rate" && (
-          <>
-            <ObserverSlider id="cam-seen" label="As a viewer: how did they come across?" value={observed} onChange={setObserved} />
-            <button className="primary" type="button" onClick={() => setObs("done")}>
-              Continue
-            </button>
-          </>
-        )}
+      <section className="rec-box done-rec">
+        <video className="playback" controls playsInline src={rec.url} aria-label={`Play back your take (${formatSeconds(rec.seconds)})`} />
+        <p className="working-line" role="status">
+          <span className="spinner" aria-hidden="true" /> {txState === "working" ? "Transcribing…" : "Getting your feedback…"}
+        </p>
       </section>
     );
   }
 
   return (
     <section className="rec-box done-rec">
-      {obs === "done" && observed !== predicted && (
-        <p className="notice ok" role="status">
-          {observed > predicted ? `You expected ${predicted}/10 and saw ${observed}/10. You came across better than it felt.` : `You expected ${predicted}/10 and saw ${observed}/10. Note one thing to change, then let it go.`}
-        </p>
-      )}
       <video className="playback" controls playsInline src={rec.url} aria-label={`Play back your take (${formatSeconds(rec.seconds)})`} />
       <p className="row wrap">
         <a className="link" href={rec.url} download={`take-${new Date().toISOString().slice(0, 10)}.${rec.mimeType.includes("mp4") ? "mp4" : "webm"}`}>
@@ -758,7 +789,7 @@ function CameraTake(p: TakeProps) {
           </p>
           {p.transcriptionAvailable && transcribable && txState !== "working" && (
             <>
-              {!p.transcriptionConsent && <p className="hint">Sends the audio to Deepgram for a transcript. It's asked not to keep it.</p>}
+              {!p.transcriptionConsent && <p className="hint">Your audio goes to Deepgram to turn it into text. It's asked not to keep it. You'll only be asked once.</p>}
               <button
                 className="primary"
                 type="button"
@@ -767,7 +798,7 @@ function CameraTake(p: TakeProps) {
                   void transcribe();
                 }}
               >
-                Transcribe it
+                {p.transcriptionConsent ? "Try transcribing again" : "Transcribe my takes automatically"}
               </button>
             </>
           )}
@@ -803,11 +834,12 @@ function CameraTake(p: TakeProps) {
               source,
               seconds: rec.seconds,
               frames: rec.frames.map((f) => ({ at: Math.round(f.at * 10) / 10, jpegBase64: stillToBase64(f.dataUrl) })),
+              video: { blob: rec.blob, mimeType: rec.mimeType },
             });
           }}
         >
           <label className="label" htmlFor={tid}>
-            {source === "typed-by-user" ? "Type what you said, then get feedback" : "Check the transcript, fix any mistakes, then get feedback"}
+            {source === "typed-by-user" ? "Type what you said, then get feedback" : "Your words"}
           </label>
           <textarea id={tid} rows={7} value={transcript} onChange={(e) => setTranscript(e.target.value)} />
           <p className="hint" aria-live="polite">
@@ -861,20 +893,3 @@ function TypedTake(p: TakeProps) {
   );
 }
 
-function ObserverSlider({ id, label, value, onChange }: { id: string; label: string; value: number; onChange: (n: number) => void }) {
-  return (
-    <div className="slider">
-      <div className="slider-head">
-        <label className="label" htmlFor={id}>
-          {label}
-        </label>
-        <output htmlFor={id}>{value}/10</output>
-      </div>
-      <input id={id} type="range" min={0} max={10} value={value} onChange={(e) => onChange(Number(e.target.value))} />
-      <div className="slider-ends" aria-hidden="true">
-        <span>Stiff, unclear</span>
-        <span>Natural, clear</span>
-      </div>
-    </div>
-  );
-}
