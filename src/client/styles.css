@@ -1928,3 +1928,11 @@ button.small {
   font-weight: 600;
   font-size: 1.05rem;
 }
+.working-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  font-weight: 600;
+  margin: 0.75rem 0 0.25rem;
+}

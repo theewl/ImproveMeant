@@ -326,7 +326,9 @@ export function createApp(deps: AppDeps): Hono {
     const buf = new Uint8Array(await c.req.arrayBuffer());
     if (buf.byteLength < 1000) throw new AppError("empty_response", "The recording is empty or too short.", 422, true);
     // The client-reported length can't be trusted for limits: also estimate from size (~3 KB/s is a low voice bitrate).
-    const estimatedSeconds = Math.max(seconds, buf.byteLength / 3000);
+    // Size gives a floor on length the client can't fake; bytes per second depend on the format.
+    const bytesPerSecond = /wav/i.test(contentType) ? 32000 : /^video\//i.test(contentType) ? 150000 : 3000;
+    const estimatedSeconds = Math.max(seconds, buf.byteLength / bytesPerSecond);
     if (estimatedSeconds > 900) throw new AppError("too_large", "This recording is too long to transcribe. Type what you said instead.", 413);
     await usage.assertTranscriptionAllowed(estimatedSeconds);
     const { value } = await dedupe.run(`tx:${key}`, async () => {
