@@ -1835,3 +1835,49 @@ button.small {
 .since-worse {
   color: var(--ink-2);
 }
+
+/* ---------- Video guide ---------- */
+.audience {
+  margin: 0 0 0.9rem;
+  color: var(--ink-2);
+}
+.guide {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.guide-beat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.15rem;
+}
+.guide-name {
+  font-weight: 700;
+}
+.guide-when {
+  font-weight: 400;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+}
+.guide-example {
+  color: var(--ink-2);
+  font-family: var(--serif);
+}
+.cam-beats {
+  list-style: none;
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+.cam-beats li {
+  opacity: 0.6;
+}
+.cam-beats li.on {
+  opacity: 1;
+  font-size: 0.95rem;
+}

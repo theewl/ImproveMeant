@@ -600,14 +600,16 @@ describe("Today's take from a prompt", () => {
     start("#/take/f1", onboarded({ sessions: [earlier], prefs: { ...emptyData().prefs, onboarded: true, interests: ["culture"], viewerName: "Sam", niches: ["food"], goal: "camera" } }));
     await screen.findByRole("heading", { name: "Talk to Sam" });
     expect(screen.getByText(/Describe the last thing you ate to Sam/)).toBeInTheDocument();
-    await user.type(screen.getByRole("textbox", { name: /one thing they should walk away with/ }), "Order the dumplings, skip the soup.");
-    await user.click(screen.getByLabelText("A bold, specific claim"));
+    // The guide: who's watching, then beginning / middle / end with examples written to Sam.
+    expect(screen.getByText(/Sam, alone on a phone. They can't taste it/)).toBeInTheDocument();
+    expect(screen.getByText("Beginning", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/Sam, you have to order the dumplings/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open the camera" }));
     await screen.findByRole("heading", { name: "Camera not available" });
     await user.type(screen.getByRole("textbox", { name: /No camera here/ }), "You need to order the dumplings. The skin shattered and then it was all steam and ginger. Skip the soup.");
     await user.click(screen.getByRole("button", { name: "Get feedback" }));
     await screen.findByRole("heading", { name: "Your feedback" });
-    expect(bodies[0], JSON.stringify(bodies[0])).toMatchObject({ drillId: "cam-describe-food", throughline: "Order the dumplings, skip the soup.", hookPattern: "claim" });
+    expect(bodies[0], JSON.stringify(bodies[0])).toMatchObject({ drillId: "cam-describe-food", hookPattern: "claim" });
     expect(String(bodies[0]!.topic)).toContain("Sam");
     await user.click(screen.getByRole("button", { name: "Finish" }));
     await screen.findByRole("heading", { name: "Take done" });
@@ -616,7 +618,7 @@ describe("Today's take from a prompt", () => {
     expect(screen.getByText(/Times you said “you”: 0 → 1/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Done for today" })).toHaveAttribute("href", "#/today");
     const saved = stored().sessions.find((s) => s.camera?.promptId === "f1")!;
-    expect(saved.camera).toMatchObject({ throughline: "Order the dumplings, skip the soup.", hookPattern: "claim" });
+    expect(saved.camera).toMatchObject({ hookPattern: "claim", promptId: "f1" });
   });
 });
 

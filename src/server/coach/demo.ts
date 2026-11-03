@@ -21,7 +21,7 @@ export class DemoCoach implements CoachProvider {
   }
 
   async cameraFeedback(input: CameraFeedbackInput): Promise<Feedback> {
-    return { ...illustrativeFeedback(input.exercise), hook: null, camera: null, throughline: null };
+    return { ...illustrativeFeedback(input.exercise), hook: null, ending: null, camera: null, throughline: null };
   }
 
   async audienceQuestion(input: AudienceInput): Promise<AudienceQuestion> {

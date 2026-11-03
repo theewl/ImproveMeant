@@ -193,6 +193,8 @@ export interface Feedback {
   kind: "live" | "illustrative";
   /** Camera drills: the opening a viewer hears before deciding to stay. */
   hook?: { observation: string; quote: string | null; rewrite: string | null } | null;
+  /** Camera drills: did the take end on a takeaway or a question, or trail off? */
+  ending?: { observation: string; quote: string | null } | null;
   /** Camera drills: what the coach saw in a few still frames. Null when no frames were sent. */
   camera?: CameraNotes | null;
   /** Camera drills: the one idea a viewer would take away, in the speaker's words, or null if there isn't one. */

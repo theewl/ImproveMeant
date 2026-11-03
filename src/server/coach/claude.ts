@@ -320,6 +320,7 @@ export function buildCameraFeedback(out: CameraFeedbackOutput, response: string,
     ? { observation: clamp(out.priority.observation, 400), quote: verify(out.priority.quote), suggestion: clamp(out.priority.suggestion, 400) }
     : null;
   const hook = out.hook ? { observation: clamp(out.hook.observation, 400), quote: verify(out.hook.quote), rewrite: out.hook.rewrite ? clamp(out.hook.rewrite, 300) : null } : null;
+  const ending = out.ending ? { observation: clamp(out.ending.observation, 300), quote: verify(out.ending.quote) } : null;
   const camera =
     framesSent > 0 && out.camera
       ? {
@@ -334,6 +335,7 @@ export function buildCameraFeedback(out: CameraFeedbackOutput, response: string,
     strength,
     priority,
     hook,
+    ending,
     camera,
     throughline: out.throughline ? clamp(out.throughline, 300) : null,
     explanation: clamp(out.explanation, 600),
