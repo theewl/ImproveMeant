@@ -32,6 +32,8 @@ export interface CameraFeedbackInput {
   throughline: string;
   /** Hook pattern the speaker chose (question, claim, promise, mid-action, contrast), if any. */
   hookPattern: string;
+  /** The three questions the speaker answered, in order. */
+  questions: string[];
   response: string;
   durationSeconds: number | null;
   transcriptSource: "provider" | "browser-speech" | "typed-by-user";

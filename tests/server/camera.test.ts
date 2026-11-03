@@ -7,19 +7,16 @@ const TAKE = "If you've ever burned rice twice in one night, this is for you. Th
 const cameraOut = {
   goalMet: true,
   offTopic: false,
-  strength: { observation: "You opened on the viewer's problem, not on yourself.", quote: "this is for you" },
-  priority: { observation: "The payoff is promised but not delivered.", quote: "Here's what I'd do differently", suggestion: "Say the one thing you'd change, then stop." },
-  hook: { observation: "A viewer who has burned rice would stay.", quote: "If you've ever burned rice twice in one night", rewrite: null },
-  ending: { observation: "Promises a payoff instead of landing one.", quote: "Here's what I'd do differently." },
+  keyPoints: ["Burned rice twice in one night", "The smoke alarm went off", "Ate it anyway"],
+  didWell: [{ part: "beginning", text: "You opened on the viewer's problem, not on yourself.", quote: "If you've ever burned rice twice in one night" }],
+  toFix: [{ part: "end", text: "You promise a lesson but stop before giving it.", quote: "Here's what I'd do differently.", fix: "Say the one thing you'd change, then stop." }],
+  nextTime: "End on the one change.",
   camera: {
     observations: [
       { aspect: "eye-line", observation: "Eyes are on the screen, slightly below the lens.", fix: "Look at the lens when you land a line." },
       { aspect: "lighting", observation: "Window behind you; face in shadow.", fix: "Turn to face the window." },
     ],
   },
-  throughline: "Burn it twice and you'll still eat it.",
-  explanation: "On a phone, the first line decides whether the thumb keeps scrolling.",
-  retryFocus: "End on the one change.",
 };
 
 function body(over: Record<string, unknown> = {}) {
@@ -30,6 +27,7 @@ function body(over: Record<string, unknown> = {}) {
     notes: "burned rice, alarm, what I'd change",
     throughline: "burned rice twice, still edible",
     hookPattern: "question",
+    questions: ["What went wrong?", "What did you do?", "What would you do differently?"],
     response: { text: TAKE, transcriptSource: "browser-speech", transcriptEdited: false, durationSeconds: 24 },
     frames: [
       { at: 2, jpegBase64: JPEG },
@@ -48,8 +46,12 @@ describe("POST /api/camera-feedback (live)", () => {
     expect(r.status).toBe(200);
     const { feedback } = await r.json();
     expect(feedback.kind).toBe("live");
-    expect(feedback.hook.quote).toBe("If you've ever burned rice twice in one night");
-    expect(feedback.ending.quote).toBe("Here's what I'd do differently.");
+    expect(feedback.summary.keyPoints).toHaveLength(3);
+    expect(feedback.summary.didWell[0]).toMatchObject({ part: "beginning", quote: "If you've ever burned rice twice in one night" });
+    expect(feedback.summary.toFix[0]).toMatchObject({ part: "end", quote: "Here's what I'd do differently.", fix: "Say the one thing you'd change, then stop." });
+    expect(feedback.summary.nextTime).toBe("End on the one change.");
+    expect(feedback.summary.source).toBe("ai");
+    expect(feedback.strength.observation).toContain("viewer's problem"); // older fields still filled for history
     expect(feedback.camera.framesReviewed).toBe(3);
     expect(feedback.camera.observations).toHaveLength(2);
     expect(feedback.fidelity.status).toBe("not_applicable");
@@ -65,7 +67,7 @@ describe("POST /api/camera-feedback (live)", () => {
     expect(content[3]!.text).toContain("cooking rice");
     expect(content[3]!.text).toContain("walk away with: burned rice twice, still edible");
     expect(content[3]!.text).toContain("Hook pattern the speaker chose: question");
-    expect(feedback.throughline).toBe("Burn it twice and you'll still eat it.");
+    expect(content[3]!.text).toContain("1. What went wrong?");
     expect(String(params.system)).toContain("Never comment on appearance");
     expect(String(params.system)).toContain("beginning, middle and end");
     const usage = await deps.usage.summary();
@@ -73,11 +75,11 @@ describe("POST /api/camera-feedback (live)", () => {
   });
 
   it("drops camera notes and quotes it can't verify when no stills were sent", async () => {
-    const t = fakeTransport([textMessage({ ...cameraOut, strength: { observation: "x", quote: "words that were never said" } })]);
+    const t = fakeTransport([textMessage({ ...cameraOut, didWell: [{ part: "middle", text: "x", quote: "words that were never said" }] })]);
     const { post } = buildTestApp({ env: { ANTHROPIC_API_KEY: "sk-test" }, transport: t });
     const { feedback } = await (await post("/api/camera-feedback", body({ frames: [] }))).json();
     expect(feedback.camera).toBeNull();
-    expect(feedback.strength.quote).toBeNull();
+    expect(feedback.summary.didWell[0].quote).toBeNull();
     expect(feedback.unverifiedQuotesRemoved).toBe(1);
     const user = (t.calls[0]!.messages as { content: string }[])[0]!.content;
     expect(typeof user).toBe("string");
@@ -115,14 +117,15 @@ describe("POST /api/camera-feedback (live)", () => {
 });
 
 describe("POST /api/camera-feedback (demo)", () => {
-  it("returns clearly illustrative feedback with no camera notes", async () => {
+  it("returns automatic checks, clearly labelled, with no camera notes", async () => {
     const { post } = buildTestApp();
-    const r = await post("/api/camera-feedback", body());
+    const r = await post("/api/camera-feedback", body({ response: { text: "So yeah, um, today I went to the market and it was really nice. So yeah.", transcriptSource: "browser-speech", transcriptEdited: false, durationSeconds: 20 } }));
     expect(r.status).toBe(200);
     const { feedback } = await r.json();
     expect(feedback.kind).toBe("illustrative");
     expect(feedback.camera).toBeNull();
-    expect(feedback.hook).toBeNull();
-    expect(feedback.explanation).toContain("Your hook is in sentence three");
+    expect(feedback.summary.source).toBe("checks");
+    expect(feedback.summary.toFix.map((x: { part: string }) => x.part)).toEqual(["beginning", "delivery"]);
+    expect(feedback.summary.nextTime).toBe("Start with your answer to the first question.");
   });
 });

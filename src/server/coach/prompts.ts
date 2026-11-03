@@ -131,10 +131,11 @@ What makes talking-to-camera work, in order of importance for a viewer on a phon
 6. Pause instead of filler; keep going after a stumble rather than restarting.
 
 Rules:
-- Evaluate against the drill's definition of success only. One strength, one priority, both tied to what a viewer experiences. Specific beats general: say where in the take something happens.
+- Write for someone who just recorded themselves and is nervous. Plain words, short sentences, no jargon (no "throughline", "hook pattern", "register").
+- The speaker was asked three questions, in order: the first opens the video, the second is the body, the third ends it. Judge the take as beginning, middle and end against those questions and the definition of success.
+- "keyPoints": what they said, neutrally, so they can see their own message. "didWell": 1–2 real strengths. "toFix": at most 2 things, most important first, each with one concrete fix. "nextTime": the one thing to do on the next take. Tag each item with the part of the video it is about.
+- Specific beats general: say where in the take something happens.
 - Quotes must be copied exactly from <learner_response>; they are verified and unverifiable quotes are discarded. Keep them under 15 words.
-- Judge the take as beginning, middle and end: the opening (hook and what this is), the body (one thing, told with specifics), and the ending (a takeaway or a question for the viewer, not a trailing "so yeah"). The "ending" field is about the closing words.
-- The "hook" field is about the opening words as a viewer hears them. If you offer a rewrite, keep the speaker's register and use only material from their take; one sentence; no hype.
 - Transcripts come from speech recognition and may drop fillers and mishear words; don't treat likely recognition errors as the speaker's mistake. You cannot hear tone, pace or volume: never comment on them.
 - Still frames: comment only on what is visible: framing (headroom, eye level, how much of the frame the face fills), eye line (lens vs. screen vs. away), lighting (face lit or in shadow, backlight), background (clutter, distance from the wall), expression (neutral, engaged, animated) and stability (blur, tilt). Give one practical fix each. Never comment on appearance, attractiveness, weight, age, skin, hair, clothing taste, or anything about the person's body; never guess at identity, ethnicity, gender or health. If a frame shows no person or is unreadable, say so in one observation and move on.
 - Never give scores or percentages, and never judge talent or whether someone "has what it takes".
@@ -153,6 +154,7 @@ export function cameraUser(p: {
   notes: string;
   throughline: string;
   hookPattern: string;
+  questions: string[];
   response: string;
   durationSeconds: number | null;
   transcriptSource: string;
@@ -167,6 +169,7 @@ Task given to the speaker: ${data(p.taskPrompt)}
 </talk_setup>`);
   lines.push(`Definition of success: ${p.exercise.successDefinition}`);
   lines.push(`What good looks like: ${p.drill.goodLooksLike.join(" ")}`);
+  if (p.questions.length) lines.push(`<talk_setup>\nQuestions the speaker was asked to answer, in order (beginning, middle, end):\n${p.questions.map((q, i) => `${i + 1}. ${data(q)}`).join("\n")}\n</talk_setup>`);
   lines.push(`Example of useful feedback (style reference only, about a different take): ${p.exercise.exampleFeedback}`);
   lines.push(`Transcript source: ${p.transcriptSource === "typed-by-user" ? "typed by the speaker after recording" : p.transcriptSource === "browser-speech" ? "browser speech recognition (fillers usually removed)" : "transcription service"}${p.transcriptEdited ? ", corrected by the speaker" : ""}.`);
   if (p.durationSeconds != null) lines.push(`Recording length: ${Math.round(p.durationSeconds)} seconds.`);

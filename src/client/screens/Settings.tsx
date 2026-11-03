@@ -5,6 +5,7 @@ import { exportJson } from "../lib/storage";
 import { localDayKey } from "../../shared/dates";
 import { PreferencesForm } from "./Onboarding";
 import { CrisisList } from "../components/Crisis";
+import { isAppleWebKit } from "../lib/useSpeechCapture";
 
 export function Settings() {
   const { data, update, deleteAll, status, refreshStatus } = useApp();
@@ -31,6 +32,12 @@ export function Settings() {
           <input type="checkbox" checked={!!data.prefs.quietMode} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, quietMode: e.target.checked } }))} />
           Quiet mode: hide timers and numbers while I practice
         </label>
+        {isAppleWebKit() && status?.transcription !== "deepgram" && (
+          <label className="option">
+            <input type="checkbox" checked={!!data.prefs.liveTranscriptNoSound} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, liveTranscriptNoSound: e.target.checked } }))} />
+            Live transcript instead of sound (iPhone can't do both)
+          </label>
+        )}
       </section>
 
       <section aria-labelledby="mode-h">

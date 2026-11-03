@@ -35,6 +35,8 @@ export interface Preferences {
   niches?: string[];
   /** Takes per week the learner is aiming for. */
   weeklyTakes?: 3 | 5 | 7;
+  /** iPhone/Safari without a transcription service: transcribe live and record without sound. Off by default (takes have sound). */
+  liveTranscriptNoSound?: boolean;
 }
 
 // ---------- Content ----------
@@ -179,6 +181,19 @@ export interface QuotedObservation {
   quote: string | null;
 }
 
+export type TakePart = "beginning" | "middle" | "end" | "delivery" | "camera";
+
+export interface TakeSummary {
+  /** What the learner said, as 2–3 short points. */
+  keyPoints: string[];
+  didWell: { part: TakePart; text: string; quote: string | null }[];
+  toFix: { part: TakePart; text: string; quote: string | null; fix: string }[];
+  /** One concrete thing to do on the next take. */
+  nextTime: string | null;
+  /** "ai" when the coach read the take; "checks" when it came from automatic checks on this device or server. */
+  source: "ai" | "checks";
+}
+
 /** What the coach can see in a still frame from a camera recording. */
 export type CameraAspect = "framing" | "eye-line" | "lighting" | "background" | "expression" | "stability";
 
@@ -195,6 +210,8 @@ export interface Feedback {
   hook?: { observation: string; quote: string | null; rewrite: string | null } | null;
   /** Camera drills: did the take end on a takeaway or a question, or trail off? */
   ending?: { observation: string; quote: string | null } | null;
+  /** Camera takes: the plain four-part summary shown to the learner. */
+  summary?: TakeSummary | null;
   /** Camera drills: what the coach saw in a few still frames. Null when no frames were sent. */
   camera?: CameraNotes | null;
   /** Camera drills: the one idea a viewer would take away, in the speaker's words, or null if there isn't one. */
@@ -227,6 +244,8 @@ export interface CameraSetup {
   drillId: string;
   /** Prompt from the vlog bank, if the take came from one. */
   promptId?: string;
+  /** The three questions the learner answered, in order. */
+  questions?: string[];
   /** The one idea the viewer should walk away with, in the speaker's words. */
   throughline?: string;
   hookPattern?: string;

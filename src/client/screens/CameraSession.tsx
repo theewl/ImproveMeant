@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Attempt } from "../../shared/types";
 import { CAMERA_SETUP, getCameraDrill, hookText, improvementSince, measureCameraTake, nextCameraDrill, takeStats } from "../../shared/camera";
-import { AUDIENCE, VIDEO_GUIDE, currentBeat, fillName, fillPromptText, takesThisWeek, todayPrompt, type GuideBeat, type VlogPrompt } from "../../shared/vlog";
+import { AUDIENCE, VIDEO_GUIDE, currentBeat, fillName, fillPromptText, promptQuestions, takesThisWeek, todayPrompt, type GuideBeat, type VlogPrompt } from "../../shared/vlog";
 import { fillPrompt } from "../../shared/curriculum";
 import { formatSeconds } from "../../shared/observations";
 import { wordCount } from "../../shared/text";
@@ -34,6 +34,8 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   const [throughline, setThroughline] = useState("");
   const hookPattern = prompt?.hook ?? "";
   const guide: GuideBeat[] | undefined = prompt ? VIDEO_GUIDE[prompt.kind] : undefined;
+  const [ownTopic, setOwnTopic] = useState<string | null>(null);
+  const questions = prompt ? promptQuestions(ownTopic != null ? undefined : prompt, viewer) : undefined;
   const [checkin, setCheckin] = useState<Checkin | null>(null);
   const [checkinSaved, setCheckinSaved] = useState<string | null>(null);
   const [sendFrames, setSendFrames] = useState(data.cameraFramesConsent);
@@ -71,10 +73,10 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   }, [fromStoryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    s.setSession((x) => ({ ...x, camera: { ...(x.camera ?? { drillId: drill.id }), drillId: drill.id, promptId: prompt?.id, topic, notes, throughline, hookPattern: hookPattern || undefined } }));
-  }, [topic, notes, throughline, hookPattern, drill.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    s.setSession((x) => ({ ...x, camera: { ...(x.camera ?? { drillId: drill.id }), drillId: drill.id, promptId: prompt?.id, topic: prompt ? task : topic, notes, throughline, hookPattern: hookPattern || undefined, questions } }));
+  }, [topic, notes, throughline, hookPattern, drill.id, ownTopic]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const task = prompt ? topic : fillPrompt(drill.prompt, { topic: topic || "your topic" });
+  const task = prompt ? (ownTopic != null ? ownTopic || "Your own topic" : topic) : fillPrompt(drill.prompt, { topic: topic || "your topic" });
   const attempts = s.session.attempts;
   const last = attempts[attempts.length - 1];
   const first = attempts[0];
@@ -114,10 +116,11 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
       const res = await api.cameraFeedback({
         idempotencyKey: attempt.id,
         drillId: drill.id,
-        topic,
+        topic: prompt ? task : topic,
         notes,
         throughline,
         hookPattern,
+        questions: questions ?? [],
         response: { text: attempt.text, transcriptSource: attempt.transcriptSource ?? "typed-by-user", transcriptEdited: attempt.transcriptEdited, durationSeconds: attempt.durationSeconds ?? null },
         frames: sendFrames ? frames : [],
         previous: prev ? { text: prev.text, retryFocus: prev.feedback?.retryFocus ?? null } : null,
@@ -183,6 +186,7 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
             onSubmit={(e) => {
               e.preventDefault();
               if (drill.needsTopic && !topic.trim()) return;
+              if (ownTopic != null && !ownTopic.trim()) return;
               setPhase("record");
             }}
           >
@@ -194,21 +198,49 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
                 <input id="cam-topic" value={topic} maxLength={300} required onChange={(e) => setTopic(e.target.value)} placeholder="e.g. why I stopped using a to-do app" />
               </>
             )}
-            {prompt && guide && (
+            {prompt && questions && (
               <>
-                <p className="label">Who's watching</p>
-                <p className="audience">{fillName(AUDIENCE[prompt.kind], viewer)}</p>
-                <ol className="guide" aria-label="Beginning, middle, end">
-                  {guide.map((g) => (
-                    <li key={g.name} className="guide-beat">
-                      <span className="guide-name">
-                        {g.name} <span className="guide-when">{g.when}</span>
-                      </span>
-                      <span className="guide-do">{fillName(g.do, viewer)}</span>
-                      <span className="guide-example">“{fillName(g.example, viewer)}”</span>
+                {ownTopic != null && (
+                  <>
+                    <label className="label" htmlFor="own-topic">
+                      Your topic
+                    </label>
+                    <input id="own-topic" value={ownTopic} maxLength={200} onChange={(e) => setOwnTopic(e.target.value)} placeholder="e.g. my first week at the gym" />
+                  </>
+                )}
+                <p className="label">Answer these, in order</p>
+                <ol className="guide" aria-label="Three questions: beginning, middle, end">
+                  {questions.map((q, i) => (
+                    <li key={i} className="guide-beat">
+                      <span className="guide-name">{["Beginning", "Middle", "End"][i]}</span>
+                      <span className="guide-do">{q}</span>
                     </li>
                   ))}
                 </ol>
+                <p className="hint">Talking to {viewer || "one person"}, alone on a phone. They stay if your first answer is interesting.</p>
+                <div className="row wrap">
+                  {ownTopic == null ? (
+                    <button className="link" type="button" onClick={() => setOwnTopic("")}>
+                      Talk about something else
+                    </button>
+                  ) : (
+                    <button className="link" type="button" onClick={() => setOwnTopic(null)}>
+                      Back to today's prompt
+                    </button>
+                  )}
+                </div>
+                {guide && ownTopic == null && (
+                  <details className="more">
+                    <summary>See an example</summary>
+                    <ol className="plain">
+                      {guide.map((g) => (
+                        <li key={g.name}>
+                          <strong>{g.name}:</strong> “{fillName(g.example, viewer)}”
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
               </>
             )}
             <BeforeCheckin defaultDrop={data.myHabits?.[0]} onChange={setCheckin} />
@@ -232,7 +264,7 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
                   <label className="label" htmlFor="cam-notes">
                     Three talking points, shown near the lens (optional)
                   </label>
-                  <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={guide ? guide.map((g) => fillName(g.do, viewer)).join("\n") : "Not a script. Three words or short lines."} />
+                  <textarea id="cam-notes" rows={3} maxLength={600} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={questions ? questions.join("\n") : "Not a script. Three words or short lines."} />
                   <label className="label" htmlFor="cam-idea">
                     The one thing to remember (optional)
                   </label>
@@ -263,7 +295,7 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
               {!live && !drill.noReview && <p className="hint">Demo mode: example feedback plus your own measurements. AI feedback on your take needs the server's API key.</p>}
             </details>
             <div className="actions sticky">
-              <button className="primary" type="submit" disabled={drill.needsTopic && !topic.trim()}>
+              <button className="primary" type="submit" disabled={(drill.needsTopic && !topic.trim()) || (ownTopic != null && !ownTopic.trim())}>
                 Open the camera
               </button>
             </div>
@@ -277,6 +309,7 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
           task={task}
           notes={drill.noReview ? "" : notes}
           guide={guide}
+          questions={questions}
           viewer={viewer}
           targetSeconds={drill.seconds}
           noReview={!!drill.noReview}
@@ -307,7 +340,6 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
       {phase === "feedback" && last?.feedback && (
         <section>
           <StepHeader eyebrow={drill.title} title="Your feedback" />
-          <HookLine text={last.text} />
           <FeedbackPanel feedback={last.feedback} attempt={last} onRate={(r, why) => s.rateAttempt(last.id, r, why)} />
           <CameraMeasures attempt={last} />
           <div className="actions sticky">
@@ -409,18 +441,6 @@ export function CameraSession({ drillId, fromStoryId, prompt }: { drillId: strin
   );
 }
 
-/** What a viewer hears first. Shown above the feedback so the learner reads their own opening as a stranger would. */
-function HookLine({ text }: { text: string }) {
-  const h = hookText(text);
-  if (!h) return null;
-  return (
-    <div className="hook-line">
-      <p className="eyebrow">Your first ten seconds, as a viewer hears them</p>
-      <p className="hook-quote">“{h}”</p>
-    </div>
-  );
-}
-
 function CameraMeasures({ attempt }: { attempt: Attempt }) {
   const { data } = useApp();
   if (data.prefs.quietMode) return null;
@@ -455,6 +475,7 @@ interface TakeProps {
   task: string;
   notes: string;
   guide?: GuideBeat[];
+  questions?: string[];
   viewer: string;
   targetSeconds: number;
   noReview: boolean;
@@ -474,14 +495,14 @@ interface TakeProps {
 
 /** Preview → record → watch back → check the transcript → send. */
 function CameraTake(p: TakeProps) {
-  // Apple WebKit can't run speech recognition and an audio recording together: record video only there,
-  // unless a transcription service will transcribe the audio afterwards.
+  // Apple WebKit can't run speech recognition and an audio recording at the same time. Takes always
+  // record sound unless the learner chose "live transcript instead of sound" for this device.
+  const { data } = useApp();
   const apple = isAppleWebKit();
-  const videoOnly = apple && !p.transcriptionAvailable && speechCaptureSupported();
+  const videoOnly = apple && !p.transcriptionAvailable && speechCaptureSupported() && !!data.prefs.liveTranscriptNoSound;
   const r = useVideoRecorder({ videoOnly });
   const speech = useSpeechCapture();
   const concurrentSpeech = speech.supported && (!apple || videoOnly);
-  const { data } = useApp();
   const [transcript, setTranscript] = useState("");
   const [original, setOriginal] = useState<string | null>(null);
   const [source, setSource] = useState<TakeResult["source"]>("typed-by-user");
@@ -519,7 +540,10 @@ function CameraTake(p: TakeProps) {
       setOriginal(t);
       setSource("browser-speech");
       setTxState("done");
+      return;
     }
+    // No browser transcript (e.g. iPhone with sound on): transcribe the recording if the server can and the learner agreed before.
+    if (!concurrentSpeech && p.transcriptionAvailable && p.transcriptionConsent && transcribable) void transcribe();
   }, [r.state, r.recording, speech.text, speech.failed, txState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The recogniser finalises the last sentence a moment after stop: keep the transcript in sync until the learner edits it.
@@ -532,12 +556,13 @@ function CameraTake(p: TakeProps) {
     }
   }, [speech.text, speech.interim]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const transcribable = r.recording ? (r.recording.audio ?? (r.recording.blob.size < 4_000_000 ? r.recording.blob : null)) : null;
   const transcribe = async () => {
-    if (!r.recording?.audio) return;
+    if (!r.recording || !transcribable) return;
     setTxState("working");
     setTxError(null);
     try {
-      const res = await api.transcribe(r.recording.audio, r.recording.seconds, txKey.current);
+      const res = await api.transcribe(transcribable, r.recording.seconds, txKey.current);
       setTranscript(res.transcript);
       setOriginal(res.transcript);
       setSource("provider");
@@ -593,11 +618,11 @@ function CameraTake(p: TakeProps) {
             <p className="cam-notes" aria-label="Your talking points">
               {p.notes}
             </p>
-          ) : p.guide ? (
-            <ol className="cam-notes cam-beats" aria-label="Beginning, middle, end">
-              {p.guide.map((g, i) => (
-                <li key={g.name} className={r.state === "recording" && currentBeat(r.elapsed, p.targetSeconds) === i ? "on" : ""}>
-                  <strong>{g.name}:</strong> {fillName(g.do, p.viewer)}
+          ) : p.questions ? (
+            <ol className="cam-notes cam-beats" aria-label="Your three questions">
+              {p.questions.map((q, i) => (
+                <li key={i} className={r.state === "recording" && currentBeat(r.elapsed, p.targetSeconds) === i ? "on" : ""}>
+                  <strong>{i + 1}.</strong> {q}
                 </li>
               ))}
             </ol>
@@ -607,7 +632,7 @@ function CameraTake(p: TakeProps) {
               <span className="dot pulse" aria-hidden="true" /> {formatSeconds(r.elapsed)} / {formatSeconds(p.targetSeconds)}
             </p>
           )}
-          {inHook && !p.guide && <p className="cam-hook">Hook window: give them a reason to stay</p>}
+          {inHook && !p.questions && <p className="cam-hook">Hook window: give them a reason to stay</p>}
           {overTarget && <p className="cam-hook">Target reached. Finish your thought.</p>}
         </div>
         {r.state === "ready" && <p className="cam-task">{p.task}</p>}
@@ -731,9 +756,9 @@ function CameraTake(p: TakeProps) {
             {concurrentSpeech && !speech.failed && txState === "none" ? "Your browser didn't catch enough words to make a transcript. " : concurrentSpeech && speech.failed ? "Your browser's speech recognition didn't work this time. " : ""}
             Feedback needs your words.
           </p>
-          {p.transcriptionAvailable && rec.audio && txState !== "working" && (
+          {p.transcriptionAvailable && transcribable && txState !== "working" && (
             <>
-              {!p.transcriptionConsent && <p className="hint">Transcribing sends only the audio to Deepgram, which is asked not to keep it.</p>}
+              {!p.transcriptionConsent && <p className="hint">Sends the audio to Deepgram for a transcript. It's asked not to keep it.</p>}
               <button
                 className="primary"
                 type="button"
@@ -742,10 +767,11 @@ function CameraTake(p: TakeProps) {
                   void transcribe();
                 }}
               >
-                Transcribe the audio
+                Transcribe it
               </button>
             </>
           )}
+          {!p.transcriptionAvailable && apple && !videoOnly && <p className="hint">On iPhone, type it below, or switch on live transcript in Settings (playback is then silent).</p>}
           {txState === "working" && <p className="hint">Transcribing…</p>}
           {txState === "error" && txError && (
             <p className="error-text" role="alert">
@@ -753,7 +779,7 @@ function CameraTake(p: TakeProps) {
             </p>
           )}
           <button
-            className={p.transcriptionAvailable && rec.audio ? "secondary" : "primary"}
+            className={p.transcriptionAvailable && transcribable ? "secondary" : "primary"}
             type="button"
             onClick={() => {
               setSource("typed-by-user");

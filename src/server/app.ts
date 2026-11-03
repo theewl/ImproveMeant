@@ -240,6 +240,7 @@ export function createApp(deps: AppDeps): Hono {
     notes: z.string().max(600).default(""),
     throughline: z.string().max(300).default(""),
     hookPattern: z.enum(["", ...HOOK_PATTERNS.map((h) => h.id)] as [string, ...string[]]).default(""),
+    questions: z.array(z.string().max(200)).max(3).default([]),
     response: z.object({
       text: z.string(),
       transcriptSource: z.enum(["provider", "browser-speech", "typed-by-user"]),
@@ -271,6 +272,7 @@ export function createApp(deps: AppDeps): Hono {
         notes: req.notes,
         throughline: req.throughline,
         hookPattern: req.hookPattern,
+        questions: req.questions,
         response: text,
         durationSeconds: req.response.durationSeconds,
         transcriptSource: req.response.transcriptSource,
@@ -318,7 +320,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!Number.isFinite(seconds) || seconds <= 0) throw new AppError("bad_request", "Missing or invalid recording length.", 400);
     if (seconds > 600) throw new AppError("too_large", "Recordings over 10 minutes can't be transcribed. Type what you said instead.", 413);
     const contentType = (c.req.header("content-type") ?? "").split(";")[0]!.trim();
-    if (!/^audio\/[a-z0-9.+-]+$/i.test(contentType)) throw new AppError("bad_request", "Unsupported audio type.", 415);
+    if (!/^(audio|video)\/[a-z0-9.+-]+$/i.test(contentType)) throw new AppError("bad_request", "Unsupported audio type.", 415);
     const key = c.req.header("idempotency-key") ?? "";
     if (key.length < 8) throw new AppError("bad_request", "Missing idempotency key.", 400);
     const buf = new Uint8Array(await c.req.arrayBuffer());

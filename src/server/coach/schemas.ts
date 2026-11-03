@@ -58,38 +58,32 @@ export const FeedbackOutput = z.object({
 });
 export type FeedbackOutput = z.infer<typeof FeedbackOutput>;
 
+const Part = z.enum(["beginning", "middle", "end", "delivery"]);
+
 export const CameraFeedbackOutput = z.object({
-  goalMet: z.boolean().describe("Did the take meet the drill's definition of success?"),
-  offTopic: z.boolean().describe("True if the transcript is empty of substance or unrelated to the drill."),
-  strength: z
-    .object({
-      observation: z.string().describe("One specific thing that worked for a viewer, tied to the drill."),
-      quote: z.string().describe("Exact words copied from the transcript that show it."),
-    })
-    .nullable(),
-  priority: z
-    .object({
-      observation: z.string().describe("The single most useful change for this drill."),
-      quote: z.string().describe("Exact words from the transcript it refers to; empty string if it concerns something missing."),
-      suggestion: z.string().describe("A concrete, short suggestion in the speaker's own voice."),
-    })
-    .nullable()
-    .describe("Null when the goal is met and nothing important would help. Never invent a weakness."),
-  hook: z
-    .object({
-      observation: z.string().describe("Would a viewer keep watching after the first ten seconds? Why?"),
-      quote: z.string().describe("The exact opening words (first sentence or two) from the transcript."),
-      rewrite: z.string().nullable().describe("If the opening could be stronger: a one-sentence opening in the speaker's words and register, using only material from their take. Null if the opening already works."),
-    })
-    .nullable()
-    .describe("Null only for drills where the opening is irrelevant."),
-  ending: z
-    .object({
-      observation: z.string().describe("Did the take end on a takeaway or a question for the viewer, or trail off ('so yeah')? One sentence."),
-      quote: z.string().describe("The exact closing words (last sentence) from the transcript."),
-    })
-    .nullable()
-    .describe("Null only when the transcript is too short to have an ending."),
+  goalMet: z.boolean().describe("Did the take answer the three questions with something real?"),
+  offTopic: z.boolean().describe("True if the transcript is empty of substance or unrelated to the task."),
+  keyPoints: z.array(z.string()).describe("2 or 3 short points summarising what the speaker actually said, in their own words where possible. Under 15 words each. No judgement."),
+  didWell: z
+    .array(
+      z.object({
+        part: Part,
+        text: z.string().describe("One plain sentence: what worked for a viewer."),
+        quote: z.string().describe("Exact words from the transcript that show it, or empty string."),
+      }),
+    )
+    .describe("1 or 2 items. Always at least one genuine strength when the take is on topic."),
+  toFix: z
+    .array(
+      z.object({
+        part: Part,
+        text: z.string().describe("One plain sentence: what got in the viewer's way."),
+        quote: z.string().describe("Exact words from the transcript it refers to, or empty string."),
+        fix: z.string().describe("One concrete instruction for the next take, in plain words. Under 20 words."),
+      }),
+    )
+    .describe("0 to 2 items, most important first. Empty if nothing important. Never invent a weakness."),
+  nextTime: z.string().nullable().describe("The single most useful thing to do on the next take, as an instruction. Under 20 words. Null only if off topic."),
   camera: z
     .object({
       observations: z
@@ -104,12 +98,6 @@ export const CameraFeedbackOutput = z.object({
     })
     .nullable()
     .describe("Null when no stills were supplied."),
-  throughline: z
-    .string()
-    .nullable()
-    .describe("The one idea a viewer would walk away with, in one sentence using the speaker's own words; null if the take has no single idea. If the speaker stated a throughline beforehand, say whether the take delivered it."),
-  explanation: z.string().describe("One or two sentences on why the priority matters for someone watching on a phone."),
-  retryFocus: z.string().nullable().describe("One sentence telling the speaker what to try in the next take, or null."),
 });
 export type CameraFeedbackOutput = z.infer<typeof CameraFeedbackOutput>;
 
